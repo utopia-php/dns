@@ -1,6 +1,3 @@
-# dns
-Lite &amp; fast micro PHP DNS server abstraction that is **easy to use**.
-
 # Utopia DNS
 
 [![Build Status](https://travis-ci.org/utopia-php/dns.svg?branch=master)](https://travis-ci.com/utopia-php/dns)
