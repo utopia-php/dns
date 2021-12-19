@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  php8:
+    build:
+      context: .
+      dockerfile: ./Dockerfile-php8
+    networks:
+      - dns
+
+networks:
+  dns:
