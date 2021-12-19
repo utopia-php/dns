@@ -3,8 +3,8 @@ Lite &amp; fast micro PHP DNS server abstraction that is **easy to use**.
 
 # Utopia DNS
 
-[![Build Status](https://travis-ci.org/utopia-php/audit.svg?branch=master)](https://travis-ci.com/utopia-php/audit)
-![Total Downloads](https://img.shields.io/packagist/dt/utopia-php/audit.svg)
+[![Build Status](https://travis-ci.org/utopia-php/dns.svg?branch=master)](https://travis-ci.com/utopia-php/dns)
+![Total Downloads](https://img.shields.io/packagist/dt/utopia-php/dns.svg)
 [![Discord](https://img.shields.io/discord/564160730845151244)](https://appwrite.io/discord)
 
 Utopia DNS is a simple and lite abstraction layer for quickly setting up a DNS server. This library is aiming to be as simple and easy to learn and use. This library is maintained by the Appwrite team.
