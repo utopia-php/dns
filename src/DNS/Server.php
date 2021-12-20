@@ -42,7 +42,7 @@ class Server
    
     public function start()
     {
-        $this->adapter->onPacket(function ($buf)
+        $this->adapter->onPacket(function (string $buf, string $ip, int $port)
         {
             $domain = '';
             $tmp = substr($buf,12);
@@ -61,7 +61,7 @@ class Server
             $queryType = array_search((string)ord($tmp[$i]), $this->types ) ;
            
             $domain = substr($domain, 0, strlen($domain)-1);
-            $ips = $this->resolve($domain, $queryType);
+            $ips = $this->resolve($domain, $queryType, $ip, $port);
     
             $answer = $buf[0].$buf[1].chr(129).chr(128).$buf[4].$buf[5].$buf[4].$buf[5].chr(0).chr(0).chr(0).chr(0);
             $answer .= $tmp;
@@ -79,12 +79,14 @@ class Server
      * 
      * @param string $domain
      * @param string $type
+     * @param string $ip
+     * @param int $port
      * 
      * @return string
      */
-    protected function resolve(string $domain, string $type): string
+    protected function resolve(string $domain, string $type, string $ip, int $port): string
     {
-        return $this->resolver->resolve($domain, $type);
+        return $this->resolver->resolve($domain, $type, $ip, $port);
     }
    
     /**
