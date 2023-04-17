@@ -15,7 +15,7 @@ class Swoole extends Adapter
      * @param string $host
      * @param int $port
      */
-    public function __construct(string $host = '0.0.0.0', int $port = 8053)
+    public function __construct(string $host = '0.0.0.0', int $port = 53)
     {
         $this->host = $host;
         $this->port = $port;
@@ -25,20 +25,21 @@ class Swoole extends Adapter
     /**
      * @param callable $callback
      */
-    public function onPacket(callable $callback) {
+    public function onPacket(callable $callback): void
+    {
         $this->server->on('Packet', function ($server, $data, $clientInfo) use ($callback) {
             $ip = $clientInfo['address'] ?? '';
             $port = $clientInfo['port'] ?? '';
             $answer = call_user_func($callback, $data, $ip, $port);
 
-            $server->sendto($ip , $port , $answer);
+            $server->sendto($ip, $port, $answer);
         });
     }
 
     /**
      * Start the DNS server
      */
-    public function start()
+    public function start(): void
     {
         $this->server->start();
     }
