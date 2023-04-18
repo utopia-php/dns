@@ -79,6 +79,4 @@ COPY ./phpunit.xml /usr/src/code/phpunit.xml
 COPY ./phpstan.neon /usr/src/code/phpstan.neon
 COPY ./pint.json /usr/src/code/pint.json
 
-RUN chmod +x /usr/src/code/tests/DNS/Server.php
-
 CMD [ "tail", "-f", "/dev/null" ]

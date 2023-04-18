@@ -7,10 +7,8 @@ abstract class Resolver
     /**
      * Resolve DNS Record
      *
-     * @param string $domain
-     * @param string $type
-     * @param string $ip
-     * @param int $port
+     * @param array<string, string> $question
+     * @return string
      */
-    abstract public function resolve(string $domain, string $type, string $ip, int $port): string;
+    abstract public function resolve(array $question): string;
 }

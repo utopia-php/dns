@@ -11,10 +11,6 @@ class Swoole extends Adapter
     protected string $host;
     protected int $port;
 
-    /**
-     * @param string $host
-     * @param int $port
-     */
     public function __construct(string $host = '0.0.0.0', int $port = 53)
     {
         $this->host = $host;
