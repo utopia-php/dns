@@ -4,7 +4,7 @@ namespace Utopia\DNS;
 
 /**
  * Refference about DNS packet:
- * 
+ *
  * HEADER
  * > 16 bits identificationField (1-65535. 0 means no ID). ID provided by client. Helps to match async responses. Usage may allow DNS Cache Poisoning
  * > 16 bits flagsField (0-65535). Flags contains:
@@ -20,25 +20,25 @@ namespace Utopia\DNS;
  * > 16 bits numberOfAnswers (0-65535)
  * > 16 bits numberOfAuthorities (0-65535)
  * > 16 bits numberOfAdditionals (0-65535)
- * 
+ *
  * QUESTIONS SECTION
  * > Each question contians:
  * > -- dynamic-length name. Includes domain name we are looking for. Split into labels. To get domain, join labels with dot symbol.
  * > -- -- Following pattern repeats:
  * > -- -- -- 8 bits labelLength (0-255). Defines length of label. We use it in next step
- * > -- -- -- X bits label. X length is labelLength. 
+ * > -- -- -- X bits label. X length is labelLength.
  * > -- -- When labelLength and label are both 0, it's end of name.
  * > -- 16 bits type (0-65535). Tells what type of record we are asking for, like A, AAAA, or CNAME
  * > -- 16 bits class (0-65535). Usually always 1, meaning internet class
  * > This pattern repeats, as there can be multiple questions. Not sure what the separator is
- * 
+ *
  * ANSWERS SECTION
  * > Follows same pattern as questions section.
  * > Each answer also has (at the end):
  * > -- 32 bits ttl. Time to live of the naswer
  * > -- 16 bit length. Length of the answer data.
  * > -- X bits data X length is length from above. Gives answer itself. Structure changes based on type.
- * 
+ *
  * AUTHORITIES SECTION
  * ADDITIONALS SECTION
  */
@@ -88,7 +88,7 @@ class Server
             $unpacked = \unpack('ntype/nclass', \substr($buffer, $offset, 4));
             $offset += 4;
             $typeByte = $unpacked['type'] ?? 0;
-            $classByte = $unpacked['cass'] ?? 0;
+            $classByte = $unpacked['class'] ?? 0;
 
             $type = match ($typeByte) {
                 1 => 'A',
@@ -97,7 +97,9 @@ class Server
                 16 => 'TXT',
                 28 => 'AAAA',
                 33 => 'SRV',
-                257 => 'CAA'
+                257 => 'CAA',
+                2 => 'NS',
+                default => 'A'
             };
 
             $question = [
@@ -105,7 +107,7 @@ class Server
                 'type' => $type
             ];
 
-            $answer = $this->resolve($question);
+            $answers = $this->resolve($question);
 
             // Build response
             $response = '';
@@ -116,7 +118,7 @@ class Server
             // Add rest of header
             $response .= \pack(
                 'nnn',
-                1, // numberOfAnswers
+                \count($answers), // numberOfAnswers
                 0, // numberOfAuthorities
                 0, // numberOfAdditionals
             );
@@ -124,11 +126,27 @@ class Server
             // Copy questions section
             $response .= \substr($buffer, 12, $offset - 12);
 
-            // Add answer
-            $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question
-            $response .= \pack('nnN', $typeByte, $classByte, 60); // TODO: 60 configurable from answer
-            $response .= \chr(0) . \chr(4); // TODO: Configurable from answer
-            $response .= $this->encode($answer); // TODO: Configurable from answer
+            // Add answers section
+            foreach ($answers as $answer) {
+                $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
+                $response .= \pack('nn', $typeByte, $classByte);
+
+                $answer['value'] = $answer['value'] ?? '';
+                $answer['ttl'] = $answer['ttl'] ?? 1800;
+
+                $response .= match ($question['type']) {
+                    'A' => $this->encodeIp($answer['value'], $answer['ttl']),
+                    'AAAA' => $this->encodeIpv6($answer['value'], $answer['ttl']),
+                    'CNAME' => $this->encodeDomain($answer['value'], $answer['ttl']),
+                    'NS' => $this->encodeDomain($answer['value'], $answer['ttl']),
+                    'TXT' => $this->encodeText($answer['value'], $answer['ttl']),
+                    'CCA' => $this->encodeText($answer['value'], $answer['ttl']),
+                    'CCA' => $this->encodeText($answer['value'], $answer['ttl']),
+                    'MX' => $this->encodeMx($answer['value'], $answer['ttl'], $answer['priority']),
+                    // TODO: SRV
+                    default => ''
+                };
+            }
 
             return $response;
         });
@@ -138,22 +156,81 @@ class Server
 
     /**
      * Resolve domain name to IP by record type
-     * 
+     *
      * @param array<string, string> $question
-     * @return string
+     * @return array<array<string, mixed>>
      */
-    protected function resolve(array $question): string
+    protected function resolve(array $question): array
     {
         return $this->resolver->resolve($question);
     }
 
-    protected function encode(string $string): string
+    protected function encodeIp(string $ip, int $ttl): string
+    {
+        $result = \pack('N', $ttl) . \pack('n', 4);
+
+        foreach (\explode('.', $ip) as $label) {
+            $result .= \chr((int) $label);
+        }
+
+        return $result;
+    }
+
+    protected function encodeIpv6(string $ip, int $ttl): string
+    {
+        $result = \pack('N', $ttl) . \pack('n', 16);
+
+        foreach (\explode(':', $ip) as $label) {
+            $result .= \pack('n', \hexdec($label));
+        }
+
+        return $result;
+    }
+
+    protected function encodeDomain(string $domain, int $ttl): string
     {
         $result = '';
+        $totalLength = 0;
 
-        foreach (\explode('.', $string) as $part) {
-            $result .= \chr((int)$part);
+        foreach (\explode('.', $domain) as $label) {
+            $labelLength = \strlen($label);
+            $result .= \chr($labelLength);
+            $result .= $label;
+            $totalLength += 1 + $labelLength;
         }
+
+        $result .= \chr(0);
+        $totalLength += 1;
+
+        $result = \pack('N', $ttl) . \pack('n', $totalLength) . $result;
+
+        return $result;
+    }
+
+    protected function encodeText(string $text, int $ttl): string
+    {
+        $textLength = \strlen($text);
+        $result = \pack('N', $ttl) . \pack('n', 1 + $textLength) . \chr($textLength) . $text;
+
+        return $result;
+    }
+
+    protected function encodeMx(string $domain, int $ttl, int $priority): string
+    {
+        $result = \pack('n', $priority);
+        $totalLength = 2;
+
+        foreach (\explode('.', $domain) as $label) {
+            $labelLength = \strlen($label);
+            $result .= \chr($labelLength);
+            $result .= $label;
+            $totalLength += 1 + $labelLength;
+        }
+
+        $result .= \chr(0);
+        $totalLength += 1;
+
+        $result = \pack('N', $ttl) . \pack('n', $totalLength) . $result;
 
         return $result;
     }

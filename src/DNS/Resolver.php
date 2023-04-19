@@ -8,7 +8,7 @@ abstract class Resolver
      * Resolve DNS Record
      *
      * @param array<string, string> $question
-     * @return string
+     * @return array<array<string, mixed>>
      */
-    abstract public function resolve(array $question): string;
+    abstract public function resolve(array $question): array;
 }
