@@ -143,7 +143,7 @@ class Server
                     'CCA' => $this->encodeText($answer['value'], $answer['ttl']),
                     'CCA' => $this->encodeText($answer['value'], $answer['ttl']),
                     'MX' => $this->encodeMx($answer['value'], $answer['ttl'], $answer['priority']),
-                    // TODO: SRV
+                    'SRV' => $this->encodeSrv($answer['value'], $answer['ttl'], $answer['priority'], $answer['weight'], $answer['port']),
                     default => ''
                 };
             }
@@ -167,7 +167,7 @@ class Server
 
     protected function encodeIp(string $ip, int $ttl): string
     {
-        $result = \pack('N', $ttl) . \pack('n', 4);
+        $result = \pack('Nn', $ttl, 4);
 
         foreach (\explode('.', $ip) as $label) {
             $result .= \chr((int) $label);
@@ -178,7 +178,7 @@ class Server
 
     protected function encodeIpv6(string $ip, int $ttl): string
     {
-        $result = \pack('N', $ttl) . \pack('n', 16);
+        $result = \pack('Nn', $ttl, 16);
 
         foreach (\explode(':', $ip) as $label) {
             $result .= \pack('n', \hexdec($label));
@@ -202,7 +202,7 @@ class Server
         $result .= \chr(0);
         $totalLength += 1;
 
-        $result = \pack('N', $ttl) . \pack('n', $totalLength) . $result;
+        $result = \pack('Nn', $ttl, $totalLength) . $result;
 
         return $result;
     }
@@ -210,7 +210,7 @@ class Server
     protected function encodeText(string $text, int $ttl): string
     {
         $textLength = \strlen($text);
-        $result = \pack('N', $ttl) . \pack('n', 1 + $textLength) . \chr($textLength) . $text;
+        $result = \pack('Nn', $ttl, 1 + $textLength) . \chr($textLength) . $text;
 
         return $result;
     }
@@ -230,7 +230,27 @@ class Server
         $result .= \chr(0);
         $totalLength += 1;
 
-        $result = \pack('N', $ttl) . \pack('n', $totalLength) . $result;
+        $result = \pack('Nn', $ttl, $totalLength) . $result;
+
+        return $result;
+    }
+
+    protected function encodeSrv(string $domain, int $ttl, int $priority, int $weight, int $port): string
+    {
+        $result = \pack('nnn', $priority, $weight, $port);
+        $totalLength = 6;
+
+        foreach (\explode('.', $domain) as $label) {
+            $labelLength = \strlen($label);
+            $result .= \chr($labelLength);
+            $result .= $label;
+            $totalLength += 1 + $labelLength;
+        }
+
+        $result .= \chr(0);
+        $totalLength += 1;
+
+        $result = \pack('Nn', $ttl, $totalLength) . $result;
 
         return $result;
     }

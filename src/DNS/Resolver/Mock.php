@@ -51,7 +51,7 @@ class Mock extends Resolver
                     'ttl' => 1800,
                     'priority' => 10,
                     'weight' => 5,
-                    'port' => 5223
+                    'port' => 25565
                 ]
             ];
         } elseif ($type === 'MX') {
