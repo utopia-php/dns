@@ -19,8 +19,8 @@ class Mock extends Resolver
         if ($type === 'A') {
             return [
                 [
-                    'value' => '127.0.0.1',
-                    'ttl' => 60
+                    'value' => '180.12.3.24',
+                    'ttl' => 600
                 ]
             ];
         } elseif ($type === 'AAAA') {
