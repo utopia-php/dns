@@ -134,14 +134,18 @@ class Server
                 $answer['value'] = $answer['value'] ?? '';
                 $answer['ttl'] = $answer['ttl'] ?? 1800;
 
-                $response .= match ($question['type']) {
+                /**
+                 * @var string $type
+                 */
+                $type = $question['type'];
+
+                $response .= match ($type) {
                     'A' => $this->encodeIp($answer['value'], $answer['ttl']),
                     'AAAA' => $this->encodeIpv6($answer['value'], $answer['ttl']),
                     'CNAME' => $this->encodeDomain($answer['value'], $answer['ttl']),
                     'NS' => $this->encodeDomain($answer['value'], $answer['ttl']),
                     'TXT' => $this->encodeText($answer['value'], $answer['ttl']),
-                    'CCA' => $this->encodeText($answer['value'], $answer['ttl']),
-                    'CCA' => $this->encodeText($answer['value'], $answer['ttl']),
+                    'CAA' => $this->encodeText($answer['value'], $answer['ttl']),
                     'MX' => $this->encodeMx($answer['value'], $answer['ttl'], $answer['priority']),
                     'SRV' => $this->encodeSrv($answer['value'], $answer['ttl'], $answer['priority'], $answer['weight'], $answer['port']),
                     default => ''

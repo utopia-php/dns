@@ -9,7 +9,8 @@
         "lint": "./vendor/bin/pint --test --config pint.json",
         "format": "./vendor/bin/pint --config pint.json",
         "check": "./vendor/bin/phpstan analyse --level 8 -c phpstan.neon src tests",
-        "test": "./vendor/bin/phpunit --configuration phpunit.xml"
+        "test": "./vendor/bin/phpunit --configuration phpunit.xml",
+        "coverage": "./vendor/bin/coverage-check ./tmp/clover.xml 90"
     },
     "authors": [
         {
@@ -27,6 +28,7 @@
         "swoole/ide-helper": "4.6.6",
         "phpunit/phpunit": "^9.3",
         "laravel/pint": "1.2.*",
-        "phpstan/phpstan": "1.8.*"
+        "phpstan/phpstan": "1.8.*",
+        "rregeer/phpunit-coverage-check": "^0.3.1"
     }
 }

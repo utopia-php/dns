@@ -4,106 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4c8e6f764a7c8dff21ac3ad892a39020",
-    "packages": [
-        {
-            "name": "utopia-php/cli",
-            "version": "0.11.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/utopia-php/cli.git",
-                "reference": "c7a6908a8dbe9234b8b2c954e5487d34cb079af6"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/cli/zipball/c7a6908a8dbe9234b8b2c954e5487d34cb079af6",
-                "reference": "c7a6908a8dbe9234b8b2c954e5487d34cb079af6",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.4",
-                "utopia-php/framework": "0.*.*"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^9.3",
-                "vimeo/psalm": "4.0.1"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Utopia\\CLI\\": "src/CLI"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Eldad Fux",
-                    "email": "eldad@appwrite.io"
-                }
-            ],
-            "description": "A simple CLI library to manage command line applications",
-            "keywords": [
-                "cli",
-                "command line",
-                "framework",
-                "php",
-                "upf",
-                "utopia"
-            ],
-            "support": {
-                "issues": "https://github.com/utopia-php/cli/issues",
-                "source": "https://github.com/utopia-php/cli/tree/0.11.0"
-            },
-            "time": "2021-04-16T15:16:08+00:00"
-        },
-        {
-            "name": "utopia-php/framework",
-            "version": "0.28.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/utopia-php/framework.git",
-                "reference": "7f22c556fc5991e54e5811a68fb39809b21bda55"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/framework/zipball/7f22c556fc5991e54e5811a68fb39809b21bda55",
-                "reference": "7f22c556fc5991e54e5811a68fb39809b21bda55",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.0.0"
-            },
-            "require-dev": {
-                "laravel/pint": "^1.2",
-                "phpunit/phpunit": "^9.5.25",
-                "vimeo/psalm": "4.27.0"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Utopia\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "description": "A simple, light and advanced PHP framework",
-            "keywords": [
-                "framework",
-                "php",
-                "upf"
-            ],
-            "support": {
-                "issues": "https://github.com/utopia-php/framework/issues",
-                "source": "https://github.com/utopia-php/framework/tree/0.28.1"
-            },
-            "time": "2023-03-02T08:16:01+00:00"
-        }
-    ],
+    "content-hash": "bad488f2a63a96fb3e8e65add8c0c654",
+    "packages": [],
     "packages-dev": [
         {
             "name": "doctrine/instantiator",
@@ -946,6 +848,52 @@
                 }
             ],
             "time": "2023-04-14T08:58:40+00:00"
+        },
+        {
+            "name": "rregeer/phpunit-coverage-check",
+            "version": "0.3.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/richardregeer/phpunit-coverage-check.git",
+                "reference": "9618fa74477fbc448c1b0599bef5153d170094bd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/richardregeer/phpunit-coverage-check/zipball/9618fa74477fbc448c1b0599bef5153d170094bd",
+                "reference": "9618fa74477fbc448c1b0599bef5153d170094bd",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.0.0"
+            },
+            "bin": [
+                "bin/coverage-check"
+            ],
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Richard Regeer",
+                    "email": "rich2309@gmail.com"
+                }
+            ],
+            "description": "Check the code coverage using the clover report of phpunit",
+            "keywords": [
+                "ci",
+                "code coverage",
+                "php",
+                "phpunit",
+                "testing",
+                "unittest"
+            ],
+            "support": {
+                "issues": "https://github.com/richardregeer/phpunit-coverage-check/issues",
+                "source": "https://github.com/richardregeer/phpunit-coverage-check/tree/0.3.1"
+            },
+            "time": "2019-10-14T07:04:13+00:00"
         },
         {
             "name": "sebastian/cli-parser",
