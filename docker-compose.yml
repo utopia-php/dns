@@ -11,6 +11,8 @@ services:
       - ./src:/usr/src/code/src
       - ./tests:/usr/src/code/tests
       - ./phpunit.xml:/usr/src/code/phpunit.xml
+    dns:
+      - 127.0.0.1
     networks:
       - dns
     ports:
