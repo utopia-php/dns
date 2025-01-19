@@ -24,7 +24,7 @@ final class ZoneTest extends TestCase
         $this->assertEmpty($validateErrors, 'Example.com zone file should have no validation errors.');
         $this->assertGreaterThan(0, count($records), 'Example.com zone file should import at least one record.');
     }
-    
+
     public function testRedHatZoneFile(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/zone-valid-redhat.txt');
@@ -117,9 +117,9 @@ TXT;
         // If you want a test for "non-numeric TTL," the code must interpret the second token as TTL
         // That means you'd keep the logic: if second token != numeric && != "IN", => TTL error
         // But you'd skip re-checking class in that scenario.
-        
+
         // OR you remove this test if it contradicts real BIND logic.
-        
+
         $this->assertNotEmpty($errors);
         // Update the assertion to match your actual parser’s logic:
         $this->assertStringContainsString("Unsupported class 'bogus'", $errors[0]);

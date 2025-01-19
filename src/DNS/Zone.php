@@ -272,7 +272,7 @@ final class Zone
 
     /**
      * Merge physical lines into "logical" lines by handling parentheses.
-     * For each physical line, we remove trailing comments, then merge lines if 
+     * For each physical line, we remove trailing comments, then merge lines if
      * the record is multi‑line.
      *
      * If a closing ')' is found and there is trailing text, that trailing text is split
@@ -326,7 +326,7 @@ final class Zone
         if (trim($accum) !== '') {
             $logicalLines[] = trim($accum);
         }
-        return array_filter($logicalLines, function($line) {
+        return array_filter($logicalLines, function ($line) {
             return $line !== '';
         });
     }
@@ -392,9 +392,15 @@ final class Zone
     protected function isLikelyOwner(string $token): bool
     {
         $t = strtoupper($token);
-        if ($t === 'IN') return false;
-        if (ctype_digit($t)) return false;
-        if (strpos($t, '$') === 0) return false;
+        if ($t === 'IN') {
+            return false;
+        }
+        if (ctype_digit($t)) {
+            return false;
+        }
+        if (strpos($t, '$') === 0) {
+            return false;
+        }
         return true;
     }
 
