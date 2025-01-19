@@ -10,7 +10,7 @@ class DNSClientTest extends TestCase
      * @var array<string, mixed> $options
      */
     protected array $options = [
-        'nameservers' => array('127.0.0.1')
+        'nameservers' => array('127.0.0.1:5300')
     ];
 
     public function testARecords(): void
