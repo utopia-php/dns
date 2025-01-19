@@ -34,4 +34,4 @@ jobs:
         sleep 10
 
     - name: Run Tests
-      run: docker compose exec -T dns-server vendor/bin/phpunit --configuration phpunit.xml
+      run: docker compose exec -t dns-server vendor/bin/phpunit --configuration phpunit.xml
