@@ -2,7 +2,7 @@
 
 namespace Utopia\DNS;
 
-final class Zone
+class Zone
 {
     protected int $defaultTTL = 3600;
     protected string $defaultOrigin = '';
