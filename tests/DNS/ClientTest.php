@@ -16,7 +16,7 @@ class ClientTest extends TestCase
     protected function setUp(): void
     {
         // Use a custom DNS server (e.g., 127.0.0.1:5300)
-        $this->client = new Client('127.0.0.1', 5300);
+        $this->client = new Client('localhost', 53);
     }
 
     public function testARecords(): void
