@@ -66,7 +66,7 @@ class Client
         $packet = $this->buildDnsQueryPacket($domain, $qtype);
 
         // Create a UDP socket.
-        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        $socket = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$socket) {
             throw new \Exception("Unable to create socket.");
         }

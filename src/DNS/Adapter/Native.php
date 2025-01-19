@@ -22,7 +22,7 @@ class Native extends Adapter
         $this->host = $host;
         $this->port = $port;
 
-        $server = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$server) {
             throw new Exception('Could not start server.');
         }
