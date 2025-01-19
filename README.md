@@ -8,7 +8,7 @@ Utopia DNS is a simple and lite abstraction layer for quickly setting up a DNS s
 
 Although this library is part of the [Utopia Framework](https://github.com/utopia-php/framework) project it is dependency free, and can be used as standalone with any other PHP project or framework.
 
-## Getting Started
+## Getting started
 
 Install using composer:
 ```bash
@@ -36,7 +36,7 @@ $dns = new Server($server, $resolver);
 $dns->start();
 ```
 
-## Using the DNS Client
+## Using the DNS client
 
 Utopia DNS also provides a simple, dependency‑free DNS client that can be used to perform queries against any DNS server. This client is ideal for applications that need to look up records on demand. It supports querying all sorts of DNS records (A, MX, TXT, AAAA, SRV, etc.).
 
@@ -91,8 +91,7 @@ Optional fields (such as priority, weight, and port for MX and SRV records) are 
 
 The query is wrapped in a try‑catch block to handle any exceptions that may occur during the DNS lookup.
 
-
-## Supported DNS Records
+## Supported DNS records
 
 * A
 * NS
@@ -128,21 +127,18 @@ Below is a list of supported server adapters, and their compatibly tested versio
 
 ` ✅  - supported, 🛠  - work in progress`
 
-### Future Possibilities
+### Future possibilities
 
 Currently this library only support DNS over UDP. We could add support for both DNS over TLS and HTTPS. We should also add better support for query flags, and possibly create some more predefined resolvers.
 
-## System Requirements
+## System requirements
 
 Utopia Framework requires PHP 8.0 or later. We recommend using the latest PHP version whenever possible.
 
-## Authors
+## Running tests
 
-**Eldad Fux**
+Run tests for this library using the provided Docker container.
 
-+ [https://twitter.com/eldadfux](https://twitter.com/eldadfux)
-+ [https://github.com/eldadfux](https://github.com/eldadfux)
-
-## Copyright and license
-
-The MIT License (MIT) [http://www.opensource.org/licenses/mit-license.php](http://www.opensource.org/licenses/mit-license.php)
+```sh
+docker compose exec -t dns-server vendor/bin/phpunit --configuration phpunit.xml
+```
