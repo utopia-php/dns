@@ -213,32 +213,32 @@ ZONE;
         $this->assertCount(4, $records);
 
         // 1) SOA
-        $this->assertSame('@', $records[0]->name);
-        $this->assertSame(1800, $records[0]->ttl);
-        $this->assertSame('SOA', strtoupper($records[0]->type));
+        $this->assertSame('@', $records[0]->getName());
+        $this->assertSame(1800, $records[0]->getTTL());
+        $this->assertSame('SOA', strtoupper($records[0]->getTypeName()));
 
         // 2) www
-        $this->assertSame('www.example.com', $records[1]->name);
-        $this->assertSame(1800, $records[1]->ttl); // no explicit TTL => use 1800 from $TTL
-        $this->assertSame('A', strtoupper($records[1]->type));
-        $this->assertSame('192.168.1.10', $records[1]->value);
+        $this->assertSame('www.example.com', $records[1]->getName()); 
+        $this->assertSame(1800, $records[1]->getTTL()); // no explicit TTL => use 1800 from $TTL
+        $this->assertSame('A', strtoupper($records[1]->getTypeName()));
+        $this->assertSame('192.168.1.10', $records[1]->getRdata());
 
         // 3) mail
-        $this->assertSame('mail.example.com', $records[2]->name);
-        $this->assertSame(300, $records[2]->ttl); // explicit TTL
-        $this->assertSame('MX', strtoupper($records[2]->type));
+        $this->assertSame('mail.example.com', $records[2]->getName());
+        $this->assertSame(300, $records[2]->getTTL()); // explicit TTL
+        $this->assertSame('MX', strtoupper($records[2]->getTypeName()));
         // priority=10, exchange="mail"
-        $this->assertSame(10, $records[2]->priority);
-        $this->assertSame('mail', $records[2]->value);
+        $this->assertSame(10, $records[2]->getPriority());
+        $this->assertSame('mail', $records[2]->getRdata());
 
         // 4) SRV
-        $this->assertSame('_sip._tcp.example.com', $records[3]->name);
-        $this->assertSame(600, $records[3]->ttl);
-        $this->assertSame('SRV', strtoupper($records[3]->type));
-        $this->assertSame(5, $records[3]->priority);
-        $this->assertSame(10, $records[3]->weight);
-        $this->assertSame(5060, $records[3]->port);
-        $this->assertSame('sip', $records[3]->value);
+        $this->assertSame('_sip._tcp.example.com', $records[3]->getName());
+        $this->assertSame(600, $records[3]->getTTL());
+        $this->assertSame('SRV', strtoupper($records[3]->getTypeName()));
+        $this->assertSame(5, $records[3]->getPriority());
+        $this->assertSame(10, $records[3]->getWeight());
+        $this->assertSame(5060, $records[3]->getPort());
+        $this->assertSame('sip', $records[3]->getRdata());
     }
 
     public function testImportIgnoresUnknownDirective(): void
@@ -256,7 +256,7 @@ ZONE;
         // If your code wants to produce an error in import, adapt the test or the code accordingly.
         $records = $z->import($domain, $zoneFile);
         $this->assertCount(1, $records, 'One valid record after ignoring unknown directive.');
-        $this->assertSame('www.example.com', $records[0]->name);
+        $this->assertSame('www.example.com', $records[0]->getName());
     }
 
     public function testImportSkipsMalformedLines(): void
@@ -275,8 +275,8 @@ ZONE;
         // Only "@ 3600 IN A 127.0.0.1" is valid
         $records = $z->import($domain, $zoneFile);
         $this->assertCount(1, $records);
-        $this->assertSame('@', $records[0]->name);
-        $this->assertSame('A', strtoupper($records[0]->type));
+        $this->assertSame('@', $records[0]->getName());
+        $this->assertSame('A', strtoupper($records[0]->getTypeName()));
     }
 
     public function testExportBasic(): void
@@ -290,7 +290,7 @@ ZONE;
             new Record('mail.example.com', 300, 'IN', 'MX', 'mail'),
         ];
         // For MX, set priority
-        $records[2]->priority = 10;
+        $records[2]->setPriority(10);
 
         $out = $z->export($domain, $records);
 
@@ -328,13 +328,13 @@ ZONE;
         $this->assertCount(3, $records2, 'Record count should match after round trip.');
 
         // Compare a few fields
-        $this->assertSame($records1[0]->name, $records2[0]->name);
-        $this->assertSame($records1[0]->ttl, $records2[0]->ttl);
-        $this->assertSame($records1[0]->type, $records2[0]->type);
-        $this->assertSame($records1[0]->value, $records2[0]->value);
+        $this->assertSame($records1[0]->getName(), $records2[0]->getName());
+        $this->assertSame($records1[0]->getTTL(), $records2[0]->getTTL());
+        $this->assertSame($records1[0]->getTypeName(), $records2[0]->getTypeName());
+        $this->assertSame($records1[0]->getRdata(), $records2[0]->getRdata());
 
         // And check MX details
-        $this->assertSame($records1[2]->priority, $records2[2]->priority);
-        $this->assertSame($records1[2]->value, $records2[2]->value);
+        $this->assertSame($records1[2]->getPriority(), $records2[2]->getPriority());
+        $this->assertSame($records1[2]->getRdata(), $records2[2]->getRdata());
     }
 }

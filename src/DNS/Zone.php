@@ -227,16 +227,16 @@ class Zone
             if ($type === 'MX') {
                 $mx = $this->tokenize($data);
                 if (count($mx) === 2) {
-                    $rec->priority = (int)$mx[0];
-                    $rec->value = $mx[1];
+                    $rec->setPriority((int)$mx[0]);
+                    $rec->setRdata($mx[1]);
                 }
             } elseif ($type === 'SRV') {
                 $srv = $this->tokenize($data);
                 if (count($srv) === 4) {
-                    $rec->priority = (int)$srv[0];
-                    $rec->weight = (int)$srv[1];
-                    $rec->port = (int)$srv[2];
-                    $rec->value = $srv[3];
+                    $rec->setPriority((int)$srv[0]);
+                    $rec->setWeight((int)$srv[1]);
+                    $rec->setPort((int)$srv[2]);
+                    $rec->setRdata($srv[3]);
                 }
             }
             $records[] = $rec;
@@ -255,16 +255,18 @@ class Zone
     {
         $lines = [];
         foreach ($records as $r) {
-            $owner = $r->name;
-            $ttl = $r->ttl;
-            $class = $r->class;
-            $type = $r->type;
-            $data = $r->value;
-            if ($type === 'MX' && isset($r->priority)) {
-                $data = "{$r->priority} {$r->value}";
-            } elseif ($type === 'SRV' && isset($r->priority, $r->weight, $r->port)) {
-                $data = "{$r->priority} {$r->weight} {$r->port} {$r->value}";
+            $owner = $r->getName();
+            $ttl = $r->getTTL();
+            $class = $r->getClass();
+            $type = $r->getTypeName();
+            $data = $r->getRdata();
+        
+            if ($type === 'MX' && $r->getPriority() !== null) {
+                $data = "{$r->getPriority()} {$r->getRdata()}";
+            } elseif ($type === 'SRV' && $r->getPriority() !== null && $r->getWeight() !== null && $r->getPort() !== null) {
+                $data = "{$r->getPriority()} {$r->getWeight()} {$r->getPort()} {$r->getRdata()}";
             }
+        
             $lines[] = sprintf("%s %d %s %s %s", $owner, $ttl, $class, $type, $data);
         }
         return implode("\n", $lines) . "\n";
@@ -355,8 +357,8 @@ class Zone
 
     /**
      * Tokenize a line by whitespace.
-     * 
-     * @return string[] 
+     *
+     * @return string[]
      */
     protected function tokenize(string $line): array
     {
