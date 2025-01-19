@@ -1,0 +1,99 @@
+;;
+;; Domain:     appwrite.io.
+;; Exported:   2025-01-18 22:59:34
+;;
+;; This file is intended for use for informational and archival
+;; purposes ONLY and MUST be edited before use on a production
+;; DNS server.  In particular, you must:
+;;   -- update the SOA record with the correct authoritative name server
+;;   -- update the SOA record with the contact e-mail address information
+;;   -- update the NS record(s) with the authoritative name servers for this domain.
+;;
+;; For further information, please consult the BIND documentation
+;; located on the following website:
+;;
+;; http://www.isc.org/
+;;
+;; And RFC 1035:
+;;
+;; http://www.ietf.org/rfc/rfc1035.txt
+;;
+;; Please note that we do NOT offer technical support for any use
+;; of this zone data, the BIND name server, or any other third-party
+;; DNS software.
+;;
+;; Use at your own risk.
+;; SOA Record
+appwrite.io	3600	IN	SOA	renan.ns.cloudflare.com. dns.cloudflare.com. 2048890777 10000 2400 604800 3600
+
+;; NS Records
+appwrite.io.	86400	IN	NS	renan.ns.cloudflare.com.
+appwrite.io.	86400	IN	NS	rosalyn.ns.cloudflare.com.
+
+;; A Records
+appwrite.io.	1	IN	A	143.244.205.11 ; cf_tags=cf-proxied:true
+cloud.appwrite.io.	1	IN	A	209.38.113.102 ; cf_tags=cf-proxied:true
+console.appwrite.io.	1	IN	A	188.166.194.219 ; cf_tags=cf-proxied:false
+demo.appwrite.io.	1	IN	A	134.122.94.149 ; cf_tags=cf-proxied:false
+fra.cloud.appwrite.io.	1	IN	A	209.38.113.102 ; cf_tags=cf-proxied:true
+fra-qa-cloud.appwrite.io.	1	IN	A	164.90.241.125 ; cf_tags=cf-proxied:true
+fra-stage-cloud.appwrite.io.	1	IN	A	209.38.185.230 ; cf_tags=cf-proxied:true
+fra.stage.cloud.appwrite.io.	1	IN	A	144.126.247.3 ; cf_tags=cf-proxied:true
+graph.appwrite.io.	1	IN	A	188.166.194.219 ; cf_tags=cf-proxied:false
+growth.appwrite.io.	1	IN	A	139.59.178.76 ; cf_tags=cf-proxied:false
+health.appwrite.io.	1	IN	A	188.166.194.219 ; cf_tags=cf-proxied:false
+nyc-qa-cloud.appwrite.io.	1	IN	A	161.35.251.229 ; cf_tags=cf-proxied:true
+nyc-stage-cloud.appwrite.io.	1	IN	A	209.38.50.204 ; cf_tags=cf-proxied:true
+qa-cloud.appwrite.io.	1	IN	A	164.90.241.125 ; cf_tags=cf-proxied:true
+rancher.appwrite.io.	1	IN	A	159.89.100.122 ; cf_tags=cf-proxied:false
+settings.appwrite.io.	1	IN	A	188.166.194.219 ; cf_tags=cf-proxied:false
+stage.appwrite.io.	1	IN	A	157.245.27.47 ; cf_tags=cf-proxied:false
+stage.appwrite.io.	1	IN	A	68.183.241.141 ; cf_tags=cf-proxied:false
+stage-cloud.appwrite.io.	1	IN	A	144.126.247.3 ; cf_tags=cf-proxied:true
+stage.cloud.appwrite.io.	1	IN	A	144.126.247.3 ; cf_tags=cf-proxied:true
+stage.growth.appwrite.io.	1	IN	A	188.166.159.249 ; cf_tags=cf-proxied:false
+storage.appwrite.io.	1	IN	A	188.166.194.219 ; cf_tags=cf-proxied:false
+syd-qa-cloud.appwrite.io.	1	IN	A	170.64.249.253 ; cf_tags=cf-proxied:true
+syd-stage-cloud.appwrite.io.	1	IN	A	170.64.244.56 ; cf_tags=cf-proxied:true
+users.appwrite.io.	1	IN	A	188.166.194.219 ; cf_tags=cf-proxied:false
+www.stage.appwrite.io.	1	IN	A	157.245.27.47 ; cf_tags=cf-proxied:false
+www.stage.appwrite.io.	1	IN	A	68.183.241.141 ; cf_tags=cf-proxied:false
+
+;; CNAME Records
+builtwith.appwrite.io.	1	IN	CNAME	cname.vercel-dns.com. ; cf_tags=cf-proxied:false
+calendar.appwrite.io.	1	IN	CNAME	ghs.googlehosted.com. ; cf_tags=cf-proxied:false
+careers.appwrite.io.	1	IN	CNAME	cname.vercel-dns.com. ; cf_tags=cf-proxied:false
+data.appwrite.io.	1	IN	CNAME	3d7c357b-f3a0-47d5-810e-9fc25a37c066.cfargotunnel.com. ; cf_tags=cf-proxied:true
+drive.appwrite.io.	1	IN	CNAME	ghs.googlehosted.com. ; cf_tags=cf-proxied:false
+email.appwrite.io.	1	IN	CNAME	mailgun.org. ; cf_tags=cf-proxied:false
+fonts.appwrite.io.	1	IN	CNAME	coral-app-lzqgg.ondigitalocean.app. ; cf_tags=cf-proxied:false
+hacktoberfest.appwrite.io.	1	IN	CNAME	cname.vercel-dns.com. ; cf_tags=cf-proxied:false
+join.appwrite.io.	1	IN	CNAME	infinite-citadel-3fsvt79cdftvvfcoxee7r3hs.herokudns.com. ; cf_tags=cf-proxied:false
+mail.appwrite.io.	1	IN	CNAME	ghs.googlehosted.com. ; cf_tags=cf-proxied:false
+pink.appwrite.io.	1	IN	CNAME	cname.vercel-dns.com. ; cf_tags=cf-proxied:false
+status.appwrite.io.	1	IN	CNAME	cname.vercel-dns.com. ; cf_tags=cf-proxied:false
+store.appwrite.io.	1	IN	CNAME	cname.vercel-dns.com. ; cf_tags=cf-proxied:false
+strong1._domainkey.appwrite.io.	1	IN	CNAME	strong1._domainkey.helpscout.net. ; cf_tags=cf-proxied:false
+strong2._domainkey.appwrite.io.	1	IN	CNAME	strong2._domainkey.helpscout.net. ; cf_tags=cf-proxied:false
+www.appwrite.io.	1	IN	CNAME	appwrite.io. ; cf_tags=cf-proxied:true
+
+;; MX Records
+appwrite.io.	1	IN	MX	1 aspmx.l.google.com.
+appwrite.io.	1	IN	MX	10 alt3.aspmx.l.google.com.
+appwrite.io.	1	IN	MX	5 alt1.aspmx.l.google.com.
+appwrite.io.	1	IN	MX	10 alt4.aspmx.l.google.com.
+appwrite.io.	1	IN	MX	5 alt2.aspmx.l.google.com.
+
+;; TXT Records
+appwrite.io.	1	IN	TXT	"OSSRH-69106"
+appwrite.io.	1	IN	TXT	"v=spf1 include:_spf.google.com include:mailgun.org include:emsd1.com include:acems2.com -all"
+appwrite.io.	1	IN	TXT	"google-site-verification=Mw664H-yGtCdNH32oO6K78EnGaAi5-ItKrQoBxdsVp8"
+appwrite.io.	1	IN	TXT	"detectify-verification=22b34b0a6a15576ec1cc88790c66dcfd"
+appwrite.io.	1	IN	TXT	"https://issues.sonatype.org/browse/OSSRH-69106"
+appwrite.io.	1	IN	TXT	"k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDRLMoqDwStoAgqQIRxDwxLxdtVeFdw7bgSGD2sKfiRK5zGw3vzUwn7YTK89s/tolubELjhk4hCPV0cQrk2kfyCuwa5J4S4M6FPiqYhZQlBKTAqaTejq9DAetE3vJ9WecxzKFR96qEQFfefPsNuZ9qS7sl0FY1J6pss37QDWQq/VwIDAQAB"
+dk._domainkey.appwrite.io.	1	IN	TXT	"v=DKIM1;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDhkOo8s6fh9Byz1uy69tfQ6eUnzi/5P22EWccwI1PdmCpiyNwZcq3vOS2MHbVYB+ZY6wbBlAFym8EHbZY9OTlJ3+dzt8qTUNW5olkNVl4ecDv3XO2ML8q5sxQL+dwQU6UAQiDAAC/ZRWwiXHrSsr90pqH1Q0vhB7Kp6DHrWYJquQIDAQAB"
+_dmarc.appwrite.io.	1	IN	TXT	"v=DMARC1; p=quarantine; rua=mailto:dmarc@appwrite.io; ruf=mailto:dmarc@appwrite.io;"
+google._domainkey.appwrite.io.	1	IN	TXT	"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2CBEC0f7VzkS+xNcSz4BkOzuCF+2759UHd/wU2YVKmDEaneWxlrH2j6S+hDAG88MssuQtsBi9EbUkWsmr0ZtnraJxi4EioHeXDdfnBOYn4pJIs8qOFEwKkTltG88N1xHbsUqsHOR5IDX45RVWfsvx/lKBMiQ5K35sB9oLqn6kNe2wlqdt8ck9aiqHljn2H28Z" "FOnszUJI3jWpzMdqv1VantBVNJaxRJGyMkpgzzk8c4eQOvqv+l7mF6c+lZ1BdKSoWbdUdrYc3JfaydKD7cbPyWNmDNuTV8NWzm6x3vAm51k8bcaNZgYXpmKi8nbDYn+1/qJYnUhsDoqig/w8cSGvwIDAQAB"
+mx._domainkey.appwrite.io.	1	IN	TXT	"k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDRLMoqDwStoAgqQIRxDwxLxdtVeFdw7bgSGD2sKfiRK5zGw3vzUwn7YTK89s/tolubELjhk4hCPV0cQrk2kfyCuwa5J4S4M6FPiqYhZQlBKTAqaTejq9DAetE3vJ9WecxzKFR96qEQFfefPsNuZ9qS7sl0FY1J6pss37QDWQq/VwIDAQAB"
+smtp._domainkey.appwrite.io.	1	IN	TXT	"k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuAjRmsAxKN3+TmOFG5Go9VR3nRNn8xJUtR42IVAFoP462eDpieOdXvfwj0iDxR2T0KD82IsfXkVERe/gpeK3sFgIy4FjmONoxfWrEPMpo4Dig5dV1XhkgsJsfmjopUDOVPcYdo7Gg0ntB8lKZshvkTFbQ30Ba2vwDTza2zHntWE+pd6L3/htP5TBV9QGHHQQR0YnHTvvTp" "4j9h6GHNCO9RAqfd5SzY8mT39+0TP0Bu7YxFwbz0lxmJFiAx/vTTvQs4yCASBUonQ2QZuB6+X3Nj6yIUR/m3MLZstlnYcr+jsRZulVgjQOeF8AbrmKvXEu/tRfXe8r5BGcDc+PWUEaqwIDAQAB"
+userlist._domainkey.appwrite.io.	1	IN	TXT	"v=DKIM1; k=rsa; h=sha256; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDFbNkNHAhdYfo1qQkPNokXfRv3pXi4QmJwwUdfemgNvvjzSk4HaSh0KK5wcMe7Nu++lgxptXMIyqb1UJ//R13n/4x6SqzM4GbVmx1kaMqRqjln67DAUL8BGyGgGHeaqV3d32TLWPxEdJLkqYp4ODoYsXsbRxhqtIknjeILkAglYQIDAQAB"
