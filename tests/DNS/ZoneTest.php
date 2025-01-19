@@ -17,7 +17,7 @@ final class ZoneTest extends TestCase
     }
     public function testExampleComZoneFile(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-example.com.txt');
+        $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-example.com.txt');
         $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
@@ -27,7 +27,7 @@ final class ZoneTest extends TestCase
 
     public function testRedHatZoneFile(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-redhat.txt');
+        $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-redhat.txt');
         $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
@@ -37,7 +37,7 @@ final class ZoneTest extends TestCase
 
     public function testOracle1ZoneFile(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-oracle1.txt');
+        $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-oracle1.txt');
         $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
@@ -47,7 +47,7 @@ final class ZoneTest extends TestCase
 
     public function testOracle2ZoneFile(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-oracle2.txt');
+        $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-oracle2.txt');
         $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
@@ -57,7 +57,7 @@ final class ZoneTest extends TestCase
 
     public function testLocalhostZoneFile(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-localhost.txt');
+        $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-localhost.txt');
         $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 

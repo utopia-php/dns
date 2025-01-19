@@ -355,6 +355,8 @@ class Zone
 
     /**
      * Tokenize a line by whitespace.
+     * 
+     * @return string[] 
      */
     protected function tokenize(string $line): array
     {
