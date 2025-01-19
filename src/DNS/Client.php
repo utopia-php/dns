@@ -4,18 +4,15 @@ namespace Utopia\DNS;
 
 class Client
 {
-    /** @var string */
-    private $server;
-
-    /** @var int */
-    private $port;
+    private string $server;
+    private int $port;
 
     /**
      * Mapping of record type names to their numeric codes.
      *
-     * @var array
+     * @var array<string, int>
      */
-    private $recordTypes = [
+    private array $recordTypes = [
         'A'     => 1,
         'NS'    => 2,
         'MD'    => 3,
@@ -36,26 +33,12 @@ class Client
         'SRV'   => 33,
     ];
 
-    /**
-     * Client constructor.
-     *
-     * @param string $server DNS server IP or hostname.
-     * @param int    $port   DNS server port (default is 53).
-     */
     public function __construct(string $server, int $port = 53)
     {
         $this->server = $server;
         $this->port   = $port;
     }
 
-    /**
-     * Query the DNS server for a given domain and record type.
-     *
-     * @param string $domain Domain to query.
-     * @param string $type   DNS record type (e.g., A, MX, TXT).
-     * @return Record[]    Array of Record objects.
-     * @throws \Exception  On query errors.
-     */
     public function query(string $domain, string $type = 'A'): array
     {
         $type = strtoupper($type);
@@ -65,22 +48,18 @@ class Client
         $qtype  = $this->recordTypes[$type];
         $packet = $this->buildDnsQueryPacket($domain, $qtype);
 
-        // Create a UDP socket.
         $socket = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$socket) {
             throw new \Exception("Unable to create socket.");
         }
 
-        // Send the DNS query packet.
         if (!socket_sendto($socket, $packet, strlen($packet), 0, $this->server, $this->port)) {
             socket_close($socket);
             throw new \Exception("Failed to send data to DNS server {$this->server}:{$this->port}");
         }
 
-        // Set a timeout for the response.
         socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 5, 'usec' => 0]);
 
-        // Receive the response.
         $response = '';
         if (false === socket_recvfrom($socket, $response, 4096, 0, $this->server, $this->port)) {
             socket_close($socket);
@@ -91,42 +70,24 @@ class Client
         return $this->parseDnsResponse($response);
     }
 
-    /**
-     * Build a binary DNS query packet.
-     *
-     * @param string $domain Domain to query.
-     * @param int    $qtype  Numeric query type.
-     * @return string        DNS query packet.
-     */
     private function buildDnsQueryPacket(string $domain, int $qtype): string
     {
-        // Transaction ID: 2 bytes (random)
         $id = random_int(0, 0xffff);
         $header = pack('n', $id);
-        // Flags: standard query with recursion desired (0x0100)
         $header .= pack('n', 0x0100);
-        // QDCOUNT = 1, ANCOUNT = 0, NSCOUNT = 0, ARCOUNT = 0.
         $header .= pack('nnnn', 1, 0, 0, 0);
 
-        // Build the question section (domain in DNS label format).
         $qname = '';
         foreach (explode('.', $domain) as $label) {
             $qname .= chr(strlen($label)) . $label;
         }
-        $qname .= "\0";  // End of domain name.
+        $qname .= "\0";
 
-        // QTYPE and QCLASS (IN = 1).
         $question = $qname . pack('nn', $qtype, 1);
 
         return $header . $question;
     }
 
-    /**
-     * Parse a DNS response packet and extract answer records.
-     *
-     * @param string $packet The raw DNS response.
-     * @return Record[]      Array of Record objects.
-     */
     private function parseDnsResponse(string $packet): array
     {
         $records = [];
@@ -135,24 +96,29 @@ class Client
         }
 
         $header = unpack('nid/nflags/nqdcount/nancount/nnscount/narcount', substr($packet, 0, 12));
-        $offset = 12;
-
-        // Skip the question section.
-        for ($i = 0; $i < $header['qdcount']; $i++) {
-            $this->decodeDomainName($packet, $offset);
-            $offset += 4; // Skip QTYPE and QCLASS.
+        if ($header === false || !isset($header['qdcount'], $header['ancount'])) {
+            throw new \Exception("Invalid DNS header.");
         }
 
-        // Parse the answer records.
+        $offset = 12;
+
+        for ($i = 0; $i < $header['qdcount']; $i++) {
+            $this->decodeDomainName($packet, $offset);
+            $offset += 4;
+        }
+
         for ($i = 0; $i < $header['ancount']; $i++) {
             $name = $this->decodeDomainName($packet, $offset);
             if (strlen($packet) < $offset + 10) {
                 break;
             }
             $rr = unpack('ntype/nclass/Nttl/nrdlength', substr($packet, $offset, 10));
+            if ($rr === false || !isset($rr['type'], $rr['class'], $rr['ttl'], $rr['rdlength'])) {
+                throw new \Exception("Invalid resource record format.");
+            }
             $offset += 10;
-            $rdata = $this->parseRdata($packet, $offset, $rr['type'], $rr['rdlength']);
 
+            $rdata = $this->parseRdata($packet, $offset, $rr['type'], $rr['rdlength']);
             $record = new Record();
             $record->setName($name)
                    ->setType($rr['type'])
@@ -165,15 +131,6 @@ class Client
         return $records;
     }
 
-    /**
-     * Decode a domain name from the DNS packet.
-     *
-     * Handles both traditional labels and compression pointers.
-     *
-     * @param string $packet  The full DNS packet.
-     * @param int    &$offset Current offset (by reference).
-     * @return string         Decoded domain name.
-     */
     private function decodeDomainName(string $packet, int &$offset): string
     {
         $labels   = [];
@@ -186,7 +143,6 @@ class Client
                 $offset++;
                 break;
             }
-            // Check for pointer (if the two highest bits are set).
             if (($length & 0xC0) === 0xC0) {
                 if (!$jumped) {
                     $original = $offset + 2;
@@ -206,24 +162,21 @@ class Client
         return implode('.', $labels);
     }
 
-    /**
-     * Parse the RDATA field for a resource record.
-     *
-     * @param string $packet   The full DNS packet.
-     * @param int    &$offset  Current offset for RDATA (by reference).
-     * @param int    $type     Numeric record type.
-     * @param int    $rdlength Length of RDATA.
-     * @return string          Human‑readable record data.
-     */
     private function parseRdata(string $packet, int &$offset, int $type, int $rdlength): string
     {
         switch ($type) {
             case 1: // A record
                 $data = substr($packet, $offset, 4);
+                if ($data === false) {
+                    throw new \Exception("Failed to parse A record RDATA.");
+                }
                 $offset += 4;
                 return inet_ntop($data);
             case 28: // AAAA record
                 $data = substr($packet, $offset, 16);
+                if ($data === false) {
+                    throw new \Exception("Failed to parse AAAA record RDATA.");
+                }
                 $offset += 16;
                 return inet_ntop($data);
             case 2: // NS record
@@ -231,10 +184,13 @@ class Client
             case 12: // PTR record
                 return $this->decodeDomainName($packet, $offset);
             case 15: // MX record
-                $pref = unpack('n', substr($packet, $offset, 2))[1];
+                $pref = unpack('n', substr($packet, $offset, 2));
+                if ($pref === false || !isset($pref[1])) {
+                    throw new \Exception("Failed to parse MX record preference.");
+                }
                 $offset += 2;
                 $exchange = $this->decodeDomainName($packet, $offset);
-                return "Preference: {$pref}, Exchange: {$exchange}";
+                return "Preference: {$pref[1]}, Exchange: {$exchange}";
             case 16: // TXT record
                 $txts = [];
                 $end = $offset + $rdlength;
@@ -246,23 +202,29 @@ class Client
                 }
                 return implode(' ', $txts);
             case 33: // SRV record
-                $priority = unpack('n', substr($packet, $offset, 2))[1];
-                $offset += 2;
-                $weight = unpack('n', substr($packet, $offset, 2))[1];
-                $offset += 2;
-                $port = unpack('n', substr($packet, $offset, 2))[1];
-                $offset += 2;
+                $priority = unpack('n', substr($packet, $offset, 2));
+                $weight = unpack('n', substr($packet, $offset + 2, 2));
+                $port = unpack('n', substr($packet, $offset + 4, 2));
+                if ($priority === false || $weight === false || $port === false) {
+                    throw new \Exception("Failed to parse SRV record.");
+                }
+                $offset += 6;
                 $target = $this->decodeDomainName($packet, $offset);
-                return "Priority: {$priority}, Weight: {$weight}, Port: {$port}, Target: {$target}";
+                return "Priority: {$priority[1]}, Weight: {$weight[1]}, Port: {$port[1]}, Target: {$target}";
             case 6: // SOA record
                 $mname = $this->decodeDomainName($packet, $offset);
                 $rname = $this->decodeDomainName($packet, $offset);
                 $parts = unpack('Nserial/Nrefresh/Nretry/Nexpire/Nminttl', substr($packet, $offset, 20));
+                if ($parts === false || !isset($parts['serial'], $parts['refresh'], $parts['retry'], $parts['expire'], $parts['minttl'])) {
+                    throw new \Exception("Failed to parse SOA record.");
+                }
                 $offset += 20;
                 return "MNAME: {$mname}, RNAME: {$rname}, Serial: {$parts['serial']}, Refresh: {$parts['refresh']}, Retry: {$parts['retry']}, Expire: {$parts['expire']}, Minimum TTL: {$parts['minttl']}";
             default:
-                // For unsupported types, return the raw data as a hex string.
                 $data = substr($packet, $offset, $rdlength);
+                if ($data === false) {
+                    throw new \Exception("Failed to parse unknown RDATA.");
+                }
                 $offset += $rdlength;
                 return '0x' . bin2hex($data);
         }

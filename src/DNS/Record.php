@@ -15,9 +15,9 @@ class Record
     private $type = 0;
 
     /**
-     * @var string
+     * @var int
      */
-    private $class = '';
+    private $class = 0;
 
     /**
      * @var int
@@ -167,7 +167,7 @@ class Record
      * @param int|string $class
      * @return Record
      */
-    public function setClass($class): self
+    public function setClass(int|string $class): self
     {
         if (is_int($class)) {
             $this->class = $class;
@@ -181,6 +181,7 @@ class Record
             $upper = strtoupper($class);
             $this->class = $map[$upper] ?? 1; // Default to 'IN' if class is invalid
         }
+
         return $this;
     }
 
