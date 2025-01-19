@@ -14,17 +14,17 @@ final class RecordTest extends TestCase
     {
         $record = new Record();
 
-        // Defaults
+        // Standard fields defaults
         $this->assertSame('', $record->getName());
         $this->assertSame(0, $record->getType());
-        $this->assertSame('', $record->getClass());
+        $this->assertSame('IN', $record->getClass()); // Expect default class to be 'IN'
         $this->assertSame(0, $record->getTTL());
         $this->assertSame('', $record->getRdata());
 
-        // Optional fields should be null by default.
-        $this->assertNull($record->getPriority());
-        $this->assertNull($record->getWeight());
-        $this->assertNull($record->getPort());
+        // Optional fields should be null by default
+        $this->assertNull($record->getPriority(), 'Priority should be null by default.');
+        $this->assertNull($record->getWeight(), 'Weight should be null by default.');
+        $this->assertNull($record->getPort(), 'Port should be null by default.');
     }
 
     /**

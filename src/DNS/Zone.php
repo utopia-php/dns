@@ -260,13 +260,13 @@ class Zone
             $class = $r->getClass();
             $type = $r->getTypeName();
             $data = $r->getRdata();
-        
+
             if ($type === 'MX' && $r->getPriority() !== null) {
                 $data = "{$r->getPriority()} {$r->getRdata()}";
             } elseif ($type === 'SRV' && $r->getPriority() !== null && $r->getWeight() !== null && $r->getPort() !== null) {
                 $data = "{$r->getPriority()} {$r->getWeight()} {$r->getPort()} {$r->getRdata()}";
             }
-        
+
             $lines[] = sprintf("%s %d %s %s %s", $owner, $ttl, $class, $type, $data);
         }
         return implode("\n", $lines) . "\n";

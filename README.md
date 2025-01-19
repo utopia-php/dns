@@ -15,6 +15,8 @@ Install using composer:
 composer require utopia-php/dns
 ```
 
+## Using the DNS server
+
 Init your DNS server with your preferred adapter and resolver. The adapter is used for running the UDP server to serve DNS requests, and the resolver will be used to answering DNS queries with proper results. You can and in most cases should implement your own resolver by extending [src/DNS/Resolver.php](src/DNS/Resolver.php)
 
 ```php
@@ -34,7 +36,63 @@ $dns = new Server($server, $resolver);
 $dns->start();
 ```
 
-### Supported DNS Records
+## Using the DNS Client
+
+Utopia DNS also provides a simple, dependency‑free DNS client that can be used to perform queries against any DNS server. This client is ideal for applications that need to look up records on demand. It supports querying all sorts of DNS records (A, MX, TXT, AAAA, SRV, etc.).
+
+Example Usage
+
+Below is an example of how to use the DNS client:
+
+```php 
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Utopia\DNS\Client;
+
+$client = new Client('8.8.8.8'); // Query against Google's public DNS
+
+try {
+    // Query for A records for example.com
+    $records = $client->query('example.com', 'A');
+    
+    foreach ($records as $record) {
+        echo 'Name: '   . $record->getName()   . "\n";
+        echo 'Type: '   . $record->getTypeName() . "\n";
+        echo 'TTL: '    . $record->getTTL()      . "\n";
+        echo 'Data: '   . $record->getRdata()    . "\n\n";
+    }
+    
+    // Query for other record types (e.g. MX, TXT, AAAA, SRV)
+    // $mxRecords = $client->query('example.com', 'MX');
+    // $txtRecords = $client->query('example.com', 'TXT');
+    // ...
+    
+} catch (Exception $e) {
+    echo "DNS query failed: " . $e->getMessage();
+}
+```
+
+### How it works
+
+#### Instantiate the client
+
+Create a new instance of the Client class and specify the DNS server you wish to query. In the example above, we use Google’s DNS server (8.8.8.8).
+
+#### Perform a query
+
+Use the query() method with the desired domain and record type (for example, 'A' for an IPv4 address) to retrieve DNS records.
+
+The client returns an array of Record objects. These objects contain the queried domain name, type (both numeric and human‑readable), TTL, and record data.
+Optional fields (such as priority, weight, and port for MX and SRV records) are available via their getters.
+
+#### Error handling
+
+The query is wrapped in a try‑catch block to handle any exceptions that may occur during the DNS lookup.
+
+
+## Supported DNS Records
 
 * A
 * NS

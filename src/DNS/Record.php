@@ -1,4 +1,5 @@
 <?php
+
 namespace Utopia\DNS;
 
 class Record
@@ -58,13 +59,13 @@ class Record
     public function __construct(
         string $name = '',
         int $ttl = 0,
-        string $class = '',
+        string $class = 'IN',
         $type = 0,
         string $rdata = ''
     ) {
         $this->name  = $name;
         $this->ttl   = $ttl;
-        $this->class = $class;
+        $this->setClass($class);
         $this->setType($type);
         $this->rdata = $rdata;
     }
@@ -149,18 +150,37 @@ class Record
      */
     public function getClass(): string
     {
-        return $this->class;
+        $classes = [
+            1 => 'IN',  // Internet
+            2 => 'CS',  // CSNET
+            3 => 'CH',  // CHAOS
+            4 => 'HS',  // Hesiod
+        ];
+        return $classes[$this->class] ?? "CLASS{$this->class}";
     }
 
     /**
      * Set the DNS class.
      *
-     * @param string $class
+     * Accepts either a numeric code or a string representation.
+     *
+     * @param int|string $class
      * @return Record
      */
-    public function setClass(string $class): self
+    public function setClass($class): self
     {
-        $this->class = $class;
+        if (is_int($class)) {
+            $this->class = $class;
+        } elseif (is_string($class)) {
+            $map = [
+                'IN' => 1,
+                'CS' => 2,
+                'CH' => 3,
+                'HS' => 4,
+            ];
+            $upper = strtoupper($class);
+            $this->class = $map[$upper] ?? 1; // Default to 'IN' if class is invalid
+        }
         return $this;
     }
 

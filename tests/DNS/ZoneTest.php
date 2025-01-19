@@ -218,7 +218,7 @@ ZONE;
         $this->assertSame('SOA', strtoupper($records[0]->getTypeName()));
 
         // 2) www
-        $this->assertSame('www.example.com', $records[1]->getName()); 
+        $this->assertSame('www.example.com', $records[1]->getName());
         $this->assertSame(1800, $records[1]->getTTL()); // no explicit TTL => use 1800 from $TTL
         $this->assertSame('A', strtoupper($records[1]->getTypeName()));
         $this->assertSame('192.168.1.10', $records[1]->getRdata());
