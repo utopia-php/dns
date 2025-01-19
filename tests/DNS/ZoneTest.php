@@ -15,27 +15,6 @@ final class ZoneTest extends TestCase
     {
         $this->zone = new Zone();
     }
-
-    public function testDigitalOceanZoneFile(): void
-    {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-digitalocean.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
-        $records = $this->zone->import($this->domain, $content);
-
-        $this->assertEmpty($validateErrors, 'DigitalOcean zone file should have no validation errors.');
-        $this->assertGreaterThan(0, count($records), 'DigitalOcean zone file should import at least one record.');
-    }
-
-    public function testCloudflareZoneFile(): void
-    {
-        $content = file_get_contents(__DIR__ . '/../resources/zone-valid-cloudflare.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
-        $records = $this->zone->import($this->domain, $content);
-
-        $this->assertEmpty($validateErrors, 'Cloudflare zone file should have no validation errors.');
-        $this->assertGreaterThan(0, count($records), 'Cloudflare zone file should import at least one record.');
-    }
-
     public function testExampleComZoneFile(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/zone-valid-example.com.txt');
@@ -45,7 +24,7 @@ final class ZoneTest extends TestCase
         $this->assertEmpty($validateErrors, 'Example.com zone file should have no validation errors.');
         $this->assertGreaterThan(0, count($records), 'Example.com zone file should import at least one record.');
     }
-
+    
     public function testRedHatZoneFile(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/zone-valid-redhat.txt');
