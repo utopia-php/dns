@@ -18,7 +18,7 @@ final class ZoneTest extends TestCase
     public function testExampleComZoneFile(): void
     {
         $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-example.com.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
+        $validateErrors = $this->zone->validate($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
         $this->assertEmpty($validateErrors, 'Example.com zone file should have no validation errors.');
@@ -28,7 +28,7 @@ final class ZoneTest extends TestCase
     public function testRedHatZoneFile(): void
     {
         $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-redhat.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
+        $validateErrors = $this->zone->validate($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
         $this->assertEmpty($validateErrors, 'RedHat zone file should have no validation errors.');
@@ -38,7 +38,7 @@ final class ZoneTest extends TestCase
     public function testOracle1ZoneFile(): void
     {
         $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-oracle1.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
+        $validateErrors = $this->zone->validate($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
         $this->assertEmpty($validateErrors, 'Oracle 1 zone file should have no validation errors.');
@@ -48,7 +48,7 @@ final class ZoneTest extends TestCase
     public function testOracle2ZoneFile(): void
     {
         $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-oracle2.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
+        $validateErrors = $this->zone->validate($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
         $this->assertEmpty($validateErrors, 'Oracle 2 zone file should have no validation errors.');
@@ -58,7 +58,7 @@ final class ZoneTest extends TestCase
     public function testLocalhostZoneFile(): void
     {
         $content = (string)file_get_contents(__DIR__ . '/../resources/zone-valid-localhost.txt');
-        $validateErrors = $this->zone->validateZoneFile($this->domain, $content);
+        $validateErrors = $this->zone->validate($this->domain, $content);
         $records = $this->zone->import($this->domain, $content);
 
         $this->assertEmpty($validateErrors, 'Localhost zone file should have no validation errors.');
@@ -80,7 +80,7 @@ www     IN  A   192.168.1.10
 mail    300 IN  MX 10 mail.example.com.
 TXT;
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
         $this->assertEmpty($errors, 'Expected no errors for a valid zone with $ORIGIN/$TTL directives.');
     }
 
@@ -95,7 +95,7 @@ TXT;
 TXT;
 
         // We consider "$INCLUDE" an unsupported directive => error
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
 
         $this->assertNotEmpty($errors, 'Expected errors for unsupported directives.');
         $this->assertStringContainsString('Unsupported directive', $errors[0]);
@@ -112,7 +112,7 @@ TXT;
         // Real BIND sees "www" as the owner, "bogus" as TTL if numeric, else error
         $zoneFile = "@  bogus  IN A 127.0.0.1\n";
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
 
         // If you want a test for "non-numeric TTL," the code must interpret the second token as TTL
         // That means you'd keep the logic: if second token != numeric && != "IN", => TTL error
@@ -132,7 +132,7 @@ TXT;
 
         $zoneFile = "www 300 IN BADTYPE data\n";
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
         $this->assertNotEmpty($errors, 'Expected an error for unknown record type.');
         $this->assertStringContainsString("Unknown record type 'BADTYPE'", $errors[0]);
     }
@@ -145,7 +145,7 @@ TXT;
         // "MX" with no priority => error
         $zoneFile = "mail 3600 IN MX mail.example.com.\n";
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
         $this->assertNotEmpty($errors, 'Expected error for incomplete MX record.');
         $this->assertStringContainsString('MX needs priority & exchange', $errors[0]);
     }
@@ -158,7 +158,7 @@ TXT;
         // SRV must have 4 parts: priority weight port target
         $zoneFile = "_sip._tcp 600 IN SRV 5 10 5060\n"; // missing target
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('SRV must have 4 parts', $errors[0]);
     }
@@ -176,7 +176,7 @@ TXT;
 @  3600 IN A 127.0.0.1
 TXT;
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
         $this->assertEmpty($errors, 'Comments/blank lines should not produce validation errors.');
     }
 
@@ -188,7 +188,7 @@ TXT;
         // Zero TTL is valid in many DNS servers, so no error expected
         $zoneFile = "@ 0 IN A 127.0.0.1\n";
 
-        $errors = $z->validateZoneFile($domain, $zoneFile);
+        $errors = $z->validate($domain, $zoneFile);
         $this->assertEmpty($errors, 'Zero TTL should be accepted as valid integer TTL.');
     }
 

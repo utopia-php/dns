@@ -16,7 +16,7 @@ class Zone
      * @param string $content The raw zone file content.
      * @return string[] An array of error messages.
      */
-    public function validateZoneFile(string $domain, string $content): array
+    public function validate(string $domain, string $content): array
     {
         $this->defaultTTL = 3600;
         $this->defaultOrigin = $domain;
