@@ -59,4 +59,14 @@ class Native extends Adapter
             }
         }
     }
+
+    /**
+     * Get the name of the adapter
+     * 
+     * @return string
+     */
+    public function getName(): string
+    {
+        return 'native';
+    }
 }

@@ -44,4 +44,14 @@ class Memory extends Resolver
             return [];
         }
     }
+
+    /**
+     * Get the name of the resolver
+     * 
+     * @return string
+     */
+    public function getName(): string
+    {
+        return 'memory';
+    }
 }

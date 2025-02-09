@@ -15,4 +15,11 @@ abstract class Adapter
      * Start the DNS server
      */
     abstract public function start(): void;
+
+    /**
+     * Get the name of the adapter
+     * 
+     * @return string
+     */
+    abstract public function getName(): string;
 }

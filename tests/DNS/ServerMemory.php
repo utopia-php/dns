@@ -99,5 +99,6 @@ $resolver->addRecord('mail.appwrite.io', 'MX', [
 ]);
 
 $dns = new Server($server, $resolver);
+$dns->setDebug(false);
 
 $dns->start();

@@ -2,6 +2,9 @@
 
 namespace Utopia\DNS;
 
+use Utopia\CLI\Console;
+use Throwable;
+
 /**
  * Refference about DNS packet:
  *
@@ -47,6 +50,8 @@ class Server
 {
     protected Adapter $adapter;
     protected Resolver $resolver;
+    protected array $errors = [];
+    protected bool $debug = false;
 
     public function __construct(Adapter $adapter, Resolver $resolver)
     {
@@ -54,108 +59,202 @@ class Server
         $this->resolver = $resolver;
     }
 
+    /**
+     * Add Error Handler
+     * 
+     * @param callable $handler
+     * @return self
+     */
+    public function error(callable $handler): self
+    {
+        $this->errors[] = $handler;
+        return $this;
+    }
+
+    /**
+     * Set Debug Mode
+     * 
+     * @param bool $status
+     * @return self
+     */
+    public function setDebug(bool $status): self
+    {
+        $this->debug = $status;
+        return $this;
+    }
+
+    /**
+     * Handle Error
+     * 
+     * @param Throwable $error
+     * @return void
+     */
+    protected function handleError(Throwable $error): void
+    {
+        if (empty($this->errors)) {
+            // Default error handler
+            Console::error('[ERROR] ' . $error->getMessage() . ' in ' . $error->getFile() . ' on line ' . $error->getLine() . "\n" . $error->getTraceAsString());
+            return;
+        }
+
+        foreach ($this->errors as $handler) {
+            call_user_func($handler, $error);
+        }
+    }
+
     public function start(): void
     {
-        $this->adapter->onPacket(function (string $buffer, string $ip, int $port) {
-            // Parse question domain
-            $domain = "";
-            $offset = 12;
-            while ($offset < \strlen($buffer)) {
-                // Get label length
-                $labelLength = \ord($buffer[$offset]);
+        try {
+            Console::success('[DNS] Starting DNS Server...');
+            Console::info('[CONFIG] Adapter: ' . $this->adapter->getName());
+            Console::info('[CONFIG] Resolver: ' . $this->resolver->getName());
+            Console::info('[CONFIG] Memory Limit: ' . ini_get('memory_limit'));
+            Console::info('[CONFIG] Max Execution Time: ' . ini_get('max_execution_time') . 's');
+            Console::info('[CONFIG] PHP Version: ' . PHP_VERSION);
+            Console::info('[CONFIG] OS: ' . PHP_OS);
+            Console::info('[CONFIG] Time: ' . date('Y-m-d H:i:s T'));
+            Console::info('[CONFIG] Debug Mode: ' . ($this->debug ? 'Enabled' : 'Disabled'));
+            
+            Console::success('[DNS] Server is ready to accept connections');
+            
+            $this->adapter->onPacket(function (string $buffer, string $ip, int $port) {
+                try {
+                    $startTime = microtime(true);
+                    Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from {$ip}:{$port}");
+                    
+                    // Parse header information for better debugging
+                    $header = unpack('nid/nflags/nquestions/nanswers/nauthorities/nadditionals', substr($buffer, 0, 12));
+                    if ($header) {
+                        Console::info("[PACKET] DNS Header - ID: {$header['id']}, Questions: {$header['questions']}, Answers: {$header['answers']}");
+                    }
 
-                // End of question
-                if ($labelLength === 0 && \ord($buffer[$offset + 1]) === 0) {
-                    // Skip over padding bytes
-                    $offset += 1;
-                    break;
+                    // Parse question domain
+                    $domain = "";
+                    $offset = 12;
+                    while ($offset < \strlen($buffer)) {
+                        // Get label length
+                        $labelLength = \ord($buffer[$offset]);
+                        
+                        Console::info("[PACKET] Processing label at offset {$offset}, length: {$labelLength}");
+
+                        // End of question
+                        if ($labelLength === 0 && \ord($buffer[$offset + 1]) === 0) {
+                            Console::info("[PACKET] End of domain name found at offset " . ($offset + 1));
+                            $offset += 1;
+                            break;
+                        }
+
+                        // Extract label as string
+                        $label = \substr($buffer, $offset + 1, $labelLength);
+                        Console::info("[PACKET] Found label: {$label}");
+
+                        if (empty($domain)) {
+                            $domain .= $label;
+                        } else {
+                            $domain .= '.' . $label;
+                        }
+
+                        // Skip to next label length
+                        $offset += 1 + $labelLength;
+                    }
+
+                    // Parse question type
+                    $unpacked = \unpack('ntype/nclass', \substr($buffer, $offset, 4));
+                    $offset += 4;
+                    $typeByte = $unpacked['type'] ?? 0;
+                    $classByte = $unpacked['class'] ?? 0;
+
+                    $type = match ($typeByte) {
+                        1 => 'A',
+                        5 => 'CNAME',
+                        15 => 'MX',
+                        16 => 'TXT',
+                        28 => 'AAAA',
+                        33 => 'SRV',
+                        257 => 'CAA',
+                        2 => 'NS',
+                        default => 'A'
+                    };
+
+                    $question = [
+                        'domain' => $domain,
+                        'type' => $type
+                    ];
+
+                    if ($this->debug) {
+                        Console::info("[QUERY] Query for domain: {$domain} (Type: {$type})");
+                    }
+
+                    $answers = $this->resolve($question);
+
+                    if (empty($answers)) {
+                        Console::warning("[RESPONSE] No answers found for {$domain} ({$type})");
+                    }
+
+                    // Build response
+                    $response = '';
+
+                    // Copy some of header
+                    $response .= \substr($buffer, 0, 6);
+
+                    // Add rest of header
+                    $response .= \pack(
+                        'nnn',
+                        \count($answers), // numberOfAnswers
+                        0, // numberOfAuthorities
+                        0, // numberOfAdditionals
+                    );
+
+                    // Copy questions section
+                    $response .= \substr($buffer, 12, $offset - 12);
+
+                    // Add answers section
+                    foreach ($answers as $answer) {
+                        $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
+                        $response .= \pack('nn', $typeByte, $classByte);
+
+                        $answer['value'] = $answer['value'] ?? '';
+                        $answer['ttl'] = $answer['ttl'] ?? 1800;
+
+                        /**
+                         * @var string $type
+                         */
+                        $type = $question['type'];
+
+                        $response .= match ($type) {
+                            'A' => $this->encodeIp($answer['value'], $answer['ttl']),
+                            'AAAA' => $this->encodeIpv6($answer['value'], $answer['ttl']),
+                            'CNAME' => $this->encodeDomain($answer['value'], $answer['ttl']),
+                            'NS' => $this->encodeDomain($answer['value'], $answer['ttl']),
+                            'TXT' => $this->encodeText($answer['value'], $answer['ttl']),
+                            'CAA' => $this->encodeText($answer['value'], $answer['ttl']),
+                            'MX' => $this->encodeMx($answer['value'], $answer['ttl'], $answer['priority']),
+                            'SRV' => $this->encodeSrv($answer['value'], $answer['ttl'], $answer['priority'], $answer['weight'], $answer['port']),
+                            default => ''
+                        };
+                    }
+
+                    $processingTime = (microtime(true) - $startTime) * 1000;
+                    Console::info("[PACKET] Processing completed in {$processingTime}ms");
+                    
+                    if (empty($response)) {
+                        Console::warning("[PACKET] Generated empty response for {$domain} ({$type})");
+                    }
+                    
+                    return $response;
+                } catch (Throwable $error) {
+                    Console::error("[ERROR] Failed to process packet: " . $error->getMessage());
+                    Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
+                    Console::error("[ERROR] Processing time: " . ((microtime(true) - $startTime) * 1000) . "ms");
+                    $this->handleError($error);
+                    return '';
                 }
+            });
 
-                // Extract label as string
-                $label = \substr($buffer, $offset + 1, $labelLength);
-
-                if (empty($domain)) {
-                    $domain .= $label;
-                } else {
-                    $domain .= '.' . $label;
-                }
-
-                // Skip to next label length
-                $offset += 1 + $labelLength;
-            }
-
-            // Parse question type
-            $unpacked = \unpack('ntype/nclass', \substr($buffer, $offset, 4));
-            $offset += 4;
-            $typeByte = $unpacked['type'] ?? 0;
-            $classByte = $unpacked['class'] ?? 0;
-
-            $type = match ($typeByte) {
-                1 => 'A',
-                5 => 'CNAME',
-                15 => 'MX',
-                16 => 'TXT',
-                28 => 'AAAA',
-                33 => 'SRV',
-                257 => 'CAA',
-                2 => 'NS',
-                default => 'A'
-            };
-
-            $question = [
-                'domain' => $domain,
-                'type' => $type
-            ];
-
-            $answers = $this->resolve($question);
-
-            // Build response
-            $response = '';
-
-            // Copy some of header
-            $response .= \substr($buffer, 0, 6);
-
-            // Add rest of header
-            $response .= \pack(
-                'nnn',
-                \count($answers), // numberOfAnswers
-                0, // numberOfAuthorities
-                0, // numberOfAdditionals
-            );
-
-            // Copy questions section
-            $response .= \substr($buffer, 12, $offset - 12);
-
-            // Add answers section
-            foreach ($answers as $answer) {
-                $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
-                $response .= \pack('nn', $typeByte, $classByte);
-
-                $answer['value'] = $answer['value'] ?? '';
-                $answer['ttl'] = $answer['ttl'] ?? 1800;
-
-                /**
-                 * @var string $type
-                 */
-                $type = $question['type'];
-
-                $response .= match ($type) {
-                    'A' => $this->encodeIp($answer['value'], $answer['ttl']),
-                    'AAAA' => $this->encodeIpv6($answer['value'], $answer['ttl']),
-                    'CNAME' => $this->encodeDomain($answer['value'], $answer['ttl']),
-                    'NS' => $this->encodeDomain($answer['value'], $answer['ttl']),
-                    'TXT' => $this->encodeText($answer['value'], $answer['ttl']),
-                    'CAA' => $this->encodeText($answer['value'], $answer['ttl']),
-                    'MX' => $this->encodeMx($answer['value'], $answer['ttl'], $answer['priority']),
-                    'SRV' => $this->encodeSrv($answer['value'], $answer['ttl'], $answer['priority'], $answer['weight'], $answer['port']),
-                    default => ''
-                };
-            }
-
-            return $response;
-        });
-
-        $this->adapter->start();
+            $this->adapter->start();
+        } catch (Throwable $error) {
+            $this->handleError($error);
+        }
     }
 
     /**

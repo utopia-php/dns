@@ -2,10 +2,14 @@
 
 namespace Utopia\DNS;
 
+use Exception;
+
 class Client
 {
-    private string $server;
-    private int $port;
+    protected $socket;
+    protected string $server;
+    protected int $port;
+    protected int $timeout;
 
     /**
      * Mapping of record type names to their numeric codes.
@@ -33,41 +37,59 @@ class Client
         'SRV'   => 33,
     ];
 
-    public function __construct(string $server, int $port = 53)
+    public function __construct(string $server = '127.0.0.1', int $port = 53, int $timeout = 5)
     {
         $this->server = $server;
-        $this->port   = $port;
+        $this->port = $port;
+        $this->timeout = $timeout;
+
+        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        
+        if ($socket === false) {
+            throw new Exception('Failed to create socket: ' . socket_strerror(socket_last_error()));
+        }
+
+        // Set socket timeout
+        socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, array('sec' => $timeout, 'usec' => 0));
+        socket_set_option($socket, SOL_SOCKET, SO_SNDTIMEO, array('sec' => $timeout, 'usec' => 0));
+
+        $this->socket = $socket;
     }
 
     public function query(string $domain, string $type = 'A'): array
     {
-        $type = strtoupper($type);
-        if (!isset($this->recordTypes[$type])) {
-            throw new \Exception("Unknown record type: {$type}");
+        try {
+            $type = strtoupper($type);
+            if (!isset($this->recordTypes[$type])) {
+                throw new Exception("Unknown record type: {$type}");
+            }
+            $qtype  = $this->recordTypes[$type];
+            $packet = $this->buildDnsQueryPacket($domain, $qtype);
+
+            if (socket_sendto($this->socket, $packet, strlen($packet), 0, $this->server, $this->port) === false) {
+                throw new Exception('Failed to send data: ' . socket_strerror(socket_last_error($this->socket)));
+            }
+
+            $response = '';
+            $from = '';
+            $port = 0;
+
+            $result = socket_recvfrom($this->socket, $response, 512, 0, $from, $port);
+            
+            if ($result === false) {
+                $error = socket_last_error($this->socket);
+                $errorMessage = socket_strerror($error);
+                throw new Exception("Failed to receive data from {$this->server}: {$errorMessage} (Error code: {$error})");
+            }
+
+            if (empty($response)) {
+                throw new Exception("Empty response received from {$this->server}:{$this->port}");
+            }
+
+            return $this->parseDnsResponse($response);
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage(), $e->getCode(), $e);
         }
-        $qtype  = $this->recordTypes[$type];
-        $packet = $this->buildDnsQueryPacket($domain, $qtype);
-
-        $socket = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        if (!$socket) {
-            throw new \Exception("Unable to create socket.");
-        }
-
-        if (!socket_sendto($socket, $packet, strlen($packet), 0, $this->server, $this->port)) {
-            socket_close($socket);
-            throw new \Exception("Failed to send data to DNS server {$this->server}:{$this->port}");
-        }
-
-        socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 5, 'usec' => 0]);
-
-        $response = '';
-        if (false === socket_recvfrom($socket, $response, 4096, 0, $this->server, $this->port)) {
-            socket_close($socket);
-            throw new \Exception("Failed to receive data from {$this->server}");
-        }
-        socket_close($socket);
-
-        return $this->parseDnsResponse($response);
     }
 
     private function buildDnsQueryPacket(string $domain, int $qtype): string
@@ -97,7 +119,7 @@ class Client
 
         $header = unpack('nid/nflags/nqdcount/nancount/nnscount/narcount', substr($packet, 0, 12));
         if ($header === false || !isset($header['qdcount'], $header['ancount'])) {
-            throw new \Exception("Invalid DNS header.");
+            throw new Exception("Invalid DNS header.");
         }
 
         $offset = 12;
@@ -114,7 +136,7 @@ class Client
             }
             $rr = unpack('ntype/nclass/Nttl/nrdlength', substr($packet, $offset, 10));
             if ($rr === false || !isset($rr['type'], $rr['class'], $rr['ttl'], $rr['rdlength'])) {
-                throw new \Exception("Invalid resource record format.");
+                throw new Exception("Invalid resource record format.");
             }
             $offset += 10;
 
@@ -168,14 +190,14 @@ class Client
             case 1: // A record
                 $data = substr($packet, $offset, 4);
                 if ($data === false) {
-                    throw new \Exception("Failed to parse A record RDATA.");
+                    throw new Exception("Failed to parse A record RDATA.");
                 }
                 $offset += 4;
                 return inet_ntop($data);
             case 28: // AAAA record
                 $data = substr($packet, $offset, 16);
                 if ($data === false) {
-                    throw new \Exception("Failed to parse AAAA record RDATA.");
+                    throw new Exception("Failed to parse AAAA record RDATA.");
                 }
                 $offset += 16;
                 return inet_ntop($data);
@@ -186,7 +208,7 @@ class Client
             case 15: // MX record
                 $pref = unpack('n', substr($packet, $offset, 2));
                 if ($pref === false || !isset($pref[1])) {
-                    throw new \Exception("Failed to parse MX record preference.");
+                    throw new Exception("Failed to parse MX record preference.");
                 }
                 $offset += 2;
                 $exchange = $this->decodeDomainName($packet, $offset);
@@ -206,7 +228,7 @@ class Client
                 $weight = unpack('n', substr($packet, $offset + 2, 2));
                 $port = unpack('n', substr($packet, $offset + 4, 2));
                 if ($priority === false || $weight === false || $port === false) {
-                    throw new \Exception("Failed to parse SRV record.");
+                    throw new Exception("Failed to parse SRV record.");
                 }
                 $offset += 6;
                 $target = $this->decodeDomainName($packet, $offset);
@@ -216,14 +238,14 @@ class Client
                 $rname = $this->decodeDomainName($packet, $offset);
                 $parts = unpack('Nserial/Nrefresh/Nretry/Nexpire/Nminttl', substr($packet, $offset, 20));
                 if ($parts === false || !isset($parts['serial'], $parts['refresh'], $parts['retry'], $parts['expire'], $parts['minttl'])) {
-                    throw new \Exception("Failed to parse SOA record.");
+                    throw new Exception("Failed to parse SOA record.");
                 }
                 $offset += 20;
                 return "MNAME: {$mname}, RNAME: {$rname}, Serial: {$parts['serial']}, Refresh: {$parts['refresh']}, Retry: {$parts['retry']}, Expire: {$parts['expire']}, Minimum TTL: {$parts['minttl']}";
             default:
                 $data = substr($packet, $offset, $rdlength);
                 if ($data === false) {
-                    throw new \Exception("Failed to parse unknown RDATA.");
+                    throw new Exception("Failed to parse unknown RDATA.");
                 }
                 $offset += $rdlength;
                 return '0x' . bin2hex($data);
