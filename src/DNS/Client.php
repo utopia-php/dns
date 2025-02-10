@@ -44,7 +44,7 @@ class Client
         $this->timeout = $timeout;
 
         $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        
+
         if ($socket === false) {
             throw new Exception('Failed to create socket: ' . socket_strerror(socket_last_error()));
         }
@@ -75,7 +75,7 @@ class Client
             $port = 0;
 
             $result = socket_recvfrom($this->socket, $response, 512, 0, $from, $port);
-            
+
             if ($result === false) {
                 $error = socket_last_error($this->socket);
                 $errorMessage = socket_strerror($error);

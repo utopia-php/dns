@@ -18,7 +18,7 @@ abstract class Adapter
 
     /**
      * Get the name of the adapter
-     * 
+     *
      * @return string
      */
     abstract public function getName(): string;

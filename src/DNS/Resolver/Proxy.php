@@ -13,7 +13,7 @@ class Proxy extends Resolver
 
     /**
      * Create a new Proxy resolver
-     * 
+     *
      * @param string $server DNS server IP address
      * @param int $port DNS server port (default: 53)
      */
@@ -37,11 +37,11 @@ class Proxy extends Resolver
 
     /**
      * Get the name of the resolver
-     * 
+     *
      * @return string
      */
     public function getName(): string
     {
         return "Proxy ({$this->server}:{$this->port})";
     }
-} 
+}

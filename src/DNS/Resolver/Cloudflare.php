@@ -7,7 +7,7 @@ class Cloudflare extends Proxy
     /**
      * Create a new Cloudflare resolver
      * Uses Cloudflare's public DNS servers (1.1.1.1 or 1.0.0.1)
-     * 
+     *
      * @param bool $useBackup Use backup server (1.0.0.1) instead of primary (1.1.1.1)
      */
     public function __construct(bool $useBackup = false)
@@ -17,11 +17,11 @@ class Cloudflare extends Proxy
 
     /**
      * Get the name of the resolver
-     * 
+     *
      * @return string
      */
     public function getName(): string
     {
         return "Cloudflare DNS ({$this->server})";
     }
-} 
+}

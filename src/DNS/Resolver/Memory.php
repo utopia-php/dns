@@ -47,7 +47,7 @@ class Memory extends Resolver
 
     /**
      * Get the name of the resolver
-     * 
+     *
      * @return string
      */
     public function getName(): string

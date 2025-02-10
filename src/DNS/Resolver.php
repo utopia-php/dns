@@ -14,7 +14,7 @@ abstract class Resolver
 
     /**
      * Get the name of the resolver
-     * 
+     *
      * @return string
      */
     abstract public function getName(): string;

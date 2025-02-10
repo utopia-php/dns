@@ -61,7 +61,7 @@ class Server
 
     /**
      * Add Error Handler
-     * 
+     *
      * @param callable $handler
      * @return self
      */
@@ -73,7 +73,7 @@ class Server
 
     /**
      * Set Debug Mode
-     * 
+     *
      * @param bool $status
      * @return self
      */
@@ -85,7 +85,7 @@ class Server
 
     /**
      * Handle Error
-     * 
+     *
      * @param Throwable $error
      * @return void
      */
@@ -114,14 +114,14 @@ class Server
             Console::info('[CONFIG] OS: ' . PHP_OS);
             Console::info('[CONFIG] Time: ' . date('Y-m-d H:i:s T'));
             Console::info('[CONFIG] Debug Mode: ' . ($this->debug ? 'Enabled' : 'Disabled'));
-            
+
             Console::success('[DNS] Server is ready to accept connections');
-            
+
             $this->adapter->onPacket(function (string $buffer, string $ip, int $port) {
                 try {
                     $startTime = microtime(true);
                     Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from {$ip}:{$port}");
-                    
+
                     // Parse header information for better debugging
                     $header = unpack('nid/nflags/nquestions/nanswers/nauthorities/nadditionals', substr($buffer, 0, 12));
                     if ($header) {
@@ -134,7 +134,7 @@ class Server
                     while ($offset < \strlen($buffer)) {
                         // Get label length
                         $labelLength = \ord($buffer[$offset]);
-                        
+
                         Console::info("[PACKET] Processing label at offset {$offset}, length: {$labelLength}");
 
                         // End of question
@@ -236,11 +236,11 @@ class Server
 
                     $processingTime = (microtime(true) - $startTime) * 1000;
                     Console::info("[PACKET] Processing completed in {$processingTime}ms");
-                    
+
                     if (empty($response)) {
                         Console::warning("[PACKET] Generated empty response for {$domain} ({$type})");
                     }
-                    
+
                     return $response;
                 } catch (Throwable $error) {
                     Console::error("[ERROR] Failed to process packet: " . $error->getMessage());

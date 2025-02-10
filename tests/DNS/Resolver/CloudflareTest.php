@@ -25,7 +25,7 @@ class CloudflareTest extends TestCase
         $this->assertIsArray($records);
         $this->assertNotEmpty($records);
         $this->assertInstanceOf(Record::class, $records[0] ?? null);
-        
+
         /** @var Record $record */
         $record = $records[0];
         $this->assertEquals('A', $record->getTypeName());
@@ -43,11 +43,11 @@ class CloudflareTest extends TestCase
         $this->assertIsArray($records);
         $this->assertNotEmpty($records);
         $this->assertInstanceOf(Record::class, $records[0] ?? null);
-        
+
         /** @var Record $record */
         $record = $records[0];
         $this->assertEquals('AAAA', $record->getTypeName());
         $this->assertEquals('google.com', $record->getName());
         $this->assertNotFalse(filter_var($record->getRdata(), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6));
     }
-} 
+}
