@@ -78,7 +78,7 @@ try {
 
 #### Instantiate the client
 
-Create a new instance of the Client class and specify the DNS server you wish to query. In the example above, we use Google’s DNS server (8.8.8.8).
+Create a new instance of the Client class and specify the DNS server you wish to query. In the example above, we use Google's DNS server (8.8.8.8).
 
 #### Perform a query
 
@@ -141,4 +141,52 @@ Run tests for this library using the provided Docker container.
 
 ```sh
 docker compose exec -t dns-server vendor/bin/phpunit --configuration phpunit.xml
+```
+
+## Benchmarking
+
+The library includes a benchmarking tool to measure DNS server performance under load. The benchmark tests various record types and provides detailed performance metrics.
+
+### Running the benchmark
+
+```bash
+# Run with default settings
+php tests/benchmark.php
+
+# Run with custom configuration
+php tests/benchmark.php --server=127.0.0.1 --port=5300 --iterations=1000 --concurrency=20
+```
+
+### Options
+- `--server`: DNS server IP address (default: 127.0.0.1)
+- `--port`: DNS server port (default: 5300)
+- `--iterations`: Number of queries per record type (default: 10000)
+- `--concurrency`: Number of concurrent requests (default: 10)
+
+### Metrics Provided
+- Requests per second (RPS)
+- Response time statistics (min, max, avg)
+- Latency distribution (p50, p75, p90, p95, p99)
+- Time series analysis
+- Success/failure rates
+- Detailed error reporting
+
+### Example Output
+```
+--- Benchmark Results ---
+Total Requests: 40000
+Successful: 40000
+Failed: 0
+Total Time: 25.34 seconds
+Requests Per Second: 1578.93 req/s
+Min Response Time: 12.45 ms
+Max Response Time: 45.67 ms
+Avg Response Time: 23.45 ms
+
+--- Latency Distribution ---
+p50: 22.34 ms
+p75: 28.56 ms
+p90: 35.78 ms
+p95: 39.12 ms
+p99: 42.89 ms
 ```
