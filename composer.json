@@ -23,7 +23,7 @@
     },
     "require": {
         "php": ">=8.0",
-        "utopia-php/cli": "0.20.*"
+        "utopia-php/cli": "0.15.*"
     },
     "require-dev": {
         "swoole/ide-helper": "4.6.6",
