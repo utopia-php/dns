@@ -28,11 +28,13 @@ class Proxy extends Resolver
      * Resolve DNS Record by proxying to another DNS server
      *
      * @param array<string, string> $question
-     * @return array<array<string, mixed>>
+     * @return array<int, \Utopia\DNS\Record>
      */
     public function resolve(array $question): array
     {
-        return $this->client->query($question['name'], $question['type']);
+        $records = $this->client->query($question['name'], $question['type']);
+        
+        return $records;
     }
 
     /**

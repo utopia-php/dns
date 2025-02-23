@@ -50,6 +50,7 @@ class Server
 {
     protected Adapter $adapter;
     protected Resolver $resolver;
+    /** @var array<int, callable> */
     protected array $errors = [];
     protected bool $debug = false;
 
@@ -118,8 +119,8 @@ class Server
             Console::success('[DNS] Server is ready to accept connections');
 
             $this->adapter->onPacket(function (string $buffer, string $ip, int $port) {
+                $startTime = microtime(true);
                 try {
-                    $startTime = microtime(true);
                     Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from {$ip}:{$port}");
 
                     // Parse header information for better debugging
@@ -213,23 +214,20 @@ class Server
                         $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
                         $response .= \pack('nn', $typeByte, $classByte);
 
-                        $answer['value'] = $answer['value'] ?? '';
-                        $answer['ttl'] = $answer['ttl'] ?? 1800;
-
                         /**
                          * @var string $type
                          */
                         $type = $question['type'];
 
                         $response .= match ($type) {
-                            'A' => $this->encodeIp($answer['value'], $answer['ttl']),
-                            'AAAA' => $this->encodeIpv6($answer['value'], $answer['ttl']),
-                            'CNAME' => $this->encodeDomain($answer['value'], $answer['ttl']),
-                            'NS' => $this->encodeDomain($answer['value'], $answer['ttl']),
-                            'TXT' => $this->encodeText($answer['value'], $answer['ttl']),
-                            'CAA' => $this->encodeText($answer['value'], $answer['ttl']),
-                            'MX' => $this->encodeMx($answer['value'], $answer['ttl'], $answer['priority']),
-                            'SRV' => $this->encodeSrv($answer['value'], $answer['ttl'], $answer['priority'], $answer['weight'], $answer['port']),
+                            'A' => $this->encodeIp($answer->getRdata(), $answer->getTTL()),
+                            'AAAA' => $this->encodeIpv6($answer->getRdata(), $answer->getTTL()),
+                            'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
+                            'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
+                            'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
+                            'CAA' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
+                            'MX' => $this->encodeMx($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0),
+                            'SRV' => $this->encodeSrv($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0, $answer->getWeight() ?? 0, $answer->getPort() ?? 0),
                             default => ''
                         };
                     }
@@ -261,7 +259,7 @@ class Server
      * Resolve domain name to IP by record type
      *
      * @param array<string, string> $question
-     * @return array<array<string, mixed>>
+     * @return array<int, \Utopia\DNS\Record>
      */
     protected function resolve(array $question): array
     {

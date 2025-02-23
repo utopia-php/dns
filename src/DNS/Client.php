@@ -6,6 +6,7 @@ use Exception;
 
 class Client
 {
+    /** @var \Socket */
     protected $socket;
     protected string $server;
     protected int $port;
@@ -56,6 +57,9 @@ class Client
         $this->socket = $socket;
     }
 
+    /**
+     * @return array<int, \Utopia\DNS\Record>
+     */
     public function query(string $domain, string $type = 'A'): array
     {
         try {
@@ -110,6 +114,9 @@ class Client
         return $header . $question;
     }
 
+    /**
+     * @return array<int, Record>
+     */
     private function parseDnsResponse(string $packet): array
     {
         $records = [];
@@ -189,18 +196,18 @@ class Client
         switch ($type) {
             case 1: // A record
                 $data = substr($packet, $offset, 4);
-                if ($data === false) {
+                if ($data == '') {
                     throw new Exception("Failed to parse A record RDATA.");
                 }
                 $offset += 4;
-                return inet_ntop($data);
+                return inet_ntop($data) ?: throw new Exception("Failed to convert IP address");
             case 28: // AAAA record
                 $data = substr($packet, $offset, 16);
-                if ($data === false) {
+                if ($data == '') {
                     throw new Exception("Failed to parse AAAA record RDATA.");
                 }
                 $offset += 16;
-                return inet_ntop($data);
+                return inet_ntop($data) ?: throw new Exception("Failed to convert IPv6 address");
             case 2: // NS record
             case 5: // CNAME record
             case 12: // PTR record
@@ -244,7 +251,7 @@ class Client
                 return "MNAME: {$mname}, RNAME: {$rname}, Serial: {$parts['serial']}, Refresh: {$parts['refresh']}, Retry: {$parts['retry']}, Expire: {$parts['expire']}, Minimum TTL: {$parts['minttl']}";
             default:
                 $data = substr($packet, $offset, $rdlength);
-                if ($data === false) {
+                if ($data == false) {
                     throw new Exception("Failed to parse unknown RDATA.");
                 }
                 $offset += $rdlength;

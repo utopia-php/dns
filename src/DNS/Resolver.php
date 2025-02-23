@@ -8,7 +8,7 @@ abstract class Resolver
      * Resolve DNS Record
      *
      * @param array<string, string> $question
-     * @return array<array<string, mixed>>
+     * @return array<int, \Utopia\DNS\Record>
      */
     abstract public function resolve(array $question): array;
 
