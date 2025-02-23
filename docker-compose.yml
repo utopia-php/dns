@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  dns-server:
+    image: dns-dev
+    build:
+      context: .
+    command: [ "sh", "-c", "php /usr/src/code/tests/DNS/ServerMemory.php" ]
+    volumes:
+      - ./bin:/usr/src/code/bin
+      - ./src:/usr/src/code/src
+      - ./tests:/usr/src/code/tests
+      - ./phpunit.xml:/usr/src/code/phpunit.xml
+    dns:
+      - 127.0.0.1
+    networks:
+      - dns
+    ports:
+      - '5300:53/udp'
+networks:
+  dns:

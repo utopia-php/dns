@@ -1,0 +1,35 @@
+{
+    "name": "utopia-php/dns",
+    "description": "Lite & fast micro PHP DNS server abstraction that is **easy to use**.",
+    "type": "library",
+    "keywords": ["php","framework", "upf", "utopia", "dns"],
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "scripts": {
+        "lint": "./vendor/bin/pint --test --config pint.json",
+        "format": "./vendor/bin/pint --config pint.json",
+        "check": "./vendor/bin/phpstan analyse --level 8 -c phpstan.neon src tests",
+        "test": "./vendor/bin/phpunit --configuration phpunit.xml",
+        "coverage": "./vendor/bin/coverage-check ./tmp/clover.xml 90"
+    },
+    "authors": [
+        {
+            "name": "Eldad Fux",
+            "email": "eldad@appwrite.io"
+        }
+    ],
+    "autoload": {
+        "psr-4": {"Utopia\\DNS\\": "src/DNS"}
+    },
+    "require": {
+        "php": ">=8.0",
+        "utopia-php/cli": "0.15.*"
+    },
+    "require-dev": {
+        "swoole/ide-helper": "4.6.6",
+        "phpunit/phpunit": "^9.3",
+        "laravel/pint": "1.2.*",
+        "phpstan/phpstan": "1.8.*",
+        "rregeer/phpunit-coverage-check": "^0.3.1"
+    }
+}
