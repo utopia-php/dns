@@ -220,8 +220,8 @@ class Server
                         $type = $question['type'];
 
                         $response .= match ($type) {
-                            'A' => $this->encodeIp($answer->getRdata(), $answer->getTTL()),
-                            'AAAA' => $this->encodeIpv6($answer->getRdata(), $answer->getTTL()),
+                            'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
+                            'AAAA' => $this->encodeIPv6($answer->getRdata(), $answer->getTTL()),
                             'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
                             'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
                             'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
@@ -266,7 +266,7 @@ class Server
         return $this->resolver->resolve($question);
     }
 
-    protected function encodeIp(string $ip, int $ttl): string
+    protected function encodeIP(string $ip, int $ttl): string
     {
         $result = \pack('Nn', $ttl, 4);
 
@@ -277,7 +277,7 @@ class Server
         return $result;
     }
 
-    protected function encodeIpv6(string $ip, int $ttl): string
+    protected function encodeIPv6(string $ip, int $ttl): string
     {
         $result = \pack('Nn', $ttl, 16);
 
