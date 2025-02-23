@@ -48,7 +48,7 @@ class Memory extends Resolver
         if (\array_key_exists($key, $this->records)) {
             return $this->records[$key];
         }
-        
+
         return [];
     }
 
