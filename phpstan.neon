@@ -4,3 +4,4 @@ parameters:
   excludePaths:
     - tests/resources
     - tests/benchmark.php
+    - vendor
