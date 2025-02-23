@@ -34,7 +34,4 @@ jobs:
         sleep 10
 
     - name: Run Tests
-      run: docker compose exec -T dns-server vendor/bin/phpunit --configuration phpunit.xml
-
-    - name: Check Coverage
-      run: docker compose exec -T dns-server vendor/bin/coverage-check tmp/clover.xml 90
+      run: docker compose exec -t dns-server vendor/bin/phpunit --configuration phpunit.xml

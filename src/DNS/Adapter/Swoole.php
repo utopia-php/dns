@@ -24,7 +24,6 @@ class Swoole extends Adapter
     public function onPacket(callable $callback): void
     {
         $this->server->on('Packet', function ($server, $data, $clientInfo) use ($callback) {
-            \var_dump("On packet");
             $ip = $clientInfo['address'] ?? '';
             $port = $clientInfo['port'] ?? '';
             $answer = call_user_func($callback, $data, $ip, $port);
@@ -39,5 +38,15 @@ class Swoole extends Adapter
     public function start(): void
     {
         $this->server->start();
+    }
+
+    /**
+     * Get the name of the adapter
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        return 'swoole';
     }
 }

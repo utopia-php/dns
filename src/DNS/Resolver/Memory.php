@@ -3,11 +3,12 @@
 namespace Utopia\DNS\Resolver;
 
 use Utopia\DNS\Resolver;
+use Utopia\DNS\Record;
 
 class Memory extends Resolver
 {
     /**
-     * @var array<string, array<array<string, mixed>>> $records
+     * @var array<string, array<int, Record>> $records
      */
     protected array $records = [];
 
@@ -25,14 +26,20 @@ class Memory extends Resolver
             $this->records[$key] = [];
         }
 
-        $this->records[$key][] = $answer;
+        $this->records[$key][] = new Record(
+            $domain,
+            $answer['ttl'] ?? 1800,
+            $answer['class'] ?? '',
+            $type,
+            $answer['value'] ?? ''
+        );
     }
 
     /**
      * Resolve DNS Record
      *
      * @param array<string, string> $question
-     * @return array<array<string, mixed>>
+     * @return array<int, \Utopia\DNS\Record>
      */
     public function resolve(array $question): array
     {
@@ -40,8 +47,18 @@ class Memory extends Resolver
 
         if (\array_key_exists($key, $this->records)) {
             return $this->records[$key];
-        } else {
-            return [];
         }
+
+        return [];
+    }
+
+    /**
+     * Get the name of the resolver
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        return 'memory';
     }
 }
