@@ -18,7 +18,7 @@ class CloudflareTest extends TestCase
     public function testResolveGoogleA(): void
     {
         $records = $this->resolver->resolve([
-            'name' => 'google.com',
+            'domain' => 'google.com',
             'type' => 'A'
         ]);
 
@@ -36,7 +36,7 @@ class CloudflareTest extends TestCase
     public function testResolveGoogleAAAA(): void
     {
         $records = $this->resolver->resolve([
-            'name' => 'google.com',
+            'domain' => 'google.com',
             'type' => 'AAAA'
         ]);
 

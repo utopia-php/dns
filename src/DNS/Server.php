@@ -195,41 +195,54 @@ class Server
                     // Build response
                     $response = '';
 
-                    // Copy some of header
-                    $response .= \substr($buffer, 0, 6);
+                    // Copy request ID from original header
+                    $response .= substr($buffer, 0, 2);
 
-                    // Add rest of header
-                    $response .= \pack(
-                        'nnn',
-                        \count($answers), // numberOfAnswers
+                    // Add flags
+                    if (empty($answers)) {
+                        // Set QR bit (response) and RCODE 3 (NXDOMAIN)
+                        $flags = 0x8003; // 1000 0000 0000 0011
+                    } else {
+                        // Set QR bit (response) and RCODE 0 (no error)
+                        $flags = 0x8000; // 1000 0000 0000 0000
+                    }
+                    $response .= pack('n', $flags);
+
+                    // Add counts
+                    $response .= pack(
+                        'nnnn',
+                        1, // numberOfQuestions (copy from request)
+                        count($answers), // numberOfAnswers
                         0, // numberOfAuthorities
-                        0, // numberOfAdditionals
+                        0  // numberOfAdditionals
                     );
 
                     // Copy questions section
-                    $response .= \substr($buffer, 12, $offset - 12);
+                    $response .= substr($buffer, 12, $offset - 12);
 
-                    // Add answers section
-                    foreach ($answers as $answer) {
-                        $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
-                        $response .= \pack('nn', $typeByte, $classByte);
+                    // Add answers section if we have any
+                    if (!empty($answers)) {
+                        foreach ($answers as $answer) {
+                            $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
+                            $response .= \pack('nn', $typeByte, $classByte);
 
-                        /**
-                         * @var string $type
-                         */
-                        $type = $question['type'];
+                            /**
+                             * @var string $type
+                             */
+                            $type = $question['type'];
 
-                        $response .= match ($type) {
-                            'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
-                            'AAAA' => $this->encodeIPv6($answer->getRdata(), $answer->getTTL()),
-                            'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
-                            'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
-                            'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
-                            'CAA' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
-                            'MX' => $this->encodeMx($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0),
-                            'SRV' => $this->encodeSrv($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0, $answer->getWeight() ?? 0, $answer->getPort() ?? 0),
-                            default => ''
-                        };
+                            $response .= match ($type) {
+                                'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
+                                'AAAA' => $this->encodeIPv6($answer->getRdata(), $answer->getTTL()),
+                                'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
+                                'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
+                                'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
+                                'CAA' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
+                                'MX' => $this->encodeMx($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0),
+                                'SRV' => $this->encodeSrv($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0, $answer->getWeight() ?? 0, $answer->getPort() ?? 0),
+                                default => ''
+                            };
+                        }
                     }
 
                     $processingTime = (microtime(true) - $startTime) * 1000;
@@ -242,10 +255,22 @@ class Server
                     return $response;
                 } catch (Throwable $error) {
                     Console::error("[ERROR] Failed to process packet: " . $error->getMessage());
-                    Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-                    Console::error("[ERROR] Processing time: " . ((microtime(true) - $startTime) * 1000) . "ms");
+                    
+                    // Send SERVFAIL response
+                    $response = '';
+                    $response .= substr($buffer, 0, 2); // Copy request ID
+                    $response .= pack('n', 0x8002); // QR bit + RCODE 2 (SERVFAIL)
+                    $response .= pack(
+                        'nnnn',
+                        1, // numberOfQuestions (copy from request)
+                        0, // numberOfAnswers
+                        0, // numberOfAuthorities
+                        0  // numberOfAdditionals
+                    );
+                    $response .= substr($buffer, 12, $offset - 12); // Copy question
+
                     $this->handleError($error);
-                    return '';
+                    return $response;
                 }
             });
 

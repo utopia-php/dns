@@ -32,7 +32,7 @@ class Proxy extends Resolver
      */
     public function resolve(array $question): array
     {
-        $records = $this->client->query($question['name'], $question['type']);
+        $records = $this->client->query($question['domain'], $question['type']);
 
         return $records;
     }
