@@ -4,6 +4,10 @@ namespace Utopia\DNS;
 
 use Utopia\CLI\Console;
 use Throwable;
+use Utopia\Telemetry\Adapter as Telemetry;
+use Utopia\Telemetry\Adapter\None as NoTelemetry;
+use Utopia\Telemetry\Counter;
+use Utopia\Telemetry\Histogram;
 
 /**
  * Refference about DNS packet:
@@ -54,10 +58,34 @@ class Server
     protected array $errors = [];
     protected bool $debug = false;
 
+    /**
+     * @var Histogram|null
+     */
+    protected ?Histogram $resolveDuration = null;
+    protected ?Counter $failureCount = null;
+
     public function __construct(Adapter $adapter, Resolver $resolver)
     {
         $this->adapter = $adapter;
         $this->resolver = $resolver;
+        $this->setTelemetry(new NoTelemetry());
+    }
+
+    /**
+     * Set telemetry adapter
+     *
+     * @param  Telemetry  $telemetry
+     */
+    public function setTelemetry(Telemetry $telemetry): void
+    {
+        $this->resolveDuration = $telemetry->createHistogram(
+            'dns.resolve.duration',
+            's',
+            null,
+            ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]]
+        );
+
+        $this->failureCount = $telemetry->createCounter('dns.resolve.failure');
     }
 
     /**
@@ -233,6 +261,7 @@ class Server
                     }
 
                     $processingTime = (microtime(true) - $startTime) * 1000;
+                    $this->resolveDuration?->record($processingTime);
                     Console::info("[PACKET] Processing completed in {$processingTime}ms");
 
                     if (empty($response)) {
@@ -241,6 +270,7 @@ class Server
 
                     return $response;
                 } catch (Throwable $error) {
+                    $this->failureCount?->add(1, ['message' => $error->getMessage()]);
                     Console::error("[ERROR] Failed to process packet: " . $error->getMessage());
                     Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
                     Console::error("[ERROR] Processing time: " . ((microtime(true) - $startTime) * 1000) . "ms");
