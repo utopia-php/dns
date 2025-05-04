@@ -59,18 +59,13 @@ class Server
     protected bool $debug = false;
 
     /**
-     * @var Histogram|null
+     * Telemetry metrics
      */
     protected ?Histogram $resolveDuration = null;
     protected ?Counter $failureCount = null;
-
-    /**
-     * Additional telemetry metrics
-     */
     protected ?Counter $incomingQueriesTotal = null;
     protected ?Counter $responseRcodesTotal = null;
     protected ?Counter $queryDuplicatesTotal = null;
-    protected ?Counter $queryRecursionsTotal = null;
     protected ?Counter $responsesTotal = null;
 
     public function __construct(Adapter $adapter, Resolver $resolver)
@@ -100,7 +95,6 @@ class Server
         $this->incomingQueriesTotal = $telemetry->createCounter('dns.incoming.queries.total');
         $this->responseRcodesTotal = $telemetry->createCounter('dns.response.rcodes.total');
         $this->queryDuplicatesTotal = $telemetry->createCounter('dns.query.duplicates.total');
-        $this->queryRecursionsTotal = $telemetry->createCounter('dns.query.recursions.total');
         $this->responsesTotal = $telemetry->createCounter('dns.responses.total');
     }
 
@@ -174,11 +168,6 @@ class Server
                     $header = unpack('nid/nflags/nquestions/nanswers/nauthorities/nadditionals', substr($buffer, 0, 12));
                     if ($header) {
                         Console::info("[PACKET] DNS Header - ID: {$header['id']}, Questions: {$header['questions']}, Answers: {$header['answers']}");
-
-                        // Check if recursion is desired (RD bit in flags)
-                        if (($header['flags'] & 0x0100) === 0x0100) {
-                            $this->queryRecursionsTotal?->add(1);
-                        }
                     }
 
                     // Parse question domain
