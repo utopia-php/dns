@@ -219,7 +219,7 @@ class Server
                     };
 
                     $question = [
-                        'domain' => $domain,
+                        'name' => $domain,
                         'type' => $type
                     ];
 
