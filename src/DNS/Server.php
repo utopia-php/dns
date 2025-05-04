@@ -64,6 +64,15 @@ class Server
     protected ?Histogram $resolveDuration = null;
     protected ?Counter $failureCount = null;
 
+    /**
+     * Additional telemetry metrics
+     */
+    protected ?Counter $incomingQueriesTotal = null;
+    protected ?Counter $responseRcodesTotal = null;
+    protected ?Counter $queryDuplicatesTotal = null;
+    protected ?Counter $queryRecursionsTotal = null;
+    protected ?Counter $responsesTotal = null;
+
     public function __construct(Adapter $adapter, Resolver $resolver)
     {
         $this->adapter = $adapter;
@@ -86,6 +95,13 @@ class Server
         );
 
         $this->failureCount = $telemetry->createCounter('dns.resolve.failure');
+
+        // Initialize additional telemetry metrics
+        $this->incomingQueriesTotal = $telemetry->createCounter('dns.incoming.queries.total');
+        $this->responseRcodesTotal = $telemetry->createCounter('dns.response.rcodes.total');
+        $this->queryDuplicatesTotal = $telemetry->createCounter('dns.query.duplicates.total');
+        $this->queryRecursionsTotal = $telemetry->createCounter('dns.query.recursions.total');
+        $this->responsesTotal = $telemetry->createCounter('dns.responses.total');
     }
 
     /**
@@ -151,10 +167,18 @@ class Server
                 try {
                     Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from {$ip}:{$port}");
 
+                    // Track incoming query
+                    $this->incomingQueriesTotal?->add(1);
+
                     // Parse header information for better debugging
                     $header = unpack('nid/nflags/nquestions/nanswers/nauthorities/nadditionals', substr($buffer, 0, 12));
                     if ($header) {
                         Console::info("[PACKET] DNS Header - ID: {$header['id']}, Questions: {$header['questions']}, Answers: {$header['answers']}");
+
+                        // Check if recursion is desired (RD bit in flags)
+                        if (($header['flags'] & 0x0100) === 0x0100) {
+                            $this->queryRecursionsTotal?->add(1);
+                        }
                     }
 
                     // Parse question domain
@@ -234,6 +258,13 @@ class Server
                         0, // numberOfAdditionals
                     );
 
+                    // Track responses (total)
+                    $this->responsesTotal?->add(1);
+
+                    // Determine and track response code
+                    $responseLabel = empty($answers) ? 'NXDOMAIN' : 'NOERROR';
+                    $this->responseRcodesTotal?->add(1, ['rcode' => $responseLabel]);
+
                     // Copy questions section
                     $response .= \substr($buffer, 12, $offset - 12);
 
@@ -270,7 +301,8 @@ class Server
 
                     return $response;
                 } catch (Throwable $error) {
-                    $this->failureCount?->add(1, ['message' => $error->getMessage()]);
+                    $errorCategory = $this->categorizeError($error->getMessage());
+                    $this->failureCount?->add(1, ['error' => $errorCategory]);
                     Console::error("[ERROR] Failed to process packet: " . $error->getMessage());
                     Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
                     Console::error("[ERROR] Processing time: " . ((microtime(true) - $startTime) * 1000) . "ms");
@@ -384,5 +416,32 @@ class Server
         $result = \pack('Nn', $ttl, $totalLength) . $result;
 
         return $result;
+    }
+
+    /**
+     * Categorize error messages into standardized error types
+     * to prevent high cardinality in telemetry metrics
+     *
+     * @param string $errorMessage
+     * @return string
+     */
+    protected function categorizeError(string $errorMessage): string
+    {
+        return match (true) {
+            str_contains($errorMessage, 'Out of memory') => 'memory_limit',
+            str_contains($errorMessage, 'Maximum execution time') => 'timeout',
+            str_contains($errorMessage, 'file_get_contents') ||
+            str_contains($errorMessage, 'fopen') ||
+            str_contains($errorMessage, 'Permission denied') => 'file_access',
+            str_contains($errorMessage, 'Connection refused') ||
+            str_contains($errorMessage, 'Connection timed out') => 'connection',
+            str_contains($errorMessage, 'Undefined') => 'undefined_reference',
+            str_contains($errorMessage, 'Invalid argument') => 'invalid_argument',
+            str_contains($errorMessage, 'Cannot unpack') ||
+            str_contains($errorMessage, 'Malformed') => 'malformed_packet',
+            str_contains($errorMessage, 'Domain not found') ||
+            str_contains($errorMessage, 'Host not found') => 'dns_resolution',
+            default => 'other'
+        };
     }
 }
