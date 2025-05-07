@@ -62,7 +62,7 @@ class Server
      * Telemetry metrics
      */
     protected ?Histogram $resolveDuration = null;
-    protected ?Counter $failureCount = null;
+    protected ?Counter $failuresTotal = null;
     protected ?Counter $incomingQueriesTotal = null;
     protected ?Counter $responseRcodesTotal = null;
     protected ?Counter $responsesTotal = null;
@@ -88,7 +88,7 @@ class Server
             ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]]
         );
 
-        $this->failureCount = $telemetry->createCounter('dns.resolve.failure');
+        $this->failuresTotal = $telemetry->createCounter('dns.resolve.failure');
 
         // Initialize additional telemetry metrics
         $this->incomingQueriesTotal = $telemetry->createCounter('dns.incoming.queries.total');
@@ -289,7 +289,7 @@ class Server
                     return $response;
                 } catch (Throwable $error) {
                     $errorCategory = $this->categorizeError($error->getMessage());
-                    $this->failureCount?->add(1, ['error' => $errorCategory]);
+                    $this->failuresTotal?->add(1, ['error' => $errorCategory]);
                     Console::error("[ERROR] Failed to process packet: " . $error->getMessage());
                     Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
                     Console::error("[ERROR] Processing time: " . ((microtime(true) - $startTime) * 1000) . "ms");
