@@ -65,7 +65,6 @@ class Server
     protected ?Counter $failureCount = null;
     protected ?Counter $incomingQueriesTotal = null;
     protected ?Counter $responseRcodesTotal = null;
-    protected ?Counter $queryDuplicatesTotal = null;
     protected ?Counter $responsesTotal = null;
 
     public function __construct(Adapter $adapter, Resolver $resolver)
@@ -94,7 +93,6 @@ class Server
         // Initialize additional telemetry metrics
         $this->incomingQueriesTotal = $telemetry->createCounter('dns.incoming.queries.total');
         $this->responseRcodesTotal = $telemetry->createCounter('dns.response.rcodes.total');
-        $this->queryDuplicatesTotal = $telemetry->createCounter('dns.query.duplicates.total');
         $this->responsesTotal = $telemetry->createCounter('dns.responses.total');
     }
 
