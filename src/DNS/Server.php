@@ -280,7 +280,7 @@ class Server
                         };
                     }
 
-                    $processingTime = (microtime(true) - $startTime) * 1000;
+                    $processingTime = (microtime(true) - $startTime);
                     $this->resolveDuration?->record($processingTime);
                     Console::info("[PACKET] Processing completed in {$processingTime}ms");
 
