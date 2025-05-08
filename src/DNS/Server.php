@@ -319,9 +319,13 @@ class Server
     {
         $result = \pack('Nn', $ttl, 4);
 
-        foreach (\explode('.', $ip) as $label) {
-            $result .= \chr((int) $label);
+        $binaryIP = inet_pton($ip);
+        if ($binaryIP === false) {
+            throw new \Exception("Invalid IPv4 address format: {$ip}");
         }
+
+        // Append the binary IPv4 address directly
+        $result .= $binaryIP;
 
         return $result;
     }
@@ -330,9 +334,12 @@ class Server
     {
         $result = \pack('Nn', $ttl, 16);
 
-        foreach (\explode(':', $ip) as $label) {
-            $result .= \pack('n', \hexdec($label));
+        $binaryIP = inet_pton($ip);
+        if ($binaryIP === false) {
+            throw new \Exception("Invalid IPv6 address format: {$ip}");
         }
+
+        $result .= $binaryIP;
 
         return $result;
     }
