@@ -280,7 +280,7 @@ class Server
 
                     $processingTime = (microtime(true) - $startTime);
                     $this->resolveDuration?->record($processingTime, ['type' => $type]);
-                    Console::info("[PACKET] Processing completed in {$processingTime}ms");
+                    Console::info("[PACKET] Processing completed in {$processingTime}s");
 
                     if (empty($response)) {
                         Console::warning("[PACKET] Generated empty response for {$domain} ({$type})");
