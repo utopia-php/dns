@@ -43,7 +43,7 @@ class Memory extends Resolver
      */
     public function resolve(array $question): array
     {
-        $key = $question['domain'] . '_' . $question['type'];
+        $key = $question['name'] . '_' . $question['type'];
 
         if (\array_key_exists($key, $this->records)) {
             return $this->records[$key];

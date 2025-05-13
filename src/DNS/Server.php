@@ -4,6 +4,10 @@ namespace Utopia\DNS;
 
 use Utopia\CLI\Console;
 use Throwable;
+use Utopia\Telemetry\Adapter as Telemetry;
+use Utopia\Telemetry\Adapter\None as NoTelemetry;
+use Utopia\Telemetry\Counter;
+use Utopia\Telemetry\Histogram;
 
 /**
  * Refference about DNS packet:
@@ -54,10 +58,42 @@ class Server
     protected array $errors = [];
     protected bool $debug = false;
 
+    /**
+     * Telemetry metrics
+     */
+    protected ?Histogram $resolveDuration = null;
+    protected ?Counter $failuresTotal = null;
+    protected ?Counter $incomingQueriesTotal = null;
+    protected ?Counter $responseRcodesTotal = null;
+    protected ?Counter $responsesTotal = null;
+
     public function __construct(Adapter $adapter, Resolver $resolver)
     {
         $this->adapter = $adapter;
         $this->resolver = $resolver;
+        $this->setTelemetry(new NoTelemetry());
+    }
+
+    /**
+     * Set telemetry adapter
+     *
+     * @param  Telemetry  $telemetry
+     */
+    public function setTelemetry(Telemetry $telemetry): void
+    {
+        $this->resolveDuration = $telemetry->createHistogram(
+            'dns.resolve.duration',
+            's',
+            null,
+            ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]]
+        );
+
+        $this->failuresTotal = $telemetry->createCounter('dns.resolve.failure');
+
+        // Initialize additional telemetry metrics
+        $this->incomingQueriesTotal = $telemetry->createCounter('dns.incoming.queries.total');
+        $this->responseRcodesTotal = $telemetry->createCounter('dns.response.rcodes.total');
+        $this->responsesTotal = $telemetry->createCounter('dns.responses.total');
     }
 
     /**
@@ -123,6 +159,9 @@ class Server
                 try {
                     Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from {$ip}:{$port}");
 
+                    // Track incoming query
+                    $this->incomingQueriesTotal?->add(1);
+
                     // Parse header information for better debugging
                     $header = unpack('nid/nflags/nquestions/nanswers/nauthorities/nadditionals', substr($buffer, 0, 12));
                     if ($header) {
@@ -178,7 +217,7 @@ class Server
                     };
 
                     $question = [
-                        'domain' => $domain,
+                        'name' => $domain,
                         'type' => $type
                     ];
 
@@ -206,6 +245,13 @@ class Server
                         0, // numberOfAdditionals
                     );
 
+                    // Track responses (total)
+                    $this->responsesTotal?->add(1);
+
+                    // Determine and track response code
+                    $responseLabel = empty($answers) ? 'NXDOMAIN' : 'NOERROR';
+                    $this->responseRcodesTotal?->add(1, ['rcode' => $responseLabel]);
+
                     // Copy questions section
                     $response .= \substr($buffer, 12, $offset - 12);
 
@@ -232,8 +278,9 @@ class Server
                         };
                     }
 
-                    $processingTime = (microtime(true) - $startTime) * 1000;
-                    Console::info("[PACKET] Processing completed in {$processingTime}ms");
+                    $processingTime = (microtime(true) - $startTime);
+                    $this->resolveDuration?->record($processingTime, ['type' => $type]);
+                    Console::info("[PACKET] Processing completed in {$processingTime}s");
 
                     if (empty($response)) {
                         Console::warning("[PACKET] Generated empty response for {$domain} ({$type})");
@@ -241,6 +288,8 @@ class Server
 
                     return $response;
                 } catch (Throwable $error) {
+                    $errorCategory = $this->categorizeError($error->getMessage());
+                    $this->failuresTotal?->add(1, ['error' => $errorCategory]);
                     Console::error("[ERROR] Failed to process packet: " . $error->getMessage());
                     Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
                     Console::error("[ERROR] Processing time: " . ((microtime(true) - $startTime) * 1000) . "ms");
@@ -270,9 +319,13 @@ class Server
     {
         $result = \pack('Nn', $ttl, 4);
 
-        foreach (\explode('.', $ip) as $label) {
-            $result .= \chr((int) $label);
+        $binaryIP = inet_pton($ip);
+        if ($binaryIP === false) {
+            throw new \Exception("Invalid IPv4 address format: {$ip}");
         }
+
+        // Append the binary IPv4 address directly
+        $result .= $binaryIP;
 
         return $result;
     }
@@ -281,9 +334,12 @@ class Server
     {
         $result = \pack('Nn', $ttl, 16);
 
-        foreach (\explode(':', $ip) as $label) {
-            $result .= \pack('n', \hexdec($label));
+        $binaryIP = inet_pton($ip);
+        if ($binaryIP === false) {
+            throw new \Exception("Invalid IPv6 address format: {$ip}");
         }
+
+        $result .= $binaryIP;
 
         return $result;
     }
@@ -354,5 +410,32 @@ class Server
         $result = \pack('Nn', $ttl, $totalLength) . $result;
 
         return $result;
+    }
+
+    /**
+     * Categorize error messages into standardized error types
+     * to prevent high cardinality in telemetry metrics
+     *
+     * @param string $errorMessage
+     * @return string
+     */
+    protected function categorizeError(string $errorMessage): string
+    {
+        return match (true) {
+            str_contains($errorMessage, 'Out of memory') => 'memory_limit',
+            str_contains($errorMessage, 'Maximum execution time') => 'timeout',
+            str_contains($errorMessage, 'file_get_contents') ||
+            str_contains($errorMessage, 'fopen') ||
+            str_contains($errorMessage, 'Permission denied') => 'file_access',
+            str_contains($errorMessage, 'Connection refused') ||
+            str_contains($errorMessage, 'Connection timed out') => 'connection',
+            str_contains($errorMessage, 'Undefined') => 'undefined_reference',
+            str_contains($errorMessage, 'Invalid argument') => 'invalid_argument',
+            str_contains($errorMessage, 'Cannot unpack') ||
+            str_contains($errorMessage, 'Malformed') => 'malformed_packet',
+            str_contains($errorMessage, 'Domain not found') ||
+            str_contains($errorMessage, 'Host not found') => 'dns_resolution',
+            default => 'other'
+        };
     }
 }
