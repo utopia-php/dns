@@ -164,9 +164,11 @@ class Server
 
                     // Parse header information for better debugging
                     $header = unpack('nid/nflags/nquestions/nanswers/nauthorities/nadditionals', substr($buffer, 0, 12));
-                    if ($header) {
-                        Console::info("[PACKET] DNS Header - ID: {$header['id']}, Questions: {$header['questions']}, Answers: {$header['answers']}");
+                    if (!$header) {
+                        throw new \Exception('Invalid header');
                     }
+
+                    Console::info("[PACKET] DNS Header - ID: {$header['id']}, Questions: {$header['questions']}, Answers: {$header['answers']}");
 
                     // Parse question domain
                     $domain = "";
@@ -231,26 +233,37 @@ class Server
                         Console::warning("[RESPONSE] No answers found for {$domain} ({$type})");
                     }
 
-                    // Build response
-                    $response = '';
-
-                    // Copy some of header
-                    $response .= \substr($buffer, 0, 6);
-
-                    // Add rest of header
-                    $response .= \pack(
-                        'nnn',
-                        \count($answers), // numberOfAnswers
-                        0, // numberOfAuthorities
-                        0, // numberOfAdditionals
-                    );
-
                     // Track responses (total)
                     $this->responsesTotal?->add(1);
 
                     // Determine and track response code
                     $responseLabel = empty($answers) ? 'NXDOMAIN' : 'NOERROR';
                     $this->responseRcodesTotal?->add(1, ['rcode' => $responseLabel]);
+
+                    // Build response
+                    $response = '';
+
+                    // Copy the transaction ID
+                    $response .= \substr($buffer, 0, 2);
+
+                    // Construct the flags field more explicitly
+                    $qr = 1;                                // Response
+                    $opcode = 0;                            // Standard query
+                    $aa = 1;                                // Authoritative
+                    $tc = 0;                                // Not truncated
+                    $rd = ($header['flags'] >> 8) & 1;      // Get RD from request
+                    $ra = 0;                                // Recursion not available (or available, change as needed)
+                    $z = 0;                                 // Zero
+                    $rcode = empty($answers) ? 3 : 0;       // response code
+
+                    $flags = ($qr << 15) | ($opcode << 11) | ($aa << 10) | ($tc << 9) | ($rd << 8) | ($ra << 7) | ($z << 4) | $rcode;
+                    $response .= pack('n', $flags);
+
+                    // Copy the question count
+                    $response .= \substr($buffer, 4, 2);
+
+                    // Set the answer, authority, and additional records count (initially 0)
+                    $response .= pack('nnn', \count($answers), 0, 0);
 
                     // Copy questions section
                     $response .= \substr($buffer, 12, $offset - 12);
