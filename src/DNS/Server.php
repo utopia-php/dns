@@ -276,7 +276,7 @@ class Server
                         /**
                          * @var string $type
                          */
-                        $type = $question['type'];
+                        $type = $answer->getTypeName() ?? $question['type'];
 
                         $response .= match ($type) {
                             'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
