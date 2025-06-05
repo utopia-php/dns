@@ -271,7 +271,20 @@ class Server
                     // Add answers section
                     foreach ($answers as $answer) {
                         $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
-                        $response .= \pack('nn', $typeByte, $classByte);
+                        $answerTypeByte = match ($answer->getTypeName()) {
+                            'A' => 1,
+                            'CNAME' => 5,
+                            'MX' => 15,
+                            'TXT' => 16,
+                            'AAAA' => 28,
+                            'SRV' => 33,
+                            'CAA' => 257,
+                            'NS' => 2,
+                            default => $typeByte // Fallback to question type if unknown
+                        };
+
+                        // Pack the answer's type, not the question type
+                        $response .= \pack('nn', $answerTypeByte, $classByte);
 
                         /**
                          * @var string $type
