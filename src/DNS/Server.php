@@ -271,12 +271,14 @@ class Server
                     // Add answers section
                     foreach ($answers as $answer) {
                         $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
-                        $response .= \pack('nn', $typeByte, $classByte);
+
+                        // Pack the answer's type, not the question type
+                        $response .= \pack('nn', $answer->getType(), $classByte);
 
                         /**
                          * @var string $type
                          */
-                        $type = $question['type'];
+                        $type = $answer->getTypeName();
 
                         $response .= match ($type) {
                             'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
