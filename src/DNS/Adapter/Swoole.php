@@ -10,6 +10,7 @@ class Swoole extends Adapter
     protected Server $server;
     protected string $host;
     protected int $port;
+    protected $workerStartCallback = null;
 
     public function __construct(string $host = '0.0.0.0', int $port = 53)
     {
@@ -30,6 +31,29 @@ class Swoole extends Adapter
 
             $server->sendto($ip, $port, $answer);
         });
+    }
+
+    /**
+     * Set callback for worker start event
+     *
+     * @param callable $callback
+     */
+    public function onWorkerStart(callable $callback): void
+    {
+        $this->workerStartCallback = $callback;
+        $this->server->on('WorkerStart', function ($server, $workerId) use ($callback) {
+            call_user_func($callback, $server, $workerId);
+        });
+    }
+
+    /**
+     * Get the server instance for configuration
+     *
+     * @return Server
+     */
+    public function getServer(): Server
+    {
+        return $this->server;
     }
 
     /**
