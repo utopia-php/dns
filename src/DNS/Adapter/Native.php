@@ -78,10 +78,6 @@ class Native extends Adapter
      */
     public function onWorkerStart(callable $callback): void
     {
-        if (is_callable($callback)) {
-            call_user_func($callback, $this->server, 0); // Pass dummy worker ID
-        } else {
-            throw new Exception('Worker start callback must be callable.');
-        }
+        call_user_func($callback, $this->server, 0);
     }
 }
