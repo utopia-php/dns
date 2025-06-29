@@ -2,6 +2,7 @@
 
 namespace Utopia\DNS\Adapter;
 
+use Swoole\Runtime;
 use Utopia\DNS\Adapter;
 use Swoole\Server;
 
@@ -59,6 +60,7 @@ class Swoole extends Adapter
      */
     public function start(): void
     {
+        Runtime::enableCoroutine();
         $this->server->start();
     }
 

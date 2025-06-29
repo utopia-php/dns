@@ -154,10 +154,6 @@ class Server
 
             Console::success('[DNS] Server is ready to accept connections');
 
-            $this->adapter->onWorkerStart(function ($server, $workerId) {
-                Console::info("[WORKER] Worker #{$workerId} - PID: " . getmypid() .  " - Started at " . date('Y-m-d H:i:s T') . ' Memory: ' . round(memory_get_usage(true) / 1024 / 1024, 2) . "MB");
-            });
-
             $this->adapter->onPacket(function (string $buffer, string $ip, int $port) {
                 $startTime = microtime(true);
                 try {
