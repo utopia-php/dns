@@ -69,4 +69,15 @@ class Native extends Adapter
     {
         return 'native';
     }
+
+    /**
+     * Worker start callback
+     *
+     * @param callable $callback
+     * @return void
+     */
+    public function onWorkerStart(callable $callback): void
+    {
+        call_user_func($callback, $this->server, 0);
+    }
 }

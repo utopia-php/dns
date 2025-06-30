@@ -22,4 +22,15 @@ abstract class Adapter
      * @return string
      */
     abstract public function getName(): string;
+
+    /**
+     * Worker Start Callback (optional for adapters that support it)
+     *
+     * @param callable $callback
+     */
+    public function onWorkerStart(callable $callback): void
+    {
+        // Default implementation does nothing
+        // Adapters that support worker events should override this
+    }
 }
