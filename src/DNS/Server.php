@@ -273,23 +273,20 @@ class Server
 
                     // Add answers section
                     foreach ($answers as $answer) {
-                        $response .= \chr(192) . \chr(12); // 192 indicates this is pointer, 12 is offset to question.
-
+                        $response .= chr(192) . chr(12); // 192 indicates this is pointer, 12 is offset to question.
                         // Pack the answer's type, not the question type
-                        $response .= \pack('nn', $answer->getType(), $classByte);
-
+                        $response .= pack('nn', $answer->getType(), $classByte);
                         /**
                          * @var string $type
                          */
                         $type = $answer->getTypeName();
-
                         $response .= match ($type) {
                             'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
                             'AAAA' => $this->encodeIPv6($answer->getRdata(), $answer->getTTL()),
                             'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
                             'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
                             'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
-                            'CAA' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
+                            'CAA' => $this->encodeCAA($answer->getRdata(), $answer->getTTL()),
                             'MX' => $this->encodeMx($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0),
                             'SRV' => $this->encodeSrv($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0, $answer->getWeight() ?? 0, $answer->getPort() ?? 0),
                             default => ''
@@ -428,6 +425,35 @@ class Server
         $result = \pack('Nn', $ttl, $totalLength) . $result;
 
         return $result;
+    }
+
+    protected function encodeCAA(array|string $rdata, int $ttl): string
+    {
+        // Accept either array or string for rdata
+        // If string, parse as 'tag value' (e.g. 'issue "letsencrypt.org"')
+        $flags = 0;
+        $tag = '';
+        $value = '';
+        if (is_array($rdata)) {
+            $flags = isset($rdata['flags']) ? (int)$rdata['flags'] : 0;
+            $tag = (string)($rdata['tag'] ?? 'issue');
+            $value = (string)($rdata['value'] ?? '');
+        } elseif (is_string($rdata)) {
+            // Try to parse: 'issue "letsencrypt.org"' or 'issuewild "example.com"'
+            if (preg_match('/^(issue|issuewild|iodef)\s+"([^"]+)"$/', $rdata, $m)) {
+                $tag = $m[1];
+                $value = $m[2];
+            } else {
+                // fallback: treat all as value
+                $tag = 'issue';
+                $value = $rdata;
+            }
+        }
+        $tagLen = strlen($tag);
+        $valueLen = strlen($value);
+        $rdataBin = chr($flags) . chr($tagLen) . $tag . $value;
+        $totalLen = 2 + $tagLen + $valueLen;
+        return pack('Nn', $ttl, $totalLen) . $rdataBin;
     }
 
     /**
