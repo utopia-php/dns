@@ -136,6 +136,7 @@ class Record
                 'TXT'   => 16,
                 'AAAA'  => 28,
                 'SRV'   => 33,
+                'CAA'   => 257,
             ];
             $upper = strtoupper($type);
             $this->type = $map[$upper] ?? 0;
@@ -321,6 +322,7 @@ class Record
             16 => 'TXT',
             28 => 'AAAA',
             33 => 'SRV',
+            257 => 'CAA',
         ];
         return $types[$this->type] ?? "TYPE{$this->type}";
     }
