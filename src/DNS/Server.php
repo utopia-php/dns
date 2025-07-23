@@ -173,35 +173,38 @@ class Server
                     // Parse question domain
                     $domain = "";
                     $offset = 12;
-                    while ($offset < \strlen($buffer)) {
-                        // Get label length
-                        $labelLength = \ord($buffer[$offset]);
-
+                    while ($offset < strlen($buffer)) {
+                        // Check for at least 1 byte for label length
+                        if (($offset + 1) > strlen($buffer)) {
+                            throw new \Exception('Malformed packet: not enough bytes for label length');
+                        }
+                        $labelLength = ord($buffer[$offset]);
                         Console::info("[PACKET] Processing label at offset {$offset}, length: {$labelLength}");
-
-                        // End of question
-                        if ($labelLength === 0 && \ord($buffer[$offset + 1]) === 0) {
-                            Console::info("[PACKET] End of domain name found at offset " . ($offset + 1));
+                        // End of question (zero label)
+                        if ($labelLength === 0) {
                             $offset += 1;
+                            Console::info("[PACKET] End of domain name found at offset " . ($offset));
                             break;
                         }
-
-                        // Extract label as string
-                        $label = \substr($buffer, $offset + 1, $labelLength);
+                        // Check for enough bytes for label
+                        if (($offset + 1 + $labelLength) > strlen($buffer)) {
+                            throw new \Exception('Malformed packet: not enough bytes for label');
+                        }
+                        $label = substr($buffer, $offset + 1, $labelLength);
                         Console::info("[PACKET] Found label: {$label}");
-
                         if (empty($domain)) {
                             $domain .= $label;
                         } else {
                             $domain .= '.' . $label;
                         }
-
                         // Skip to next label length
                         $offset += 1 + $labelLength;
                     }
-
-                    // Parse question type
-                    $unpacked = \unpack('ntype/nclass', \substr($buffer, $offset, 4));
+                    // After domain, there should be 4 bytes for type/class
+                    if (($offset + 4) > strlen($buffer)) {
+                        throw new \Exception('Malformed packet: not enough bytes for question type/class');
+                    }
+                    $unpacked = unpack('ntype/nclass', substr($buffer, $offset, 4));
                     $offset += 4;
                     $typeByte = $unpacked['type'] ?? 0;
                     $classByte = $unpacked['class'] ?? 0;
