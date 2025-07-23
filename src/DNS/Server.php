@@ -429,8 +429,6 @@ class Server
 
     protected function encodeCAA(array|string $rdata, int $ttl): string
     {
-        // Accept either array or string for rdata
-        // If string, parse as 'tag value' (e.g. 'issue "letsencrypt.org"')
         $flags = 0;
         $tag = '';
         $value = '';
@@ -439,16 +437,23 @@ class Server
             $tag = (string)($rdata['tag'] ?? 'issue');
             $value = (string)($rdata['value'] ?? '');
         } elseif (is_string($rdata)) {
-            // Try to parse: 'issue "letsencrypt.org"' or 'issuewild "example.com"'
-            if (preg_match('/^(issue|issuewild|iodef)\s+"([^"]+)"$/', $rdata, $m)) {
-                $tag = $m[1];
-                $value = $m[2];
+            // Parse: 'flags tag "value"' or 'tag "value"' or 'flags tag value' or 'tag value'
+            if (preg_match('/^(?:(\d+)\s+)?([a-zA-Z0-9_-]+)\s+"([^"]+)"$/', $rdata, $m)) {
+                $flags = isset($m[1]) ? (int)$m[1] : 0;
+                $tag = $m[2];
+                $value = $m[3];
+            } elseif (preg_match('/^(?:(\d+)\s+)?([a-zA-Z0-9_-]+)\s+(.+)$/', $rdata, $m)) {
+                $flags = isset($m[1]) ? (int)$m[1] : 0;
+                $tag = $m[2];
+                $value = $m[3];
             } else {
-                // fallback: treat all as value
+                // fallback: treat all as issue value
                 $tag = 'issue';
                 $value = $rdata;
             }
         }
+        // Validate flags (must be 0-255)
+        $flags = max(0, min(255, $flags));
         $tagLen = strlen($tag);
         $valueLen = strlen($value);
         $rdataBin = chr($flags) . chr($tagLen) . $tag . $value;
