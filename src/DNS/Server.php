@@ -427,6 +427,13 @@ class Server
         return $result;
     }
 
+    /**
+     * Encode a CAA record according to RFC 6844.
+     *
+     * @param array{flags?:int,tag?:string,value?:string}|string $rdata
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeCAA(array|string $rdata, int $ttl): string
     {
         $flags = 0;
