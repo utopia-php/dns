@@ -360,22 +360,47 @@ class Zone
      *
      * @return string[]
      */
+    /**
+     * Tokenize a line by whitespace, handling quoted strings and escapes per RFC 1035.
+     *
+     * @return string[]
+     */
     protected function tokenize(string $line): array
     {
         $tokens = [];
         $current = '';
-        $inSpace = true;
+        $inQuote = false;
+        $escape = false;
         for ($i = 0, $len = strlen($line); $i < $len; $i++) {
             $c = $line[$i];
-            if ($c === ' ' || $c === "\t") {
-                if (!$inSpace) {
+            if ($escape) {
+                $current .= $c;
+                $escape = false;
+                continue;
+            }
+            if ($c === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($inQuote) {
+                if ($c === '"') {
+                    $inQuote = false;
                     $tokens[] = $current;
                     $current = '';
+                } else {
+                    $current .= $c;
                 }
-                $inSpace = true;
             } else {
-                $current .= $c;
-                $inSpace = false;
+                if ($c === '"') {
+                    $inQuote = true;
+                } elseif ($c === ' ' || $c === "\t") {
+                    if ($current !== '') {
+                        $tokens[] = $current;
+                        $current = '';
+                    }
+                } else {
+                    $current .= $c;
+                }
             }
         }
         if ($current !== '') {
