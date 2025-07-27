@@ -337,4 +337,17 @@ ZONE;
         $this->assertSame($records1[2]->getPriority(), $records2[2]->getPriority());
         $this->assertSame($records1[2]->getRdata(), $records2[2]->getRdata());
     }
+
+     public function testImportTxtWithSpecialChars()
+     {
+         $zone = new Zone();
+         $zonefile = <<<ZONE
+@ 3600 IN TXT "v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;"
+ZONE;
+         $records = $zone->import('example.com', $zonefile);
+         $this->assertCount(1, $records);
+         $rec = $records[0];
+         $this->assertEquals('TXT', $rec->getTypeName());
+         $this->assertEquals('v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;', trim($rec->getRdata(), '"'));
+     }
 }

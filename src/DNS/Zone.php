@@ -219,7 +219,14 @@ class Zone
             }
             $type = strtoupper($tokens[$pos++]);
             $dataParts = array_slice($tokens, $pos);
-            $data = implode(' ', $dataParts);
+            if ($type === 'TXT') {
+                $data = '';
+                foreach ($dataParts as $part) {
+                    $data .= $part;
+                }
+            } else {
+                $data = implode(' ', $dataParts);
+            }
             if ($owner !== '@' && !str_ends_with($owner, '.')) {
                 $owner .= '.' . rtrim($this->defaultOrigin, '.');
             }
