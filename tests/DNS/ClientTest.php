@@ -105,9 +105,10 @@ class ClientTest extends TestCase
 
         $records = $this->client->query('dev2.appwrite.io', 'TXT');
 
-        $this->assertCount(2, $records);
+        $this->assertCount(3, $records);
         $this->assertEquals('key with "$\'- symbols', $records[0]->getRdata());
         $this->assertEquals('key with spaces', $records[1]->getRdata());
+        $this->assertEquals('v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;', $records[2]->getRdata());
 
         $records = $this->client->query('dev3.appwrite.io', 'TXT');
         $this->assertCount(0, $records);

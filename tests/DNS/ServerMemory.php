@@ -60,6 +60,10 @@ $resolver->addRecord('dev2.appwrite.io', 'TXT', [
     'value' => 'key with spaces'
 ]);
 
+$resolver->addRecord('dev2.appwrite.io', 'TXT', [
+    'value' => 'v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;'
+]);
+
 $resolver->addRecord('dev.appwrite.io', 'CAA', [
     'value' => 'issue "letsencrypt.org"',
     'ttl' => 50
