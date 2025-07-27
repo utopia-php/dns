@@ -178,7 +178,17 @@ class Zone
         $lastOwner = null;
         $logicalLines = $this->collectLogicalLines($content);
         foreach ($logicalLines as $rawLine) {
-            $line = trim($this->stripTrailingComment($rawLine));
+            // For TXT records, only strip comments at #, not at semicolons
+            $isTxt = false;
+            $peekTokens = $this->tokenize($rawLine);
+            if (count($peekTokens) >= 4 && strtoupper($peekTokens[3]) === 'TXT') {
+                $isTxt = true;
+            }
+            if ($isTxt) {
+                $line = trim($this->stripTrailingComment($rawLine, true));
+            } else {
+                $line = trim($this->stripTrailingComment($rawLine, false));
+            }
             if ($line === '' || $this->isComment($line)) {
                 continue;
             }
@@ -272,11 +282,21 @@ class Zone
                 $data = "{$r->getPriority()} {$r->getRdata()}";
             } elseif ($type === 'SRV' && $r->getPriority() !== null && $r->getWeight() !== null && $r->getPort() !== null) {
                 $data = "{$r->getPriority()} {$r->getWeight()} {$r->getPort()} {$r->getRdata()}";
+            } elseif ($type === 'TXT') {
+                // Encode TXT records with double quotes and escape embedded quotes and backslashes
+                $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $data);
+                $data = '"' . $escaped . '"';
             }
 
             $lines[] = sprintf("%s %d %s %s %s", $owner, $ttl, $class, $type, $data);
         }
-        return implode("\n", $lines) . "\n";
+        // Remove any empty lines at the end
+        while (!empty($lines) && trim(end($lines)) === '') {
+            array_pop($lines);
+        }
+        $output = implode("\n", $lines);
+        // Guarantee only a single newline at the end
+        return rtrim($output, "\n") . "\n";
     }
 
     /**
@@ -300,7 +320,7 @@ class Zone
         $parenDepth = 0;
         foreach ($rawLines as $rawLine) {
             // Remove trailing comments from the physical line.
-            $line = trim($this->stripTrailingComment($rawLine));
+            $line = trim($this->stripTrailingComment($rawLine, false));
             if ($line === '') {
                 continue;
             }
@@ -343,17 +363,26 @@ class Zone
     /**
      * Remove trailing comments (anything after '#' or ';') from a line.
      */
-    protected function stripTrailingComment(string $line): string
+
+    /**
+     * Remove trailing comments (anything after '#' or ';') from a line.
+     * If $txtMode is true, only strip at #, not at semicolons.
+     */
+    protected function stripTrailingComment(string $line, bool $txtMode): string
     {
-        $hashPos = strpos($line, '#');
-        if ($hashPos !== false) {
-            $line = substr($line, 0, $hashPos);
+        $inQuote = false;
+        $result = '';
+        for ($i = 0, $len = strlen($line); $i < $len; $i++) {
+            $c = $line[$i];
+            if ($c === '"') {
+                $inQuote = !$inQuote;
+            }
+            if (!$inQuote && ($c === '#' || (!$txtMode && $c === ';'))) {
+                break;
+            }
+            $result .= $c;
         }
-        $semiPos = strpos($line, ';');
-        if ($semiPos !== false) {
-            $line = substr($line, 0, $semiPos);
-        }
-        return $line;
+        return $result;
     }
 
     protected function isComment(string $line): bool
@@ -374,6 +403,7 @@ class Zone
      */
     protected function tokenize(string $line): array
     {
+        // Manual tokenizer: handles quoted strings and escapes
         $tokens = [];
         $current = '';
         $inQuote = false;
