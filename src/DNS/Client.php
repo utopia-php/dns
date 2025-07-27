@@ -230,12 +230,7 @@ class Client
                     $txts[] = $chunk;
                     $offset += $len;
                 }
-                // If you want to match dig output, wrap in quotes and escape embedded quotes
-                $txtValue = implode('', $txts);
-                if (strpos($txtValue, '"') !== false) {
-                    $txtValue = str_replace('"', '\\"', $txtValue);
-                }
-                return '"' . $txtValue . '"';
+                return implode('', $txts);
             case 33: // SRV record
                 $priority = unpack('n', substr($packet, $offset, 2));
                 $weight = unpack('n', substr($packet, $offset + 2, 2));
