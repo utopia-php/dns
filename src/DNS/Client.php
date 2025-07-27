@@ -226,10 +226,15 @@ class Client
                 while ($offset < $end) {
                     $len = ord($packet[$offset]);
                     $offset++;
-                    $txts[] = substr($packet, $offset, $len);
+                    if ($len > 0) {
+                        $txts[] = substr($packet, $offset, $len);
+                    } else {
+                        $txts[] = '';
+                    }
                     $offset += $len;
                 }
-                return implode(' ', $txts);
+                // Concatenate chunks directly, no separator
+                return implode('', $txts);
             case 33: // SRV record
                 $priority = unpack('n', substr($packet, $offset, 2));
                 $weight = unpack('n', substr($packet, $offset + 2, 2));
