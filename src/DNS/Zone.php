@@ -181,8 +181,11 @@ class Zone
             // For TXT records, only strip comments at #, not at semicolons
             $isTxt = false;
             $peekTokens = $this->tokenize($rawLine);
-            if (count($peekTokens) >= 4 && strtoupper($peekTokens[3]) === 'TXT') {
-                $isTxt = true;
+            foreach ($peekTokens as $tok) {
+                if (strtoupper($tok) === 'TXT') {
+                    $isTxt = true;
+                    break;
+                }
             }
             if ($isTxt) {
                 $line = trim($this->stripTrailingComment($rawLine, true));
@@ -374,8 +377,17 @@ class Zone
         $result = '';
         for ($i = 0, $len = strlen($line); $i < $len; $i++) {
             $c = $line[$i];
+            // Check for unescaped quote
             if ($c === '"') {
-                $inQuote = !$inQuote;
+                $escaped = false;
+                $j = $i - 1;
+                while ($j >= 0 && $line[$j] === '\\') {
+                    $escaped = !$escaped;
+                    $j--;
+                }
+                if (!$escaped) {
+                    $inQuote = !$inQuote;
+                }
             }
             if (!$inQuote && ($c === '#' || (!$txtMode && $c === ';'))) {
                 break;
