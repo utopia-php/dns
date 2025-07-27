@@ -330,100 +330,139 @@ class Server
         return $this->resolver->resolve($question);
     }
 
+    /**
+     * Encode an IPv4 address (A record) according to RFC 1035.
+     *
+     * @param string $ip
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeIP(string $ip, int $ttl): string
     {
-        $result = \pack('Nn', $ttl, 4);
-
         $binaryIP = inet_pton($ip);
-        if ($binaryIP === false) {
+        if ($binaryIP === false || strlen($binaryIP) !== 4) {
             throw new \Exception("Invalid IPv4 address format: {$ip}");
         }
-
-        // Append the binary IPv4 address directly
-        $result .= $binaryIP;
-
+        $result = pack('Nn', $ttl, 4) . $binaryIP;
         return $result;
     }
 
+    /**
+     * Encode an IPv6 address (AAAA record) according to RFC 3596.
+     *
+     * @param string $ip
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeIPv6(string $ip, int $ttl): string
     {
-        $result = \pack('Nn', $ttl, 16);
-
         $binaryIP = inet_pton($ip);
-        if ($binaryIP === false) {
+        if ($binaryIP === false || strlen($binaryIP) !== 16) {
             throw new \Exception("Invalid IPv6 address format: {$ip}");
         }
-
-        $result .= $binaryIP;
-
+        $result = pack('Nn', $ttl, 16) . $binaryIP;
         return $result;
     }
 
+    /**
+     * Encode a domain name (CNAME, NS, PTR) according to RFC 1035.
+     *
+     * @param string $domain
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeDomain(string $domain, int $ttl): string
     {
+        $labels = explode('.', rtrim($domain, '.'));
         $result = '';
         $totalLength = 0;
-
-        foreach (\explode('.', $domain) as $label) {
-            $labelLength = \strlen($label);
-            $result .= \chr($labelLength);
-            $result .= $label;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength > 63) {
+                throw new \Exception("Label too long in domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
             $totalLength += 1 + $labelLength;
         }
-
-        $result .= \chr(0);
+        $result .= chr(0);
         $totalLength += 1;
-
-        $result = \pack('Nn', $ttl, $totalLength) . $result;
-
+        $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
 
+    /**
+     * Encode a TXT record according to RFC 1035.
+     *
+     * @param string $text
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeText(string $text, int $ttl): string
     {
-        $textLength = \strlen($text);
-        $result = \pack('Nn', $ttl, 1 + $textLength) . \chr($textLength) . $text;
-
+        $chunks = [];
+        $len = strlen($text);
+        for ($i = 0; $i < $len; $i += 255) {
+            $chunk = substr($text, $i, 255);
+            $chunks[] = chr(strlen($chunk)) . $chunk;
+        }
+        $txtData = implode('', $chunks);
+        $result = pack('Nn', $ttl, strlen($txtData)) . $txtData;
         return $result;
     }
 
+    /**
+     * Encode an MX record according to RFC 1035.
+     *
+     * @param string $domain
+     * @param int $ttl
+     * @param int $priority
+     * @return string
+     */
     protected function encodeMx(string $domain, int $ttl, int $priority): string
     {
-        $result = \pack('n', $priority);
+        $labels = explode('.', rtrim($domain, '.'));
+        $result = pack('n', $priority);
         $totalLength = 2;
-
-        foreach (\explode('.', $domain) as $label) {
-            $labelLength = \strlen($label);
-            $result .= \chr($labelLength);
-            $result .= $label;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength > 63) {
+                throw new \Exception("Label too long in MX domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
             $totalLength += 1 + $labelLength;
         }
-
-        $result .= \chr(0);
+        $result .= chr(0);
         $totalLength += 1;
-
-        $result = \pack('Nn', $ttl, $totalLength) . $result;
-
+        $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
 
+    /**
+     * Encode an SRV record according to RFC 2782.
+     *
+     * @param string $domain
+     * @param int $ttl
+     * @param int $priority
+     * @param int $weight
+     * @param int $port
+     * @return string
+     */
     protected function encodeSrv(string $domain, int $ttl, int $priority, int $weight, int $port): string
     {
-        $result = \pack('nnn', $priority, $weight, $port);
+        $labels = explode('.', rtrim($domain, '.'));
+        $result = pack('nnn', $priority, $weight, $port);
         $totalLength = 6;
-
-        foreach (\explode('.', $domain) as $label) {
-            $labelLength = \strlen($label);
-            $result .= \chr($labelLength);
-            $result .= $label;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength > 63) {
+                throw new \Exception("Label too long in SRV domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
             $totalLength += 1 + $labelLength;
         }
-
-        $result .= \chr(0);
+        $result .= chr(0);
         $totalLength += 1;
-
-        $result = \pack('Nn', $ttl, $totalLength) . $result;
-
+        $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
 
