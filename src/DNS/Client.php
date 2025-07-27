@@ -226,15 +226,16 @@ class Client
                 while ($offset < $end) {
                     $len = ord($packet[$offset]);
                     $offset++;
-                    if ($len > 0) {
-                        $txts[] = substr($packet, $offset, $len);
-                    } else {
-                        $txts[] = '';
-                    }
+                    $chunk = ($len > 0) ? substr($packet, $offset, $len) : '';
+                    $txts[] = $chunk;
                     $offset += $len;
                 }
-                // Concatenate chunks directly, no separator
-                return implode('', $txts);
+                // If you want to match dig output, wrap in quotes and escape embedded quotes
+                $txtValue = implode('', $txts);
+                if (strpos($txtValue, '"') !== false) {
+                    $txtValue = str_replace('"', '\\"', $txtValue);
+                }
+                return '"' . $txtValue . '"';
             case 33: // SRV record
                 $priority = unpack('n', substr($packet, $offset, 2));
                 $weight = unpack('n', substr($packet, $offset + 2, 2));
