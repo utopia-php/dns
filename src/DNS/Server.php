@@ -378,6 +378,9 @@ class Server
         $totalLength = 0;
         foreach ($labels as $label) {
             $labelLength = strlen($label);
+            if ($labelLength === 0) {
+                throw new \Exception("Empty label in domain: '{$domain}'");
+            }
             if ($labelLength > 63) {
                 throw new \Exception("Label too long in domain: {$label}");
             }
@@ -449,11 +452,24 @@ class Server
      */
     protected function encodeSrv(string $domain, int $ttl, int $priority, int $weight, int $port): string
     {
+        // Validate SRV parameters
+        if ($priority < 0 || $priority > 65535) {
+            throw new \Exception("SRV priority out of range: {$priority}");
+        }
+        if ($weight < 0 || $weight > 65535) {
+            throw new \Exception("SRV weight out of range: {$weight}");
+        }
+        if ($port < 0 || $port > 65535) {
+            throw new \Exception("SRV port out of range: {$port}");
+        }
         $labels = explode('.', rtrim($domain, '.'));
         $result = pack('nnn', $priority, $weight, $port);
         $totalLength = 6;
         foreach ($labels as $label) {
             $labelLength = strlen($label);
+            if ($labelLength === 0) {
+                throw new \Exception("Empty label in SRV domain: '{$domain}'");
+            }
             if ($labelLength > 63) {
                 throw new \Exception("Label too long in SRV domain: {$label}");
             }
