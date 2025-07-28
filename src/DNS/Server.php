@@ -10,7 +10,7 @@ use Utopia\Telemetry\Counter;
 use Utopia\Telemetry\Histogram;
 
 /**
- * Refference about DNS packet:
+ * Reference about DNS packet:
  *
  * HEADER
  * > 16 bits identificationField (1-65535. 0 means no ID). ID provided by client. Helps to match async responses. Usage may allow DNS Cache Poisoning
@@ -29,7 +29,7 @@ use Utopia\Telemetry\Histogram;
  * > 16 bits numberOfAdditionals (0-65535)
  *
  * QUESTIONS SECTION
- * > Each question contians:
+ * > Each question contains:
  * > -- dynamic-length name. Includes domain name we are looking for. Split into labels. To get domain, join labels with dot symbol.
  * > -- -- Following pattern repeats:
  * > -- -- -- 8 bits labelLength (0-255). Defines length of label. We use it in next step
@@ -42,12 +42,18 @@ use Utopia\Telemetry\Histogram;
  * ANSWERS SECTION
  * > Follows same pattern as questions section.
  * > Each answer also has (at the end):
- * > -- 32 bits ttl. Time to live of the naswer
+ * > -- 32 bits ttl. Time to live of the answer
  * > -- 16 bit length. Length of the answer data.
  * > -- X bits data X length is length from above. Gives answer itself. Structure changes based on type.
  *
  * AUTHORITIES SECTION
  * ADDITIONALS SECTION
+ *
+ * RFCs:
+ * - RFC 1035: https://datatracker.ietf.org/doc/html/rfc1035
+ * - RFC 3596: https://datatracker.ietf.org/doc/html/rfc3596
+ * - RFC 6844: https://datatracker.ietf.org/doc/html/rfc6844
+ * - RFC 2782: https://datatracker.ietf.org/doc/html/rfc2782
  */
 
 class Server
@@ -343,6 +349,7 @@ class Server
 
     /**
      * Encode an IPv4 address (A record) according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
      *
      * @param string $ip
      * @param int $ttl
@@ -360,6 +367,7 @@ class Server
 
     /**
      * Encode an IPv6 address (AAAA record) according to RFC 3596.
+     * @see https://datatracker.ietf.org/doc/html/rfc3596
      *
      * @param string $ip
      * @param int $ttl
@@ -377,6 +385,7 @@ class Server
 
     /**
      * Encode a domain name (CNAME, NS, PTR) according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
      *
      * @param string $domain
      * @param int $ttl
@@ -409,6 +418,7 @@ class Server
 
     /**
      * Encode a TXT record according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
      *
      * @param string $text
      * @param int $ttl
@@ -429,6 +439,7 @@ class Server
 
     /**
      * Encode an MX record according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
      *
      * @param string $domain
      * @param int $ttl
@@ -459,6 +470,7 @@ class Server
 
     /**
      * Encode an SRV record according to RFC 2782.
+     * @see https://datatracker.ietf.org/doc/html/rfc2782
      *
      * @param string $domain
      * @param int $ttl
@@ -504,6 +516,7 @@ class Server
 
     /**
      * Encode a CAA record according to RFC 6844.
+     * @see https://datatracker.ietf.org/doc/html/rfc6844
      *
      * @param array{flags?:int,tag?:string,value?:string}|string $rdata
      * @param int $ttl
