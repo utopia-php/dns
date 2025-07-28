@@ -51,7 +51,18 @@ use Utopia\Telemetry\Histogram;
  */
 
 class Server
+// DNS protocol constants
 {
+    public const IPV4_LEN = 4;
+    public const IPV6_LEN = 16;
+    public const MAX_LABEL_LEN = 63;
+    public const MAX_LABELS = 127;
+    public const MAX_DOMAIN_NAME_LEN = 255; // RFC 1035: max length of domain name in wire format
+    public const MAX_PRIORITY = 65535;
+    public const MAX_WEIGHT = 65535;
+    public const MAX_PORT = 65535;
+    public const MAX_CAA_FLAGS = 255;
+    public const MAX_TXT_CHUNK = 255;
     protected Adapter $adapter;
     protected Resolver $resolver;
     /** @var array<int, callable> */
@@ -340,10 +351,10 @@ class Server
     protected function encodeIP(string $ip, int $ttl): string
     {
         $binaryIP = inet_pton($ip);
-        if ($binaryIP === false || strlen($binaryIP) !== 4) {
+        if ($binaryIP === false || strlen($binaryIP) !== self::IPV4_LEN) {
             throw new \Exception("Invalid IPv4 address format: {$ip}");
         }
-        $result = pack('Nn', $ttl, 4) . $binaryIP;
+        $result = pack('Nn', $ttl, self::IPV4_LEN) . $binaryIP;
         return $result;
     }
 
@@ -357,10 +368,10 @@ class Server
     protected function encodeIPv6(string $ip, int $ttl): string
     {
         $binaryIP = inet_pton($ip);
-        if ($binaryIP === false || strlen($binaryIP) !== 16) {
+        if ($binaryIP === false || strlen($binaryIP) !== self::IPV6_LEN) {
             throw new \Exception("Invalid IPv6 address format: {$ip}");
         }
-        $result = pack('Nn', $ttl, 16) . $binaryIP;
+        $result = pack('Nn', $ttl, self::IPV6_LEN) . $binaryIP;
         return $result;
     }
 
@@ -381,7 +392,7 @@ class Server
             if ($labelLength === 0) {
                 throw new \Exception("Empty label in domain: '{$domain}'");
             }
-            if ($labelLength > 63) {
+            if ($labelLength > self::MAX_LABEL_LEN) {
                 throw new \Exception("Label too long in domain: {$label}");
             }
             $result .= chr($labelLength) . $label;
@@ -389,6 +400,9 @@ class Server
         }
         $result .= chr(0);
         $totalLength += 1;
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded domain name too long: {$domain}");
+        }
         $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
@@ -404,8 +418,8 @@ class Server
     {
         $chunks = [];
         $len = strlen($text);
-        for ($i = 0; $i < $len; $i += 255) {
-            $chunk = substr($text, $i, 255);
+        for ($i = 0; $i < $len; $i += self::MAX_TXT_CHUNK) {
+            $chunk = substr($text, $i, self::MAX_TXT_CHUNK);
             $chunks[] = chr(strlen($chunk)) . $chunk;
         }
         $txtData = implode('', $chunks);
@@ -428,7 +442,7 @@ class Server
         $totalLength = 2;
         foreach ($labels as $label) {
             $labelLength = strlen($label);
-            if ($labelLength > 63) {
+            if ($labelLength > self::MAX_LABEL_LEN) {
                 throw new \Exception("Label too long in MX domain: {$label}");
             }
             $result .= chr($labelLength) . $label;
@@ -436,6 +450,9 @@ class Server
         }
         $result .= chr(0);
         $totalLength += 1;
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded MX domain name too long: {$domain}");
+        }
         $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
@@ -453,13 +470,13 @@ class Server
     protected function encodeSrv(string $domain, int $ttl, int $priority, int $weight, int $port): string
     {
         // Validate SRV parameters
-        if ($priority < 0 || $priority > 65535) {
+        if ($priority < 0 || $priority > self::MAX_PRIORITY) {
             throw new \Exception("SRV priority out of range: {$priority}");
         }
-        if ($weight < 0 || $weight > 65535) {
+        if ($weight < 0 || $weight > self::MAX_WEIGHT) {
             throw new \Exception("SRV weight out of range: {$weight}");
         }
-        if ($port < 0 || $port > 65535) {
+        if ($port < 0 || $port > self::MAX_PORT) {
             throw new \Exception("SRV port out of range: {$port}");
         }
         $labels = explode('.', rtrim($domain, '.'));
@@ -470,7 +487,7 @@ class Server
             if ($labelLength === 0) {
                 throw new \Exception("Empty label in SRV domain: '{$domain}'");
             }
-            if ($labelLength > 63) {
+            if ($labelLength > self::MAX_LABEL_LEN) {
                 throw new \Exception("Label too long in SRV domain: {$label}");
             }
             $result .= chr($labelLength) . $label;
@@ -478,6 +495,9 @@ class Server
         }
         $result .= chr(0);
         $totalLength += 1;
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded SRV domain name too long: {$domain}");
+        }
         $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
@@ -515,7 +535,7 @@ class Server
             }
         }
         // Validate flags (must be 0-255)
-        $flags = max(0, min(255, $flags));
+        $flags = max(0, min(self::MAX_CAA_FLAGS, $flags));
         $tagLen = strlen($tag);
         $valueLen = strlen($value);
         $rdataBin = chr($flags) . chr($tagLen) . $tag . $value;
