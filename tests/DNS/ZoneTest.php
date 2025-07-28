@@ -337,4 +337,27 @@ ZONE;
         $this->assertSame($records1[2]->getPriority(), $records2[2]->getPriority());
         $this->assertSame($records1[2]->getRdata(), $records2[2]->getRdata());
     }
+
+     public function testImportTxtWithSpecialChars(): void
+     {
+         $zone = new Zone();
+         $zonefile = <<<ZONE
+@ 3600 IN TXT "v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;"
+ZONE;
+         $records = $zone->import('example.com', $zonefile);
+         $this->assertCount(1, $records);
+         $rec = $records[0];
+         $this->assertEquals('TXT', $rec->getTypeName());
+         $this->assertEquals('v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;', trim($rec->getRdata(), '"'));
+     }
+
+    public function testExportTxtWithSpecialChars(): void
+    {
+        $zone = new Zone();
+        $txt = 'v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1; text="quoted"; backslash=\\';
+        $rec = new Record('@', 3600, 'IN', 'TXT', $txt);
+        $exported = $zone->export('example.com', [$rec]);
+        $expected = '@ 3600 IN TXT "v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1; text=\\"quoted\\"; backslash=\\\\"' . "\n";
+        $this->assertSame($expected, $exported);
+    }
 }

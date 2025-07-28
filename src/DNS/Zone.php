@@ -178,7 +178,20 @@ class Zone
         $lastOwner = null;
         $logicalLines = $this->collectLogicalLines($content);
         foreach ($logicalLines as $rawLine) {
-            $line = trim($this->stripTrailingComment($rawLine));
+            // For TXT records, only strip comments at #, not at semicolons
+            $isTxt = false;
+            $peekTokens = $this->tokenize($rawLine);
+            foreach ($peekTokens as $tok) {
+                if (strtoupper($tok) === 'TXT') {
+                    $isTxt = true;
+                    break;
+                }
+            }
+            if ($isTxt) {
+                $line = trim($this->stripTrailingComment($rawLine, true));
+            } else {
+                $line = trim($this->stripTrailingComment($rawLine, false));
+            }
             if ($line === '' || $this->isComment($line)) {
                 continue;
             }
@@ -219,7 +232,14 @@ class Zone
             }
             $type = strtoupper($tokens[$pos++]);
             $dataParts = array_slice($tokens, $pos);
-            $data = implode(' ', $dataParts);
+            if ($type === 'TXT') {
+                $data = '';
+                foreach ($dataParts as $part) {
+                    $data .= $part;
+                }
+            } else {
+                $data = implode(' ', $dataParts);
+            }
             if ($owner !== '@' && !str_ends_with($owner, '.')) {
                 $owner .= '.' . rtrim($this->defaultOrigin, '.');
             }
@@ -265,11 +285,21 @@ class Zone
                 $data = "{$r->getPriority()} {$r->getRdata()}";
             } elseif ($type === 'SRV' && $r->getPriority() !== null && $r->getWeight() !== null && $r->getPort() !== null) {
                 $data = "{$r->getPriority()} {$r->getWeight()} {$r->getPort()} {$r->getRdata()}";
+            } elseif ($type === 'TXT') {
+                // Encode TXT records with double quotes and escape embedded quotes and backslashes
+                $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $data);
+                $data = '"' . $escaped . '"';
             }
 
             $lines[] = sprintf("%s %d %s %s %s", $owner, $ttl, $class, $type, $data);
         }
-        return implode("\n", $lines) . "\n";
+        // Remove any empty lines at the end
+        while (!empty($lines) && trim(end($lines)) === '') {
+            array_pop($lines);
+        }
+        $output = implode("\n", $lines);
+        // Guarantee only a single newline at the end
+        return rtrim($output, "\n") . "\n";
     }
 
     /**
@@ -293,7 +323,7 @@ class Zone
         $parenDepth = 0;
         foreach ($rawLines as $rawLine) {
             // Remove trailing comments from the physical line.
-            $line = trim($this->stripTrailingComment($rawLine));
+            $line = trim($this->stripTrailingComment($rawLine, false));
             if ($line === '') {
                 continue;
             }
@@ -336,17 +366,35 @@ class Zone
     /**
      * Remove trailing comments (anything after '#' or ';') from a line.
      */
-    protected function stripTrailingComment(string $line): string
+
+    /**
+     * Remove trailing comments (anything after '#' or ';') from a line.
+     * If $txtMode is true, only strip at #, not at semicolons.
+     */
+    protected function stripTrailingComment(string $line, bool $txtMode): string
     {
-        $hashPos = strpos($line, '#');
-        if ($hashPos !== false) {
-            $line = substr($line, 0, $hashPos);
+        $inQuote = false;
+        $result = '';
+        for ($i = 0, $len = strlen($line); $i < $len; $i++) {
+            $c = $line[$i];
+            // Check for unescaped quote
+            if ($c === '"') {
+                $escaped = false;
+                $j = $i - 1;
+                while ($j >= 0 && $line[$j] === '\\') {
+                    $escaped = !$escaped;
+                    $j--;
+                }
+                if (!$escaped) {
+                    $inQuote = !$inQuote;
+                }
+            }
+            if (!$inQuote && ($c === '#' || (!$txtMode && $c === ';'))) {
+                break;
+            }
+            $result .= $c;
         }
-        $semiPos = strpos($line, ';');
-        if ($semiPos !== false) {
-            $line = substr($line, 0, $semiPos);
-        }
-        return $line;
+        return $result;
     }
 
     protected function isComment(string $line): bool
@@ -360,22 +408,48 @@ class Zone
      *
      * @return string[]
      */
+    /**
+     * Tokenize a line by whitespace, handling quoted strings and escapes per RFC 1035.
+     *
+     * @return string[]
+     */
     protected function tokenize(string $line): array
     {
+        // Manual tokenizer: handles quoted strings and escapes
         $tokens = [];
         $current = '';
-        $inSpace = true;
+        $inQuote = false;
+        $escape = false;
         for ($i = 0, $len = strlen($line); $i < $len; $i++) {
             $c = $line[$i];
-            if ($c === ' ' || $c === "\t") {
-                if (!$inSpace) {
+            if ($escape) {
+                $current .= $c;
+                $escape = false;
+                continue;
+            }
+            if ($c === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($inQuote) {
+                if ($c === '"') {
+                    $inQuote = false;
                     $tokens[] = $current;
                     $current = '';
+                } else {
+                    $current .= $c;
                 }
-                $inSpace = true;
             } else {
-                $current .= $c;
-                $inSpace = false;
+                if ($c === '"') {
+                    $inQuote = true;
+                } elseif ($c === ' ' || $c === "\t") {
+                    if ($current !== '') {
+                        $tokens[] = $current;
+                        $current = '';
+                    }
+                } else {
+                    $current .= $c;
+                }
             }
         }
         if ($current !== '') {

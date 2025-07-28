@@ -10,7 +10,7 @@ use Utopia\Telemetry\Counter;
 use Utopia\Telemetry\Histogram;
 
 /**
- * Refference about DNS packet:
+ * Reference about DNS packet:
  *
  * HEADER
  * > 16 bits identificationField (1-65535. 0 means no ID). ID provided by client. Helps to match async responses. Usage may allow DNS Cache Poisoning
@@ -29,7 +29,7 @@ use Utopia\Telemetry\Histogram;
  * > 16 bits numberOfAdditionals (0-65535)
  *
  * QUESTIONS SECTION
- * > Each question contians:
+ * > Each question contains:
  * > -- dynamic-length name. Includes domain name we are looking for. Split into labels. To get domain, join labels with dot symbol.
  * > -- -- Following pattern repeats:
  * > -- -- -- 8 bits labelLength (0-255). Defines length of label. We use it in next step
@@ -42,16 +42,33 @@ use Utopia\Telemetry\Histogram;
  * ANSWERS SECTION
  * > Follows same pattern as questions section.
  * > Each answer also has (at the end):
- * > -- 32 bits ttl. Time to live of the naswer
+ * > -- 32 bits ttl. Time to live of the answer
  * > -- 16 bit length. Length of the answer data.
  * > -- X bits data X length is length from above. Gives answer itself. Structure changes based on type.
  *
  * AUTHORITIES SECTION
  * ADDITIONALS SECTION
+ *
+ * RFCs:
+ * - RFC 1035: https://datatracker.ietf.org/doc/html/rfc1035
+ * - RFC 3596: https://datatracker.ietf.org/doc/html/rfc3596
+ * - RFC 6844: https://datatracker.ietf.org/doc/html/rfc6844
+ * - RFC 2782: https://datatracker.ietf.org/doc/html/rfc2782
  */
 
 class Server
+// DNS protocol constants
 {
+    public const IPV4_LEN = 4;
+    public const IPV6_LEN = 16;
+    public const MAX_LABEL_LEN = 63;
+    public const MAX_LABELS = 127;
+    public const MAX_DOMAIN_NAME_LEN = 255; // RFC 1035: max length of domain name in wire format
+    public const MAX_PRIORITY = 65535;
+    public const MAX_WEIGHT = 65535;
+    public const MAX_PORT = 65535;
+    public const MAX_CAA_FLAGS = 255;
+    public const MAX_TXT_CHUNK = 255;
     protected Adapter $adapter;
     protected Resolver $resolver;
     /** @var array<int, callable> */
@@ -330,105 +347,176 @@ class Server
         return $this->resolver->resolve($question);
     }
 
+    /**
+     * Encode an IPv4 address (A record) according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
+     *
+     * @param string $ip
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeIP(string $ip, int $ttl): string
     {
-        $result = \pack('Nn', $ttl, 4);
-
         $binaryIP = inet_pton($ip);
-        if ($binaryIP === false) {
+        if ($binaryIP === false || strlen($binaryIP) !== self::IPV4_LEN) {
             throw new \Exception("Invalid IPv4 address format: {$ip}");
         }
-
-        // Append the binary IPv4 address directly
-        $result .= $binaryIP;
-
+        $result = pack('Nn', $ttl, self::IPV4_LEN) . $binaryIP;
         return $result;
     }
 
+    /**
+     * Encode an IPv6 address (AAAA record) according to RFC 3596.
+     * @see https://datatracker.ietf.org/doc/html/rfc3596
+     *
+     * @param string $ip
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeIPv6(string $ip, int $ttl): string
     {
-        $result = \pack('Nn', $ttl, 16);
-
         $binaryIP = inet_pton($ip);
-        if ($binaryIP === false) {
+        if ($binaryIP === false || strlen($binaryIP) !== self::IPV6_LEN) {
             throw new \Exception("Invalid IPv6 address format: {$ip}");
         }
-
-        $result .= $binaryIP;
-
+        $result = pack('Nn', $ttl, self::IPV6_LEN) . $binaryIP;
         return $result;
     }
 
+    /**
+     * Encode a domain name (CNAME, NS, PTR) according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
+     *
+     * @param string $domain
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeDomain(string $domain, int $ttl): string
     {
+        $labels = explode('.', rtrim($domain, '.'));
         $result = '';
         $totalLength = 0;
-
-        foreach (\explode('.', $domain) as $label) {
-            $labelLength = \strlen($label);
-            $result .= \chr($labelLength);
-            $result .= $label;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength === 0) {
+                throw new \Exception("Empty label in domain: '{$domain}'");
+            }
+            if ($labelLength > self::MAX_LABEL_LEN) {
+                throw new \Exception("Label too long in domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
             $totalLength += 1 + $labelLength;
         }
-
-        $result .= \chr(0);
+        $result .= chr(0);
         $totalLength += 1;
-
-        $result = \pack('Nn', $ttl, $totalLength) . $result;
-
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded domain name too long: {$domain}");
+        }
+        $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
 
+    /**
+     * Encode a TXT record according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
+     *
+     * @param string $text
+     * @param int $ttl
+     * @return string
+     */
     protected function encodeText(string $text, int $ttl): string
     {
-        $textLength = \strlen($text);
-        $result = \pack('Nn', $ttl, 1 + $textLength) . \chr($textLength) . $text;
-
+        $chunks = [];
+        $len = strlen($text);
+        for ($i = 0; $i < $len; $i += self::MAX_TXT_CHUNK) {
+            $chunk = substr($text, $i, self::MAX_TXT_CHUNK);
+            $chunks[] = chr(strlen($chunk)) . $chunk;
+        }
+        $txtData = implode('', $chunks);
+        $result = pack('Nn', $ttl, strlen($txtData)) . $txtData;
         return $result;
     }
 
+    /**
+     * Encode an MX record according to RFC 1035.
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
+     *
+     * @param string $domain
+     * @param int $ttl
+     * @param int $priority
+     * @return string
+     */
     protected function encodeMx(string $domain, int $ttl, int $priority): string
     {
-        $result = \pack('n', $priority);
+        $labels = explode('.', rtrim($domain, '.'));
+        $result = pack('n', $priority);
         $totalLength = 2;
-
-        foreach (\explode('.', $domain) as $label) {
-            $labelLength = \strlen($label);
-            $result .= \chr($labelLength);
-            $result .= $label;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength > self::MAX_LABEL_LEN) {
+                throw new \Exception("Label too long in MX domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
             $totalLength += 1 + $labelLength;
         }
-
-        $result .= \chr(0);
+        $result .= chr(0);
         $totalLength += 1;
-
-        $result = \pack('Nn', $ttl, $totalLength) . $result;
-
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded MX domain name too long: {$domain}");
+        }
+        $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
 
+    /**
+     * Encode an SRV record according to RFC 2782.
+     * @see https://datatracker.ietf.org/doc/html/rfc2782
+     *
+     * @param string $domain
+     * @param int $ttl
+     * @param int $priority
+     * @param int $weight
+     * @param int $port
+     * @return string
+     */
     protected function encodeSrv(string $domain, int $ttl, int $priority, int $weight, int $port): string
     {
-        $result = \pack('nnn', $priority, $weight, $port);
+        // Validate SRV parameters
+        if ($priority < 0 || $priority > self::MAX_PRIORITY) {
+            throw new \Exception("SRV priority out of range: {$priority}");
+        }
+        if ($weight < 0 || $weight > self::MAX_WEIGHT) {
+            throw new \Exception("SRV weight out of range: {$weight}");
+        }
+        if ($port < 0 || $port > self::MAX_PORT) {
+            throw new \Exception("SRV port out of range: {$port}");
+        }
+        $labels = explode('.', rtrim($domain, '.'));
+        $result = pack('nnn', $priority, $weight, $port);
         $totalLength = 6;
-
-        foreach (\explode('.', $domain) as $label) {
-            $labelLength = \strlen($label);
-            $result .= \chr($labelLength);
-            $result .= $label;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength === 0) {
+                throw new \Exception("Empty label in SRV domain: '{$domain}'");
+            }
+            if ($labelLength > self::MAX_LABEL_LEN) {
+                throw new \Exception("Label too long in SRV domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
             $totalLength += 1 + $labelLength;
         }
-
-        $result .= \chr(0);
+        $result .= chr(0);
         $totalLength += 1;
-
-        $result = \pack('Nn', $ttl, $totalLength) . $result;
-
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded SRV domain name too long: {$domain}");
+        }
+        $result = pack('Nn', $ttl, $totalLength) . $result;
         return $result;
     }
 
     /**
      * Encode a CAA record according to RFC 6844.
+     * @see https://datatracker.ietf.org/doc/html/rfc6844
      *
      * @param array{flags?:int,tag?:string,value?:string}|string $rdata
      * @param int $ttl
@@ -460,7 +548,7 @@ class Server
             }
         }
         // Validate flags (must be 0-255)
-        $flags = max(0, min(255, $flags));
+        $flags = max(0, min(self::MAX_CAA_FLAGS, $flags));
         $tagLen = strlen($tag);
         $valueLen = strlen($value);
         $rdataBin = chr($flags) . chr($tagLen) . $tag . $value;
