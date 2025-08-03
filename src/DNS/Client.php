@@ -243,10 +243,11 @@ class Client
                 $target = $this->decodeDomainName($packet, $offset);
                 return "Priority: {$priority[1]}, Weight: {$weight[1]}, Port: {$port[1]}, Target: {$target}";
             case 257: // CAA record
-                $flags = ord($packet[$offset]);
-                $offset++;
-                $tagLength = ord($packet[$offset]);
-                $offset++;
+                if ($rdlength < 2) {
+                    throw new Exception("CAA record too short (rdlength={$rdlength})");
+                }
+                $flags = ord($packet[$offset++]);
+                $tagLength = ord($packet[$offset++]);
                 $tag = substr($packet, $offset, $tagLength);
                 $offset += $tagLength;
                 $value = substr($packet, $offset, $rdlength - 2 - $tagLength);
