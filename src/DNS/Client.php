@@ -36,6 +36,7 @@ class Client
         'TXT'   => 16,
         'AAAA'  => 28,
         'SRV'   => 33,
+        'CAA'   => 257,
     ];
 
     public function __construct(string $server = '127.0.0.1', int $port = 53, int $timeout = 5)
@@ -241,6 +242,16 @@ class Client
                 $offset += 6;
                 $target = $this->decodeDomainName($packet, $offset);
                 return "Priority: {$priority[1]}, Weight: {$weight[1]}, Port: {$port[1]}, Target: {$target}";
+            case 257: // CAA record
+                $flags = ord($packet[$offset]);
+                $offset++;
+                $tagLength = ord($packet[$offset]);
+                $offset++;
+                $tag = substr($packet, $offset, $tagLength);
+                $offset += $tagLength;
+                $value = substr($packet, $offset, $rdlength - 2 - $tagLength);
+                $offset += $rdlength - 2 - $tagLength;
+                return "Flags: {$flags}, Tag: {$tag}, Value: {$value}";
             case 6: // SOA record
                 $mname = $this->decodeDomainName($packet, $offset);
                 $rname = $this->decodeDomainName($packet, $offset);
