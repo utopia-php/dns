@@ -251,7 +251,7 @@ class Client
                 $offset += $tagLength;
                 $value = substr($packet, $offset, $rdlength - 2 - $tagLength);
                 $offset += $rdlength - 2 - $tagLength;
-                return "Flags: {$flags}, Tag: {$tag}, Value: {$value}";
+                return "{$flags} {$tag} \"{$value}\"";
             case 6: // SOA record
                 $mname = $this->decodeDomainName($packet, $offset);
                 $rname = $this->decodeDomainName($packet, $offset);

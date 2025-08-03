@@ -138,17 +138,15 @@ class ClientTest extends TestCase
 
     public function testCAARecords(): void
     {
-        $records = $this->client->query('github.com', 'CAA');
+        $records = $this->client->query('google.com', 'CAA');
 
         $this->assertCount(1, $records);
-        $this->assertEquals('github.com', $records[0]->getName());
+        $this->assertEquals('google.com', $records[0]->getName());
         $this->assertEquals('IN', $records[0]->getClass());
         $this->assertIsNumeric($records[0]->getTTL());
         $this->assertEquals('CAA', $records[0]->getTypeName());
         
         $rdata = $records[0]->getRdata();
-        $this->assertStringContainsString('Flags:', $rdata);
-        $this->assertStringContainsString('Tag:', $rdata);
-        $this->assertStringContainsString('Value:', $rdata);
+        $this->assertEquals('0 issue "pki.goog"', $rdata);
     }
 }
