@@ -138,15 +138,21 @@ class ClientTest extends TestCase
 
     public function testCAARecords(): void
     {
-        $records = $this->client->query('google.com', 'CAA');
+        $records = $this->client->query('dev.appwrite.io', 'CAA');
 
         $this->assertCount(1, $records);
-        $this->assertEquals('google.com', $records[0]->getName());
+        $this->assertEquals('dev.appwrite.io', $records[0]->getName());
         $this->assertEquals('IN', $records[0]->getClass());
         $this->assertIsNumeric($records[0]->getTTL());
         $this->assertEquals('CAA', $records[0]->getTypeName());
 
         $rdata = $records[0]->getRdata();
-        $this->assertEquals('0 issue "pki.goog"', $rdata);
+        $this->assertEquals('0 issue "letsencrypt.org"', $rdata);
+
+        $records = $this->client->query('dev2.appwrite.io', 'CAA');
+
+        $this->assertCount(2, $records);
+        $this->assertEquals('0 issue "letsencrypt.org"', $records[0]->getRdata());
+        $this->assertEquals('0 issue "sectigo.com"', $records[1]->getRdata());
     }
 }
