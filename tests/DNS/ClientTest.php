@@ -145,7 +145,7 @@ class ClientTest extends TestCase
         $this->assertEquals('IN', $records[0]->getClass());
         $this->assertIsNumeric($records[0]->getTTL());
         $this->assertEquals('CAA', $records[0]->getTypeName());
-        
+
         $rdata = $records[0]->getRdata();
         $this->assertEquals('0 issue "pki.goog"', $rdata);
     }
