@@ -135,4 +135,29 @@ class ClientTest extends TestCase
         $records = $this->client->query('dev3.appwrite.io', 'NS');
         $this->assertCount(0, $records);
     }
+
+    public function testCAARecords(): void
+    {
+        $records = $this->client->query('dev.appwrite.io', 'CAA');
+
+        $this->assertCount(1, $records);
+        $this->assertEquals('dev.appwrite.io', $records[0]->getName());
+        $this->assertEquals('IN', $records[0]->getClass());
+        $this->assertIsNumeric($records[0]->getTTL());
+        $this->assertEquals('CAA', $records[0]->getTypeName());
+
+        $rdata = $records[0]->getRdata();
+        $this->assertEquals('0 issue "letsencrypt.org"', $rdata);
+
+        $records = $this->client->query('dev2.appwrite.io', 'CAA');
+
+        $this->assertCount(2, $records);
+        $this->assertEquals('0 issue "letsencrypt.org"', $records[0]->getRdata());
+        $this->assertEquals('0 issue "sectigo.com"', $records[1]->getRdata());
+
+        $records = $this->client->query('dev3.appwrite.io', 'CAA');
+
+        $this->assertCount(1, $records);
+        $this->assertEquals('255 issuewild "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"', $records[0]->getRdata());
+    }
 }

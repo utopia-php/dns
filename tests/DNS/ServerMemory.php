@@ -77,6 +77,10 @@ $resolver->addRecord('dev2.appwrite.io', 'CAA', [
     'value' => 'issue "sectigo.com"'
 ]);
 
+$resolver->addRecord('dev3.appwrite.io', 'CAA', [
+    'value' => '255 issuewild "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"'
+]);
+
 $resolver->addRecord('dev.appwrite.io', 'NS', [
     'value' => 'ns.appwrite.io',
     'ttl' => 60
