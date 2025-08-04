@@ -154,5 +154,10 @@ class ClientTest extends TestCase
         $this->assertCount(2, $records);
         $this->assertEquals('0 issue "letsencrypt.org"', $records[0]->getRdata());
         $this->assertEquals('0 issue "sectigo.com"', $records[1]->getRdata());
+
+        $records = $this->client->query('dev3.appwrite.io', 'CAA');
+
+        $this->assertCount(1, $records);
+        $this->assertEquals('255 issuewild "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"', $records[0]->getRdata());
     }
 }
