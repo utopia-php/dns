@@ -106,6 +106,15 @@ $resolver->addRecord('mail.appwrite.io', 'MX', [
     'priority' => 10
 ]);
 
+$resolver->addRecord('appwrite.io', 'SOA', [
+    'value' => 'ns1.appwrite.io. admin.appwrite.io. 2025011801 7200 3600 1209600 1800',
+    'ttl' => 3600
+]);
+
+$resolver->addRecord('dev2.appwrite.io', 'SOA', [
+    'value' => 'ns1.dev2.appwrite.io. admin.dev2.appwrite.io. 2025011802 14400 7200 2419200 3600'
+]);
+
 $dns = new Server($server, $resolver);
 $dns->setDebug(false);
 

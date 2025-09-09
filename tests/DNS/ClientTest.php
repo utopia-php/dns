@@ -160,4 +160,32 @@ class ClientTest extends TestCase
         $this->assertCount(1, $records);
         $this->assertEquals('255 issuewild "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"', $records[0]->getRdata());
     }
+
+    public function testSOARecords(): void
+    {
+        $records = $this->client->query('appwrite.io', 'SOA');
+
+        $this->assertCount(1, $records);
+        $this->assertEquals('appwrite.io', $records[0]->getName());
+        $this->assertEquals('IN', $records[0]->getClass());
+        $this->assertIsNumeric($records[0]->getTTL());
+        $this->assertEquals(3600, $records[0]->getTTL());
+        $this->assertEquals('SOA', $records[0]->getTypeName());
+
+        $rdata = $records[0]->getRdata();
+        $this->assertStringContainsString('ns1.appwrite.io.', $rdata);
+        $this->assertStringContainsString('admin.appwrite.io.', $rdata);
+        $this->assertStringContainsString('2025011801', $rdata);
+
+        $records = $this->client->query('dev2.appwrite.io', 'SOA');
+
+        $this->assertCount(1, $records);
+        $rdata = $records[0]->getRdata();
+        $this->assertStringContainsString('ns1.dev2.appwrite.io.', $rdata);
+        $this->assertStringContainsString('admin.dev2.appwrite.io.', $rdata);
+        $this->assertStringContainsString('2025011802', $rdata);
+
+        $records = $this->client->query('dev3.appwrite.io', 'SOA');
+        $this->assertCount(0, $records);
+    }
 }
