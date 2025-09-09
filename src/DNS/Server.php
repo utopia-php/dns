@@ -228,13 +228,14 @@ class Server
 
                     $type = match ($typeByte) {
                         1 => 'A',
+                        2 => 'NS',
                         5 => 'CNAME',
+                        6 => 'SOA',
                         15 => 'MX',
                         16 => 'TXT',
                         28 => 'AAAA',
                         33 => 'SRV',
                         257 => 'CAA',
-                        2 => 'NS',
                         default => 'A'
                     };
 
@@ -302,6 +303,7 @@ class Server
                             'AAAA' => $this->encodeIPv6($answer->getRdata(), $answer->getTTL()),
                             'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
                             'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
+                            'SOA' => $this->encodeSOA($answer->getRdata(), $answer->getTTL()),
                             'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
                             'CAA' => $this->encodeCAA($answer->getRdata(), $answer->getTTL()),
                             'MX' => $this->encodeMx($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0),
@@ -434,6 +436,61 @@ class Server
         }
         $txtData = implode('', $chunks);
         $result = pack('Nn', $ttl, strlen($txtData)) . $txtData;
+        return $result;
+    }
+
+    /**
+     * Encode a SOA record according to RFC 1035.
+     * Format: MNAME RNAME SERIAL REFRESH RETRY EXPIRE MINIMUM
+     * @see https://datatracker.ietf.org/doc/html/rfc1035
+     *
+     * @param string $rdata SOA data in the format "mname rname serial refresh retry expire minimum"
+     * @param int $ttl
+     * @return string
+     */
+    protected function encodeSOA(string $rdata, int $ttl): string
+    {
+        // Parse SOA record data: "ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800"
+        $parts = preg_split('/\s+/', trim($rdata));
+
+        if (count($parts) < 7) {
+            throw new \Exception("Invalid SOA record format: {$rdata}");
+        }
+
+        $mname = $parts[0];     // Primary nameserver
+        $rname = $parts[1];     // Email address (with . instead of @)
+        $serial = (int)$parts[2];    // Serial number
+        $refresh = (int)$parts[3];   // Refresh interval
+        $retry = (int)$parts[4];     // Retry interval
+        $expire = (int)$parts[5];    // Expire time
+        $minimum = (int)$parts[6];   // Minimum TTL
+
+        // Encode MNAME (primary nameserver)
+        $mnameEncoded = '';
+        foreach (explode('.', rtrim($mname, '.')) as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength > self::MAX_LABEL_LEN) {
+                throw new \Exception("Label too long in SOA MNAME: {$label}");
+            }
+            $mnameEncoded .= chr($labelLength) . $label;
+        }
+        $mnameEncoded .= chr(0);
+
+        // Encode RNAME (responsible person email)
+        $rnameEncoded = '';
+        foreach (explode('.', rtrim($rname, '.')) as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength > self::MAX_LABEL_LEN) {
+                throw new \Exception("Label too long in SOA RNAME: {$label}");
+            }
+            $rnameEncoded .= chr($labelLength) . $label;
+        }
+        $rnameEncoded .= chr(0);
+
+        // Pack all SOA data
+        $soaData = $mnameEncoded . $rnameEncoded . pack('NNNNN', $serial, $refresh, $retry, $expire, $minimum);
+
+        $result = pack('Nn', $ttl, strlen($soaData)) . $soaData;
         return $result;
     }
 
