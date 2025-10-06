@@ -291,11 +291,8 @@ class Server
 
                     // Add answers section
                     foreach ($answers as $answer) {
-                        // Encode the domain name from the answer record
-                        // For SOA records, this ensures we use the apex domain name
-                        // even when the question was for a subdomain
                         $answerDomain = $answer->getName();
-
+                        
                         // Check if we can use compression (domain names match)
                         if ($answerDomain === $domain) {
                             // Use pointer compression - points back to question domain
@@ -307,23 +304,20 @@ class Server
 
                         // Pack the answer's type and class
                         $response .= pack('nn', $answer->getType(), $classByte);
-
                         /**
                          * @var string $type
                          */
                         $type = $answer->getTypeName();
-
-                        // For record types that encode data only (not domain names in data)
                         $response .= match ($type) {
                             'A' => $this->encodeIP($answer->getRdata(), $answer->getTTL()),
                             'AAAA' => $this->encodeIPv6($answer->getRdata(), $answer->getTTL()),
+                            'CNAME' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
+                            'NS' => $this->encodeDomain($answer->getRdata(), $answer->getTTL()),
                             'SOA' => $this->encodeSOA($answer->getRdata(), $answer->getTTL()),
                             'TXT' => $this->encodeText($answer->getRdata(), $answer->getTTL()),
                             'CAA' => $this->encodeCAA($answer->getRdata(), $answer->getTTL()),
                             'MX' => $this->encodeMx($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0),
                             'SRV' => $this->encodeSrv($answer->getRdata(), $answer->getTTL(), $answer->getPriority() ?? 0, $answer->getWeight() ?? 0, $answer->getPort() ?? 0),
-                            // For CNAME and NS, we need to encode just the TTL, length, and target domain
-                            'CNAME', 'NS' => pack('Nn', $answer->getTTL(), strlen($this->encodeDomainName($answer->getName()))) . $this->encodeDomainName($answer->getName()),
                             default => ''
                         };
                     }
