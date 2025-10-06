@@ -261,7 +261,7 @@ class Client
                     throw new Exception("Failed to parse SOA record.");
                 }
                 $offset += 20;
-                return "MNAME: {$mname}, RNAME: {$rname}, Serial: {$parts['serial']}, Refresh: {$parts['refresh']}, Retry: {$parts['retry']}, Expire: {$parts['expire']}, Minimum TTL: {$parts['minttl']}";
+                return "{$mname}. {$rname}. {$parts['serial']} {$parts['refresh']} {$parts['retry']} {$parts['expire']} {$parts['minttl']}";
             default:
                 $data = substr($packet, $offset, $rdlength);
                 if ($data == false) {
