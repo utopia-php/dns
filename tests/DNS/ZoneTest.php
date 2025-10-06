@@ -192,6 +192,30 @@ TXT;
         $this->assertEmpty($errors, 'Zero TTL should be accepted as valid integer TTL.');
     }
 
+    public function testValidateSOARecordEmptyData(): void
+    {
+        $z = new Zone();
+        $domain = 'example.com';
+
+        // Test with completely missing SOA data
+        $zoneFile = "example.com. 3600 IN SOA";
+
+        $errors = $z->validate($domain, $zoneFile);
+        $this->assertNotEmpty($errors, 'Expected validation error for SOA with empty data');
+        $this->assertStringContainsString('SOA record has empty data', $errors[0]);
+    }
+
+    public function testValidateSOARecordValidData(): void
+    {
+        $z = new Zone();
+        $domain = 'example.com';
+
+        $zoneFile = "@ IN SOA ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800\n";
+
+        $errors = $z->validate($domain, $zoneFile);
+        $this->assertEmpty($errors, 'Valid SOA record should not produce errors.');
+    }
+
     public function testImportWithDirectivesAndAutoQualification(): void
     {
         $z = new Zone();

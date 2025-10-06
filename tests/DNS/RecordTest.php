@@ -178,4 +178,47 @@ final class RecordTest extends TestCase
         $this->assertSame(20, $record->getWeight());
         $this->assertSame(5060, $record->getPort());
     }
+
+    /**
+     * Test a record configured for SOA (Start of Authority).
+     */
+    public function testSOARecord(): void
+    {
+        $record = new Record();
+        $soaData = 'ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800';
+
+        $record->setName('example.com')
+               ->setTTL(3600)
+               ->setClass('IN')
+               ->setType(6) // SOA numeric code is 6.
+               ->setRdata($soaData);
+
+        $this->assertSame('example.com', $record->getName());
+        $this->assertSame(3600, $record->getTTL());
+        $this->assertSame('IN', $record->getClass());
+        $this->assertSame('SOA', $record->getTypeName());
+        $this->assertSame($soaData, $record->getRdata());
+    }
+
+    /**
+     * Test a record configured for SOA using string type.
+     */
+    public function testSOARecordWithStringType(): void
+    {
+        $record = new Record();
+        $soaData = 'ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800';
+
+        $record->setName('example.com')
+               ->setTTL(1800)
+               ->setClass('IN')
+               ->setType('SOA') // Using string instead of numeric code.
+               ->setRdata($soaData);
+
+        $this->assertSame('example.com', $record->getName());
+        $this->assertSame(1800, $record->getTTL());
+        $this->assertSame('IN', $record->getClass());
+        $this->assertSame(6, $record->getType()); // Should convert to numeric 6
+        $this->assertSame('SOA', $record->getTypeName());
+        $this->assertSame($soaData, $record->getRdata());
+    }
 }
