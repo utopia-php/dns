@@ -291,7 +291,20 @@ class Server
 
                     // Add answers section
                     foreach ($answers as $answer) {
-                        $response .= chr(192) . chr(12); // 192 indicates this is pointer, 12 is offset to question.
+                        // Encode the domain name from the answer record
+                        // For SOA records, this ensures we use the apex domain name
+                        // even when the question was for a subdomain
+                        $answerDomain = $answer->getName();
+                        
+                        // Check if we can use compression (domain names match)
+                        if ($answerDomain === $domain) {
+                            // Use pointer compression - points back to question domain
+                            $response .= chr(192) . chr(12);
+                        } else {
+                            // Encode the full domain name since it's different from question
+                            $response .= $this->encodeDomainName($answerDomain);
+                        }
+                        
                         // Pack the answer's type, not the question type
                         $response .= pack('nn', $answer->getType(), $classByte);
                         /**
@@ -336,6 +349,37 @@ class Server
         } catch (Throwable $error) {
             $this->handleError($error);
         }
+    }
+
+    /**
+     * Encode just the domain name part (without TTL and length prefix)
+     * Used for domain names in answer sections
+     *
+     * @param string $domain
+     * @return string
+     */
+    protected function encodeDomainName(string $domain): string
+    {
+        $labels = explode('.', rtrim($domain, '.'));
+        $result = '';
+        $totalLength = 0;
+        foreach ($labels as $label) {
+            $labelLength = strlen($label);
+            if ($labelLength === 0) {
+                throw new \Exception("Empty label in domain: '{$domain}'");
+            }
+            if ($labelLength > self::MAX_LABEL_LEN) {
+                throw new \Exception("Label too long in domain: {$label}");
+            }
+            $result .= chr($labelLength) . $label;
+            $totalLength += 1 + $labelLength;
+        }
+        $result .= chr(0);
+        $totalLength += 1;
+        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
+            throw new \Exception("Encoded domain name too long: {$domain}");
+        }
+        return $result;
     }
 
     /**
