@@ -292,16 +292,25 @@ class Server
                     // Add answers section
                     foreach ($answers as $answer) {
                         $answerDomain = $answer->getName();
+                        $type = $answer->getTypeName();
                         
-                        // Check if we can use compression (domain names match)
-                        if ($answerDomain === $domain) {
-                            // Use pointer compression - points back to question domain
-                            $response .= chr(192) . chr(12);
+                        // For SOA records, check if we need to encode a different domain name
+                        if ($type === 'SOA' && $answerDomain !== $domain) {
+                            // Encode the full domain name since it's different from question (apex vs subdomain)
+                            $labels = explode('.', rtrim($answerDomain, '.'));
+                            foreach ($labels as $label) {
+                                $labelLength = strlen($label);
+                                if ($labelLength > self::MAX_LABEL_LEN) {
+                                    throw new \Exception("Label too long in SOA domain: {$label}");
+                                }
+                                $response .= chr($labelLength) . $label;
+                            }
+                            $response .= chr(0); // End of domain name
                         } else {
-                            // Encode the full domain name since it's different from question
-                            $response .= $this->encodeDomainName($answerDomain);
+                            // Use compression pointer for all other cases
+                            $response .= chr(192) . chr(12); // 192 indicates this is pointer, 12 is offset to question.
                         }
-
+                        
                         // Pack the answer's type and class
                         $response .= pack('nn', $answer->getType(), $classByte);
                         /**
@@ -355,30 +364,6 @@ class Server
      * @param string $domain
      * @return string
      */
-    protected function encodeDomainName(string $domain): string
-    {
-        $labels = explode('.', rtrim($domain, '.'));
-        $result = '';
-        $totalLength = 0;
-        foreach ($labels as $label) {
-            $labelLength = strlen($label);
-            if ($labelLength === 0) {
-                throw new \Exception("Empty label in domain: '{$domain}'");
-            }
-            if ($labelLength > self::MAX_LABEL_LEN) {
-                throw new \Exception("Label too long in domain: {$label}");
-            }
-            $result .= chr($labelLength) . $label;
-            $totalLength += 1 + $labelLength;
-        }
-        $result .= chr(0);
-        $totalLength += 1;
-        if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
-            throw new \Exception("Encoded domain name too long: {$domain}");
-        }
-        return $result;
-    }
-
     /**
      * Resolve domain name to IP by record type
      *
