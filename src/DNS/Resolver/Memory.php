@@ -49,6 +49,25 @@ class Memory extends Resolver
             return $this->records[$key];
         }
 
+        // Special handling for SOA records: if not found at the exact domain,
+        // walk up the domain hierarchy to find the zone apex SOA record
+        if ($question['type'] === 'SOA') {
+            $domain = $question['name'];
+            $parts = explode('.', $domain);
+
+            // Try each parent domain level, starting from immediate parent
+            // e.g., for "dev.sub.example.com", try "sub.example.com", then "example.com"
+            while (count($parts) > 1) {
+                array_shift($parts); // Remove leftmost subdomain
+                $parentDomain = implode('.', $parts);
+                $parentKey = $parentDomain . '_SOA';
+
+                if (\array_key_exists($parentKey, $this->records)) {
+                    return $this->records[$parentKey];
+                }
+            }
+        }
+
         return [];
     }
 
