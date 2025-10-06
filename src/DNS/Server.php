@@ -453,7 +453,7 @@ class Server
         // Parse SOA record data: "ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800"
         $parts = preg_split('/\s+/', trim($rdata));
 
-        if (count($parts) < 7) {
+        if (!$parts || count($parts) < 7) {
             throw new \Exception("Invalid SOA record format: {$rdata}");
         }
 
