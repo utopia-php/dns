@@ -291,8 +291,27 @@ class Server
 
                     // Add answers section
                     foreach ($answers as $answer) {
-                        $response .= chr(192) . chr(12); // 192 indicates this is pointer, 12 is offset to question.
-                        // Pack the answer's type, not the question type
+                        $answerDomain = $answer->getName();
+                        $type = $answer->getTypeName();
+
+                        // For SOA records, check if we need to encode a different domain name
+                        if ($type === 'SOA' && $answerDomain !== $domain) {
+                            // Encode the full domain name since it's different from question (apex vs subdomain)
+                            $labels = explode('.', rtrim($answerDomain, '.'));
+                            foreach ($labels as $label) {
+                                $labelLength = strlen($label);
+                                if ($labelLength > self::MAX_LABEL_LEN) {
+                                    throw new \Exception("Label too long in SOA domain: {$label}");
+                                }
+                                $response .= chr($labelLength) . $label;
+                            }
+                            $response .= chr(0); // End of domain name
+                        } else {
+                            // Use compression pointer for all other cases
+                            $response .= chr(192) . chr(12); // 192 indicates this is pointer, 12 is offset to question.
+                        }
+
+                        // Pack the answer's type and class
                         $response .= pack('nn', $answer->getType(), $classByte);
                         /**
                          * @var string $type
@@ -338,6 +357,13 @@ class Server
         }
     }
 
+    /**
+     * Encode just the domain name part (without TTL and length prefix)
+     * Used for domain names in answer sections
+     *
+     * @param string $domain
+     * @return string
+     */
     /**
      * Resolve domain name to IP by record type
      *

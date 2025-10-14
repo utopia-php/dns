@@ -111,8 +111,11 @@ $resolver->addRecord('appwrite.io', 'SOA', [
     'ttl' => 3600
 ]);
 
-$resolver->addRecord('dev2.appwrite.io', 'SOA', [
-    'value' => 'ns1.dev2.appwrite.io. admin.dev2.appwrite.io. 2025011802 14400 7200 2419200 3600'
+
+// Add a test zone apex for testing SOA inheritance
+$resolver->addRecord('dnsservertestdomain.io', 'SOA', [
+    'value' => 'ns1.dnsservertestdomain.io. admin.dnsservertestdomain.io. 2025100601 86400 7200 3600000 172800',
+    'ttl' => 7200
 ]);
 
 $dns = new Server($server, $resolver);
