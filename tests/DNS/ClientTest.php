@@ -183,7 +183,7 @@ class ClientTest extends TestCase
         $rdata = $records[0]->getRdata();
         $this->assertEquals('appwrite.io', $records[0]->getName());
         $this->assertStringContainsString('ns1.appwrite.io.', $rdata);
-        $this->assertStringContainsString('admin.dev2.appwrite.io.', $rdata);
+        $this->assertStringContainsString('admin.appwrite.io.', $rdata);
         $this->assertStringContainsString('2025011802', $rdata);
     }
 }
