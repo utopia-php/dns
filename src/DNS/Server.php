@@ -293,7 +293,7 @@ class Server
                     foreach ($answers as $answer) {
                         $answerDomain = $answer->getName();
                         $type = $answer->getTypeName();
-                        
+
                         // For SOA records, check if we need to encode a different domain name
                         if ($type === 'SOA' && $answerDomain !== $domain) {
                             // Encode the full domain name since it's different from question (apex vs subdomain)
@@ -310,7 +310,7 @@ class Server
                             // Use compression pointer for all other cases
                             $response .= chr(192) . chr(12); // 192 indicates this is pointer, 12 is offset to question.
                         }
-                        
+
                         // Pack the answer's type and class
                         $response .= pack('nn', $answer->getType(), $classByte);
                         /**
