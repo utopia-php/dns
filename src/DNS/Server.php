@@ -2,7 +2,7 @@
 
 namespace Utopia\DNS;
 
-use Utopia\CLI\Console;
+use Utopia\Console;
 use Throwable;
 use Utopia\Telemetry\Adapter as Telemetry;
 use Utopia\Telemetry\Adapter\None as NoTelemetry;

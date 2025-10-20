@@ -46,7 +46,7 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Utopia\CLI\Console;
+use Utopia\Console;
 
 function calculatePercentile(array $values, float $percentile): float
 {
