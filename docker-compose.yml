@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   dns-server:
     image: dns-dev
