@@ -111,11 +111,31 @@ $resolver->addRecord('appwrite.io', 'SOA', [
     'ttl' => 3600
 ]);
 
+// Add a delegated SOA record where the answer name differs from the query
+$resolver->addRecord('soa-delegated.appwrite.io', 'SOA', [
+    'value' => 'ns1.appwrite.io. admin.appwrite.io. 2025011801 7200 3600 1209600 1800',
+    'ttl' => 600
+]);
+
+$delegatedSoaRecords = $resolver->resolve([
+    'name' => 'soa-delegated.appwrite.io',
+    'type' => 'SOA'
+]);
+
+foreach ($delegatedSoaRecords as $record) {
+    $record->setName('appwrite.io');
+}
 
 // Add a test zone apex for testing SOA inheritance
 $resolver->addRecord('dnsservertestdomain.io', 'SOA', [
     'value' => 'ns1.dnsservertestdomain.io. admin.dnsservertestdomain.io. 2025100601 86400 7200 3600000 172800',
     'ttl' => 7200
+]);
+
+// Subdomain record used to verify SOA-owner compression behaviour
+$resolver->addRecord('subdomain.dnsservertestdomain.io', 'A', [
+    'value' => '203.0.113.10',
+    'ttl' => 300
 ]);
 
 $dns = new Server($server, $resolver);

@@ -185,5 +185,18 @@ class ClientTest extends TestCase
         $this->assertStringContainsString('ns1.appwrite.io.', $rdata);
         $this->assertStringContainsString('admin.appwrite.io.', $rdata);
         $this->assertStringContainsString('2025011801', $rdata);
+
+        $records = $this->client->query('subdomain.dnsservertestdomain.io', 'SOA');
+
+        $this->assertCount(1, $records);
+        $this->assertEquals('dnsservertestdomain.io', $records[0]->getName());
+        $this->assertEquals('IN', $records[0]->getClass());
+        $this->assertEquals(7200, $records[0]->getTTL());
+        $this->assertEquals('SOA', $records[0]->getTypeName());
+
+        $rdata = $records[0]->getRdata();
+        $this->assertStringContainsString('ns1.dnsservertestdomain.io.', $rdata);
+        $this->assertStringContainsString('admin.dnsservertestdomain.io.', $rdata);
+        $this->assertStringContainsString('2025100601', $rdata);
     }
 }
