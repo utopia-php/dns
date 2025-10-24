@@ -71,7 +71,6 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
         Console::error("Failed to create temporary directory: {$tmpDir}");
         exit(1);
     }
-
     foreach ($testCases as $domain => $queryTypes) {
         foreach ($queryTypes as $queryType) {
             for ($i = 0; $i < $iterations; $i += $concurrency) {
@@ -91,10 +90,16 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                             if (!is_dir($tmpDir)) {
                                 mkdir($tmpDir, 0777, true);
                             }
-                            $records = $client->query("' . $domain . '", "' . $queryType . '");
+                            $typeCode = \Utopia\DNS\Part\Record::typeNameToCode("' . $queryType . '");
+                            if ($typeCode === null) {
+                                throw new \InvalidArgumentException("Unsupported record type: ' . $queryType . '");
+                            }
+                            $question = new \Utopia\DNS\Part\Question("' . $domain . '", $typeCode);
+                            $message = $client->query($question);
+                            $answers = $message->answers;
                             $time = (microtime(true) - $start) * 1000;
                             $result = json_encode([
-                                "success" => count($records) > 0,
+                                "success" => count($answers) > 0,
                                 "time" => $time,
                                 "domain" => "' . $domain . '",
                                 "type" => "' . $queryType . '"
@@ -344,7 +349,7 @@ $options = getopt('', [
 ]);
 
 $server = $options['server'] ?? '127.0.0.1';
-$port = (int)($options['port'] ?? 5300);
+$port = (int)($options['port'] ?? 53);
 $iterations = (int)($options['iterations'] ?? 10000);
 $concurrency = (int)($options['concurrency'] ?? 10);
 

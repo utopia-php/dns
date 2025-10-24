@@ -1,11 +1,9 @@
-version: '3'
-
 services:
   dns-server:
     image: dns-dev
     build:
       context: .
-    command: [ "sh", "-c", "php /usr/src/code/tests/DNS/ServerMemory.php" ]
+    command: [ "sh", "-c", "php /usr/src/code/tests/resource/server.php" ]
     volumes:
       - ./bin:/usr/src/code/bin
       - ./src:/usr/src/code/src

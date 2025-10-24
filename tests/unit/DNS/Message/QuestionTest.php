@@ -1,0 +1,50 @@
+<?php
+
+namespace Tests\Unit\Utopia\DNS\Message;
+
+use PHPUnit\Framework\TestCase;
+use Utopia\DNS\Message\Question;
+use Utopia\DNS\Message\Record;
+
+final class QuestionTest extends TestCase
+{
+    public function testEncodeProducesExactBytes(): void
+    {
+        $question = new Question('www.example.com', Record::TYPE_A, Record::CLASS_IN);
+
+        $expected = "\x03www\x07example\x03com\x00\x00\x01\x00\x01";
+        $this->assertSame($expected, $question->encode());
+    }
+
+    public function testDecodeParsesExpectedFields(): void
+    {
+        $data = "\x03api\x07example\x03com\x00\x00\x1C\x00\x01";
+        $offset = 0;
+
+        $question = Question::decode($data, $offset);
+
+        $this->assertSame('api.example.com', $question->name);
+        $this->assertSame(Record::TYPE_AAAA, $question->type);
+        $this->assertSame(Record::CLASS_IN, $question->class);
+        $this->assertSame(strlen($data), $offset);
+    }
+
+    public function testDecodeHandlesCompressionPointer(): void
+    {
+        $offset = 0;
+        $firstQuestion = "\x05first\x07example\x03com\x00\x00\x01\x00\x01";
+        $pointerQuestion = "\xC0\x00\x00\x1C\x00\x01";
+        $message = $firstQuestion . $pointerQuestion;
+
+        $parsedFirst = Question::decode($message, $offset);
+        $this->assertSame('first.example.com', $parsedFirst->name);
+        $this->assertSame(Record::TYPE_A, $parsedFirst->type);
+        $this->assertSame(Record::CLASS_IN, $parsedFirst->class);
+
+        $parsedSecond = Question::decode($message, $offset);
+        $this->assertSame('first.example.com', $parsedSecond->name);
+        $this->assertSame(Record::TYPE_AAAA, $parsedSecond->type);
+        $this->assertSame(Record::CLASS_IN, $parsedSecond->class);
+        $this->assertSame(strlen($message), $offset);
+    }
+}

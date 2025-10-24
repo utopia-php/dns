@@ -28,6 +28,11 @@ class Swoole extends Adapter
             $port = $clientInfo['port'] ?? '';
             $answer = call_user_func($callback, $data, $ip, $port);
 
+            // Swoole UDP sockets reject zero-length payloads; skip responding instead.
+            if ($answer === '' || $answer === null) {
+                return;
+            }
+
             $server->sendto($ip, $port, $answer);
         });
     }

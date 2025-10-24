@@ -7,10 +7,10 @@ abstract class Resolver
     /**
      * Resolve DNS Record
      *
-     * @param array<string, string> $question
-     * @return array<int, \Utopia\DNS\Record>
+     * @param Message $query
+     * @return Message
      */
-    abstract public function resolve(array $question): array;
+    abstract public function resolve(Message $query): Message;
 
     /**
      * Get the name of the resolver
