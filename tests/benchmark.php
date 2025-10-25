@@ -90,11 +90,11 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                             if (!is_dir($tmpDir)) {
                                 mkdir($tmpDir, 0777, true);
                             }
-                            $typeCode = \Utopia\DNS\Part\Record::typeNameToCode("' . $queryType . '");
+                            $typeCode = \Utopia\DNS\Message\Record::typeNameToCode("' . $queryType . '");
                             if ($typeCode === null) {
                                 throw new \InvalidArgumentException("Unsupported record type: ' . $queryType . '");
                             }
-                            $question = new \Utopia\DNS\Part\Question("' . $domain . '", $typeCode);
+                            $question = new \Utopia\DNS\Message\Question("' . $domain . '", $typeCode);
                             $message = $client->query($question);
                             $answers = $message->answers;
                             $time = (microtime(true) - $start) * 1000;
