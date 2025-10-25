@@ -9,7 +9,7 @@ use Utopia\DNS\Message\Record;
 
 final class ClientTest extends TestCase
 {
-    public const int PORT = 54;
+    public const int PORT = 53;
 
     public function testARecords(): void
     {

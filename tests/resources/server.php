@@ -11,7 +11,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) {
     return;
 }
 
-$server = new Swoole('0.0.0.0', 54);
+$server = new Swoole('0.0.0.0', 53);
 $resolver = new Memory();
 
 $resolver->addRecord(new Record(
