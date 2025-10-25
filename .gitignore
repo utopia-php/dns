@@ -1,2 +1,4 @@
 /vendor/
 /.idea/
+out.log
+.phpunit.result.cache

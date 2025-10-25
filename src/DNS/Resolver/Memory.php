@@ -2,82 +2,120 @@
 
 namespace Utopia\DNS\Resolver;
 
+use Utopia\DNS\Message;
+use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver;
-use Utopia\DNS\Record;
 
 class Memory extends Resolver
 {
     /**
-     * @var array<string, array<int, Record>> $records
+     * @var array<string, array<int, list<Record>>> $records
      */
     protected array $records = [];
 
     /**
      * Add DNS Record
-     *
-     * @param array<string, mixed> $answer
-     * @return void
      */
-    public function addRecord(string $domain, string $type, array $answer): void
+    public function addRecord(Record $record): void
     {
-        $key = $domain . '_' . $type;
+        $nameKey = $this->normalizeNameKey($record->name);
 
-        if (!(\array_key_exists($key, $this->records))) {
-            $this->records[$key] = [];
-        }
+        /** @var array<int, list<Record>> $recordsByName */
+        $recordsByName = $this->records[$nameKey] ?? [];
 
-        $this->records[$key][] = new Record(
-            $domain,
-            $answer['ttl'] ?? 1800,
-            $answer['class'] ?? '',
-            $type,
-            $answer['value'] ?? ''
-        );
+        /** @var list<Record> $recordsByType */
+        $recordsByType = $recordsByName[$record->type] ?? [];
+        $recordsByType[] = $record;
+
+        $recordsByName[$record->type] = $recordsByType;
+        $this->records[$nameKey] = $recordsByName;
     }
 
     /**
      * Resolve DNS Record
-     *
-     * @param array<string, string> $question
-     * @return array<int, \Utopia\DNS\Record>
      */
-    public function resolve(array $question): array
+    public function resolve(Message $query): Message
     {
-        $key = $question['name'] . '_' . $question['type'];
-
-        if (\array_key_exists($key, $this->records)) {
-            return $this->records[$key];
+        if (empty($query->questions)) {
+            throw new \InvalidArgumentException('Query must contain at least one question');
         }
 
-        // Special handling for SOA records: if not found at the exact domain,
-        // walk up the domain hierarchy to find the zone apex SOA record
-        if ($question['type'] === 'SOA') {
-            $domain = $question['name'];
-            $parts = explode('.', $domain);
+        $question = $query->questions[0];
+        $nameKey = $this->normalizeNameKey($question->name);
 
-            // Try each parent domain level, starting from immediate parent
-            // e.g., for "dev.sub.example.com", try "sub.example.com", then "example.com"
-            while (count($parts) > 1) {
-                array_shift($parts); // Remove leftmost subdomain
-                $parentDomain = implode('.', $parts);
-                $parentKey = $parentDomain . '_SOA';
+        $recordsByName = $this->records[$nameKey] ?? [];
+        $answers = $recordsByName[$question->type] ?? [];
 
-                if (\array_key_exists($parentKey, $this->records)) {
-                    return $this->records[$parentKey];
-                }
-            }
+        if ($answers !== []) {
+            $responseCode = Message::RCODE_NOERROR;
+            $authority = [];
+        } elseif ($recordsByName !== []) {
+            $responseCode = Message::RCODE_NOERROR;
+            $authority = $this->findSoaAuthority($question->name);
+        } else {
+            $responseCode = Message::RCODE_NXDOMAIN;
+            $authority = $this->findSoaAuthority($question->name);
         }
 
-        return [];
+        return Message::response($query, $responseCode, $answers, $authority, authoritative: true);
     }
 
-    /**
-     * Get the name of the resolver
-     *
-     * @return string
-     */
     public function getName(): string
     {
         return 'memory';
+    }
+
+    /**
+     * Attempt to locate the closest-matching SOA record for the queried domain.
+     *
+     * @return Record[]|array<int, Record>
+     */
+    private function findSoaAuthority(string $domain): array
+    {
+        $search = rtrim($domain, '.');
+        $labels = $search === '' ? [] : explode('.', $search);
+
+        while (!empty($labels)) {
+            $candidate = implode('.', $labels);
+            $candidateKey = $this->normalizeNameKey($candidate);
+
+            /** @var array<int, list<Record>> $recordsByName */
+            $recordsByName = $this->records[$candidateKey] ?? [];
+
+            /** @var list<Record> $records */
+            $records = $recordsByName[Record::TYPE_SOA] ?? [];
+
+            if ($records !== []) {
+                return $records;
+            }
+
+            array_shift($labels);
+        }
+
+        // Check apex (both empty string and @ are normalized to empty)
+        $apexKey = $this->normalizeNameKey('');
+
+        /** @var array<int, list<Record>> $apexRecordsByType */
+        $apexRecordsByType = $this->records[$apexKey] ?? [];
+
+        /** @var list<Record> $apexRecords */
+        $apexRecords = $apexRecordsByType[Record::TYPE_SOA] ?? [];
+
+        return $apexRecords;
+    }
+
+    /**
+     * Normalize a DNS owner name to a canonical array key.
+     * Both '@' and empty string normalize to empty (apex).
+     */
+    private function normalizeNameKey(string $name): string
+    {
+        $trimmed = rtrim($name, '.');
+
+        if ($trimmed === '@' || $trimmed === '') {
+            return '';
+        }
+
+        return strtolower($trimmed);
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Utopia\DNS;
 
+use Utopia\DNS\Message\Record;
+
 class Zone
 {
     protected int $defaultTTL = 3600;
@@ -230,36 +232,49 @@ class Zone
             if (!isset($tokens[$pos])) {
                 continue;
             }
-            $type = strtoupper($tokens[$pos++]);
-            $dataParts = array_slice($tokens, $pos);
-            if ($type === 'TXT') {
-                $data = '';
-                foreach ($dataParts as $part) {
-                    $data .= $part;
-                }
-            } else {
-                $data = implode(' ', $dataParts);
+            $typeName = strtoupper($tokens[$pos++]);
+            $typeCode = Record::typeNameToCode($typeName);
+            if ($typeCode === null) {
+                continue;
             }
+
+            $dataParts = array_slice($tokens, $pos);
+            $data = $typeName === 'TXT'
+                ? implode('', $dataParts)
+                : implode(' ', $dataParts);
+
+            $priority = $weight = $port = null;
+
+            if ($typeName === 'MX') {
+                $mx = $this->tokenize($data);
+                if (count($mx) === 2) {
+                    $priority = (int)$mx[0];
+                    $data = $mx[1];
+                }
+            } elseif ($typeName === 'SRV') {
+                $srv = $this->tokenize($data);
+                if (count($srv) === 4) {
+                    $priority = (int)$srv[0];
+                    $weight = (int)$srv[1];
+                    $port = (int)$srv[2];
+                    $data = $srv[3];
+                }
+            }
+
             if ($owner !== '@' && !str_ends_with($owner, '.')) {
                 $owner .= '.' . rtrim($this->defaultOrigin, '.');
             }
-            $rec = new Record($owner, $ttl, 'IN', $type, $data);
-            if ($type === 'MX') {
-                $mx = $this->tokenize($data);
-                if (count($mx) === 2) {
-                    $rec->setPriority((int)$mx[0]);
-                    $rec->setRdata($mx[1]);
-                }
-            } elseif ($type === 'SRV') {
-                $srv = $this->tokenize($data);
-                if (count($srv) === 4) {
-                    $rec->setPriority((int)$srv[0]);
-                    $rec->setWeight((int)$srv[1]);
-                    $rec->setPort((int)$srv[2]);
-                    $rec->setRdata($srv[3]);
-                }
-            }
-            $records[] = $rec;
+
+            $records[] = new Record(
+                name: $owner,
+                type: $typeCode,
+                class: Record::CLASS_IN,
+                ttl: $ttl,
+                rdata: $data,
+                priority: $priority,
+                weight: $weight,
+                port: $port
+            );
         }
         return $records;
     }
@@ -275,17 +290,22 @@ class Zone
     {
         $lines = [];
         foreach ($records as $r) {
-            $owner = $r->getName();
-            $ttl = $r->getTTL();
-            $class = $r->getClass();
-            $type = $r->getTypeName();
-            $data = $r->getRdata();
+            $owner = $r->name;
+            $ttl = $r->ttl;
+            $class = $r->class === Record::CLASS_IN ? 'IN' : (string)$r->class;
+            $type = Record::typeCodeToName($r->type) ?? (string)$r->type;
+            $data = $r->rdata;
 
-            if ($type === 'MX' && $r->getPriority() !== null) {
-                $data = "{$r->getPriority()} {$r->getRdata()}";
-            } elseif ($type === 'SRV' && $r->getPriority() !== null && $r->getWeight() !== null && $r->getPort() !== null) {
-                $data = "{$r->getPriority()} {$r->getWeight()} {$r->getPort()} {$r->getRdata()}";
-            } elseif ($type === 'TXT') {
+            if ($r->type === Record::TYPE_MX && $r->priority !== null) {
+                $data = "{$r->priority} {$r->rdata}";
+            } elseif (
+                $r->type === Record::TYPE_SRV
+                && $r->priority !== null
+                && $r->weight !== null
+                && $r->port !== null
+            ) {
+                $data = "{$r->priority} {$r->weight} {$r->port} {$r->rdata}";
+            } elseif ($r->type === Record::TYPE_TXT) {
                 // Encode TXT records with double quotes and escape embedded quotes and backslashes
                 $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $data);
                 $data = '"' . $escaped . '"';
