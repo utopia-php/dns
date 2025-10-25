@@ -2,43 +2,45 @@
 
 namespace Utopia\DNS\Message;
 
-final class Header
+use Utopia\DNS\Exception\DecodingException;
+
+final readonly class Header
 {
     public const int LENGTH = 12;
 
     public function __construct(
-        public readonly int $id,
-        public readonly bool $isResponse,
-        public readonly int $opcode,
-        public readonly bool $authoritative,
-        public readonly bool $truncated,
-        public readonly bool $recursionDesired,
-        public readonly bool $recursionAvailable,
-        public readonly int $responseCode,
-        public readonly int $questionCount,
-        public readonly int $answerCount,
-        public readonly int $authorityCount,
-        public readonly int $additionalCount
+        public int $id,
+        public bool $isResponse,
+        public int $opcode,
+        public bool $authoritative,
+        public bool $truncated,
+        public bool $recursionDesired,
+        public bool $recursionAvailable,
+        public int $responseCode,
+        public int $questionCount,
+        public int $answerCount,
+        public int $authorityCount,
+        public int $additionalCount
     ) {
         if ($opcode < 0 || $opcode > 15) {
-            throw new \InvalidArgumentException('Opcode must be 0-15');
+            throw new DecodingException('Opcode must be 0-15');
         }
         if ($responseCode < 0 || $responseCode > 15) {
-            throw new \InvalidArgumentException('Response code must be 0-15');
+            throw new DecodingException('Response code must be 0-15');
         }
     }
 
     public static function decode(string $data, int $offset = 0): self
     {
         if (strlen($data) < $offset + self::LENGTH) {
-            throw new \InvalidArgumentException('DNS header too short');
+            throw new DecodingException('DNS header too short');
         }
 
         $chunk = substr($data, $offset, self::LENGTH);
         $values = unpack('nid/nflags/nqdcount/nancount/nnscount/narcount', $chunk);
 
         if (!is_array($values)) {
-            throw new \RuntimeException('Failed to unpack DNS header');
+            throw new DecodingException('Failed to unpack DNS header');
         }
 
         $flags = $values['flags'];

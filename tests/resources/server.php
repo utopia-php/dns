@@ -6,174 +6,51 @@ use Utopia\DNS\Server;
 use Utopia\DNS\Adapter\Swoole;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver\Memory;
+use Utopia\DNS\Zone;
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) {
     return;
 }
 
-$server = new Swoole('0.0.0.0', 54);
-$resolver = new Memory();
+$port = (int) (getenv('PORT') ?: 5300);
+$server = new Swoole('0.0.0.0', $port);
 
-$resolver->addRecord(new Record(
-    name: 'dev.appwrite.io',
-    type: Record::TYPE_A,
-    rdata: '180.12.3.24',
-    ttl: 10
-));
+$records = [
+    // Single A
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_A, rdata: '180.12.3.24', ttl: 10),
+    // Mulple AAAA
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_A, rdata: '142.6.0.1', ttl: 1800),
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_A, rdata: '142.6.0.2', ttl: 1800),
+    // Single AAAA
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_AAAA, rdata: '2001:0db8:0000:0000:0000:ff00:0042:8329', ttl: 20),
+    // Multiple AAAA
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_AAAA, rdata: '2001:0db8:0000:0000:0000:ff00:0000:0001', ttl: 20),
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_AAAA, rdata: '2001:0db8:0000:0000:0000:ff00:0000:0002', ttl: 20),
+    // Single CNAME
+    new Record(name: 'alias.appwrite.io', type: Record::TYPE_CNAME, rdata: 'cloud.appwrite.io', ttl: 30),
+    // Secret TXT
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_TXT, rdata: 'awesome-secret-key', ttl: 30),
+    // Mail MX
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_MX, rdata: '10 mail.appwrite.io', ttl: 30),
+    // Single CAA
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_CAA, rdata: '0 issue "letsencrypt.org"', ttl: 30),
+    // Subdomain NS delegation
+    new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, rdata: 'ns1.test.io', ttl: 30),
+    new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, rdata: 'ns2.test.io', ttl: 30),
+];
 
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_A,
-    rdata: '142.6.0.1',
-    ttl: 1800
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_A,
-    rdata: '142.6.0.2',
-    ttl: 1800
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev.appwrite.io',
-    type: Record::TYPE_AAAA,
-    rdata: '2001:0db8:0000:0000:0000:ff00:0042:8329',
-    ttl: 20
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_AAAA,
-    rdata: '2001:0db8:0000:0000:0000:ff00:0000:0001'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_AAAA,
-    rdata: '2001:0db8:0000:0000:0000:ff00:0000:0002'
-));
-
-$resolver->addRecord(new Record(
-    name: 'alias.appwrite.io',
-    type: Record::TYPE_CNAME,
-    ttl: 30,
-    rdata: 'cloud.appwrite.io'
-));
-
-$resolver->addRecord(new Record(
-    name: 'alias-eu.appwrite.io',
-    type: Record::TYPE_CNAME,
-    rdata: 'eu.cloud.appwrite.io'
-));
-
-$resolver->addRecord(new Record(
-    name: 'alias-us.appwrite.io',
-    type: Record::TYPE_CNAME,
-    rdata: 'us.cloud.appwrite.io'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev.appwrite.io',
-    type: Record::TYPE_TXT,
-    ttl: 40,
-    rdata: 'awesome-secret-key'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_TXT,
-    rdata: 'key with "$\'- symbols'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_TXT,
-    rdata: 'key with spaces'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_TXT,
-    rdata: 'v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev.appwrite.io',
-    type: Record::TYPE_CAA,
-    ttl: 50,
-    rdata: 'issue "letsencrypt.org"'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_CAA,
-    rdata: 'issue "letsencrypt.org"'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_CAA,
-    rdata: 'issue "sectigo.com"'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev3.appwrite.io',
-    type: Record::TYPE_CAA,
-    rdata: '255 issuewild "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev.appwrite.io',
-    type: Record::TYPE_NS,
-    ttl: 60,
-    rdata: 'ns.appwrite.io'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_NS,
-    rdata: 'ns1.appwrite.io'
-));
-
-$resolver->addRecord(new Record(
-    name: 'dev2.appwrite.io',
-    type: Record::TYPE_NS,
-    rdata: 'ns2.appwrite.io'
-));
-
-$resolver->addRecord(new Record(
-    name: 'server.appwrite.io',
-    type: Record::TYPE_SRV,
-    rdata: 'server.appwrite.io',
-    priority: 10,
-    weight: 5,
-    port: 25565
-));
-
-$resolver->addRecord(new Record(
-    name: 'mail.appwrite.io',
-    type: Record::TYPE_MX,
-    rdata: 'mx.google.com',
-    priority: 10
-));
-
-$resolver->addRecord(new Record(
+$zone = new Zone(
     name: 'appwrite.io',
-    type: Record::TYPE_SOA,
-    ttl: 3600,
-    rdata: 'ns1.appwrite.io. admin.appwrite.io. 2025011801 7200 3600 1209600 1800'
-));
+    records: $records,
+    soa: new Record(
+        name: 'appwrite.io',
+        type: Record::TYPE_SOA,
+        rdata: 'ns1.appwrite.zone team.appwrite.io 1 7200 1800 1209600 3600',
+        ttl: 30
+    )
+);
 
-// Add a test zone apex for testing SOA inheritance
-$resolver->addRecord(new Record(
-    name: 'dnsservertestdomain.io',
-    type: Record::TYPE_SOA,
-    ttl: 7200,
-    rdata: 'ns1.dnsservertestdomain.io. admin.dnsservertestdomain.io. 2025100601 86400 7200 3600000 172800'
-));
-
-$dns = new Server($server, $resolver);
+$dns = new Server($server, new Memory($zone));
 $dns->setDebug(false);
 
 $dns->start();

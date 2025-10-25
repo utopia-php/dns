@@ -2,20 +2,23 @@
 
 namespace Utopia\DNS;
 
-abstract class Resolver
+/**
+ *
+ */
+interface Resolver
 {
     /**
-     * Resolve DNS Record
+     * Returns the name of the provider.
      *
-     * @param Message $query
-     * @return Message
+     * @return string The name of the provider.
      */
-    abstract public function resolve(Message $query): Message;
+    public function getName(): string;
 
     /**
-     * Get the name of the resolver
+     * Returns a DNS response for the given query.
      *
-     * @return string
+     * @param Message $query The DNS query.
+     * @return Message The DNS response.
      */
-    abstract public function getName(): string;
+    public function resolve(Message $query): Message;
 }

@@ -22,6 +22,6 @@ class Google extends Proxy
      */
     public function getName(): string
     {
-        return "Google DNS ({$this->server})";
+        return "Google DNS ($this->server)";
     }
 }

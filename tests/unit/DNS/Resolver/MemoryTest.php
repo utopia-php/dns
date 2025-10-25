@@ -1,18 +1,33 @@
 <?php
 
-namespace Utopia\Tests\DNS\Resolver;
+namespace Tests\Unit\Utopia\DNS\Resolver;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver\Memory;
+use Utopia\DNS\Zone;
 
 class MemoryTest extends TestCase
 {
     public function testResolveReturnsExactRecord(): void
     {
-        $resolver = $this->createResolver();
+        $zone = new Zone(
+            name: 'example.com',
+            records: [new Record(
+                name: 'www.example.com',
+                type: Record::TYPE_A,
+                rdata: '192.0.2.10'
+            )],
+            soa: new Record(
+                name: 'example.com',
+                type: Record::TYPE_SOA,
+                rdata: 'ns1.example.com. admin.example.com. 1 3600 600 1209600 300'
+            )
+        );
+
+        $resolver = new Memory($zone);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -31,7 +46,21 @@ class MemoryTest extends TestCase
 
     public function testResolveNoDataIncludesAuthority(): void
     {
-        $resolver = $this->createResolver();
+        $zone = new Zone(
+            name: 'example.com',
+            records: [new Record(
+                name: 'www.example.com',
+                type: Record::TYPE_A,
+                rdata: '192.0.2.10'
+            )],
+            soa: new Record(
+                name: 'example.com',
+                type: Record::TYPE_SOA,
+                rdata: 'ns1.example.com. admin.example.com. 1 3600 600 1209600 300'
+            )
+        );
+
+        $resolver = new Memory($zone);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -48,7 +77,21 @@ class MemoryTest extends TestCase
 
     public function testResolveNxDomain(): void
     {
-        $resolver = $this->createResolver();
+        $zone = new Zone(
+            name: 'example.com',
+            records: [new Record(
+                name: 'www.example.com',
+                type: Record::TYPE_A,
+                rdata: '192.0.2.10'
+            )],
+            soa: new Record(
+                name: 'example.com',
+                type: Record::TYPE_SOA,
+                rdata: 'ns1.example.com. admin.example.com. 1 3600 600 1209600 300'
+            )
+        );
+
+        $resolver = new Memory($zone);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -65,7 +108,21 @@ class MemoryTest extends TestCase
 
     public function testResolveSoaFallsBackToParentZone(): void
     {
-        $resolver = $this->createResolver();
+        $zone = new Zone(
+            name: 'example.com',
+            records: [new Record(
+                name: 'www.example.com',
+                type: Record::TYPE_A,
+                rdata: '192.0.2.10'
+            )],
+            soa: new Record(
+                name: 'example.com',
+                type: Record::TYPE_SOA,
+                rdata: 'ns1.example.com. admin.example.com. 1 3600 600 1209600 300'
+            )
+        );
+
+        $resolver = new Memory($zone);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -79,24 +136,5 @@ class MemoryTest extends TestCase
         $this->assertNotEmpty($response->authority);
         $this->assertSame(Record::TYPE_SOA, $response->authority[0]->type);
         $this->assertSame('example.com', $response->authority[0]->name);
-    }
-
-    private function createResolver(): Memory
-    {
-        $resolver = new Memory();
-
-        $resolver->addRecord(new Record(
-            name: 'example.com',
-            type: Record::TYPE_SOA,
-            rdata: 'ns1.example.com. admin.example.com. 1 3600 600 1209600 300'
-        ));
-
-        $resolver->addRecord(new Record(
-            name: 'www.example.com',
-            type: Record::TYPE_A,
-            rdata: '192.0.2.10'
-        ));
-
-        return $resolver;
     }
 }

@@ -2,7 +2,9 @@
 
 namespace Utopia\DNS\Message;
 
-final class Domain
+use Utopia\DNS\Exception\DecodingException;
+
+final readonly class Domain
 {
     public const int MAX_LABEL_LEN = 63;
     public const int MAX_LABELS = 127;
@@ -20,6 +22,10 @@ final class Domain
             return "\x00";
         }
 
+        if (str_ends_with($name, '..')) {
+            throw new \InvalidArgumentException('Domain labels must not be empty');
+        }
+
         $trimmed = rtrim($name, '.');
         if ($trimmed === '') {
             return "\x00";
@@ -29,7 +35,7 @@ final class Domain
         $labelCount = count($labels);
 
         if ($labelCount > self::MAX_LABELS) {
-            throw new \InvalidArgumentException("Domain has too many labels: {$labelCount}");
+            throw new \InvalidArgumentException("Domain has too many labels: $labelCount");
         }
 
         $encoded = '';
@@ -40,10 +46,14 @@ final class Domain
                 throw new \InvalidArgumentException('Domain labels must not be empty');
             }
 
+            if (str_contains($label, '@')) {
+                throw new \InvalidArgumentException('Domain label contains invalid characters');
+            }
+
             $labelLength = strlen($label);
 
             if ($labelLength > self::MAX_LABEL_LEN) {
-                throw new \InvalidArgumentException("Label too long: {$label}");
+                throw new \InvalidArgumentException("Label too long: $label");
             }
 
             $encoded .= chr($labelLength) . $label;
@@ -59,5 +69,81 @@ final class Domain
         }
 
         return $encoded . "\x00";
+    }
+
+    /**
+     * Decode a domain name from DNS wire format, handling compression pointers.
+     *
+     * @param string $data   Full DNS packet
+     * @param int    $offset Current read offset (updated to first byte after the name)
+     * @return string Decoded domain name in dotted form
+     *
+     * @throws DecodingException when the packet is malformed.
+     */
+    public static function decode(string $data, int &$offset): string
+    {
+        $labels = [];
+        $jumped = false;
+        $pos = $offset;
+        $dataLength = strlen($data);
+        $loopGuard = 0;
+
+        while (true) {
+            if ($loopGuard++ > $dataLength) {
+                throw new DecodingException(
+                    'Possible compression pointer loop while decoding domain name'
+                );
+            }
+
+            if ($pos >= $dataLength) {
+                throw new DecodingException(
+                    'Unexpected end of data while decoding domain name'
+                );
+            }
+
+            $len = ord($data[$pos]);
+            if ($len === 0) {
+                if (!$jumped) {
+                    $offset = $pos + 1;
+                }
+                break;
+            }
+
+            if (($len & 0xC0) === 0xC0) {
+                if ($pos + 1 >= $dataLength) {
+                    throw new DecodingException(
+                        'Truncated compression pointer in domain name'
+                    );
+                }
+
+                $pointer = (($len & 0x3F) << 8) | ord($data[$pos + 1]);
+                if ($pointer >= $dataLength) {
+                    throw new DecodingException(
+                        'Compression pointer out of bounds in domain name'
+                    );
+                }
+                if (!$jumped) {
+                    $offset = $pos + 2;
+                }
+                $pos = $pointer;
+                $jumped = true;
+                continue;
+            }
+
+            if ($pos + 1 + $len > $dataLength) {
+                throw new DecodingException(
+                    'Label length exceeds remaining data while decoding domain name'
+                );
+            }
+
+            $labels[] = substr($data, $pos + 1, $len);
+            $pos += $len + 1;
+
+            if (!$jumped) {
+                $offset = $pos;
+            }
+        }
+
+        return implode('.', $labels);
     }
 }

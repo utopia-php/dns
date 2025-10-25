@@ -2,8 +2,12 @@
 
 namespace Utopia\DNS\Message;
 
-final class Record
+use Utopia\DNS\Exception\DecodingException;
+
+final readonly class Record
 {
+    public string $name;
+
     public const int TYPE_A = 1;
     public const int TYPE_NS = 2;
     public const int TYPE_MD = 3;
@@ -92,15 +96,16 @@ final class Record
     ];
 
     public function __construct(
-        public readonly string $name,
-        public readonly int $type,
-        public readonly int $class = Record::CLASS_IN,
-        public readonly int $ttl = 0,
-        public readonly string $rdata = '',
-        public readonly ?int $priority = null,
-        public readonly ?int $weight = null,
-        public readonly ?int $port = null
+        string $name,
+        public int $type,
+        public int $class = Record::CLASS_IN,
+        public int $ttl = 0,
+        public string $rdata = '',
+        public ?int $priority = null,
+        public ?int $weight = null,
+        public ?int $port = null
     ) {
+        $this->name = strtolower($name);
     }
 
     /**
@@ -116,43 +121,43 @@ final class Record
     public static function decode(string $data, int &$offset): self
     {
         // 1. Parse NAME (may use compression)
-        $name = self::decodeName($data, $offset);
+        $name = Domain::decode($data, $offset);
 
         // 2. Read fixed-length fields
         $limit = strlen($data);
         if ($offset + 10 > $limit) {
-            throw new \InvalidArgumentException('Truncated RR header');
+            throw new DecodingException('Truncated RR header');
         }
         $typeData = unpack('ntype', substr($data, $offset, 2));
         if (!is_array($typeData) || !array_key_exists('type', $typeData)) {
-            throw new \InvalidArgumentException('Failed to unpack record type');
+            throw new DecodingException('Failed to unpack record type');
         }
         $type = $typeData['type'];
         $offset += 2;
 
         $classData = unpack('nclass', substr($data, $offset, 2));
         if (!is_array($classData) || !array_key_exists('class', $classData)) {
-            throw new \InvalidArgumentException('Failed to unpack record class');
+            throw new DecodingException('Failed to unpack record class');
         }
         $class = $classData['class'];
         $offset += 2;
 
         $ttlData = unpack('Nttl', substr($data, $offset, 4));
         if (!is_array($ttlData) || !array_key_exists('ttl', $ttlData)) {
-            throw new \InvalidArgumentException('Failed to unpack record TTL');
+            throw new DecodingException('Failed to unpack record TTL');
         }
         $ttl = $ttlData['ttl'];
         $offset += 4;
 
         $rdLengthData = unpack('nlength', substr($data, $offset, 2));
         if (!is_array($rdLengthData) || !array_key_exists('length', $rdLengthData)) {
-            throw new \InvalidArgumentException('Failed to unpack record length');
+            throw new DecodingException('Failed to unpack record length');
         }
         $rdlength = $rdLengthData['length'];
         $offset += 2;
 
         if ($offset + $rdlength > $limit) {
-            throw new \InvalidArgumentException('RDATA exceeds packet bounds');
+            throw new DecodingException('RDATA exceeds packet bounds');
         }
         $rdataRaw = substr($data, $offset, $rdlength);
         $offset = (int) ($offset + $rdlength);
@@ -164,22 +169,22 @@ final class Record
         switch ($type) {
             case Record::TYPE_A:
                 if (strlen($rdataRaw) !== Record::IPV4_LEN) {
-                    throw new \InvalidArgumentException('Invalid IPv4 address length');
+                    throw new DecodingException('Invalid IPv4 address length');
                 }
                 $decoded = inet_ntop($rdataRaw);
                 if ($decoded === false) {
-                    throw new \InvalidArgumentException('Invalid IPv4 address payload');
+                    throw new DecodingException('Invalid IPv4 address payload');
                 }
                 $rdata = $decoded;
                 break;
 
             case Record::TYPE_AAAA:
                 if (strlen($rdataRaw) !== Record::IPV6_LEN) {
-                    throw new \InvalidArgumentException('Invalid IPv6 address length');
+                    throw new DecodingException('Invalid IPv6 address length');
                 }
                 $decoded = inet_ntop($rdataRaw);
                 if ($decoded === false) {
-                    throw new \InvalidArgumentException('Invalid IPv6 address payload');
+                    throw new DecodingException('Invalid IPv6 address payload');
                 }
                 $rdata = $decoded;
                 break;
@@ -188,71 +193,71 @@ final class Record
             case Record::TYPE_NS:
             case Record::TYPE_PTR:
                 $tempOffset = (int) ($offset - $rdlength);
-                $rdata = self::decodeName($data, $tempOffset);
+                $rdata = Domain::decode($data, $tempOffset);
                 break;
 
             case Record::TYPE_MX:
                 if (strlen($rdataRaw) < 3) { // 2 bytes preference + at least 1 for name
-                    throw new \InvalidArgumentException('Invalid MX RDATA length: ' . strlen($rdataRaw));
+                    throw new DecodingException('Invalid MX RDATA length: ' . strlen($rdataRaw));
                 }
                 $priorityData = unpack('npriority', substr($rdataRaw, 0, 2));
                 if (!is_array($priorityData) || !array_key_exists('priority', $priorityData)) {
-                    throw new \InvalidArgumentException('Failed to unpack MX priority');
+                    throw new DecodingException('Failed to unpack MX priority');
                 }
                 $priority = $priorityData['priority'];
                 $tempOffset = (int) ($offset - $rdlength + 2);
-                $rdata = self::decodeName($data, $tempOffset);
+                $rdata = Domain::decode($data, $tempOffset);
                 break;
 
             case Record::TYPE_SRV:
                 if (strlen($rdataRaw) < 7) { // 6 bytes (pri,weight,port) + at least 1 for name
-                    throw new \InvalidArgumentException('Invalid SRV RDATA length: ' . strlen($rdataRaw));
+                    throw new DecodingException('Invalid SRV RDATA length: ' . strlen($rdataRaw));
                 }
                 $priorityData = unpack('npriority', substr($rdataRaw, 0, 2));
                 $weightData = unpack('nweight', substr($rdataRaw, 2, 2));
                 $portData = unpack('nport', substr($rdataRaw, 4, 2));
                 if (!is_array($priorityData) || !array_key_exists('priority', $priorityData)) {
-                    throw new \InvalidArgumentException('Failed to unpack SRV priority');
+                    throw new DecodingException('Failed to unpack SRV priority');
                 }
                 if (!is_array($weightData) || !array_key_exists('weight', $weightData)) {
-                    throw new \InvalidArgumentException('Failed to unpack SRV weight');
+                    throw new DecodingException('Failed to unpack SRV weight');
                 }
                 if (!is_array($portData) || !array_key_exists('port', $portData)) {
-                    throw new \InvalidArgumentException('Failed to unpack SRV port');
+                    throw new DecodingException('Failed to unpack SRV port');
                 }
                 $priority = $priorityData['priority'];
                 $weight = $weightData['weight'];
                 $port = $portData['port'];
                 $tempOffset = (int) ($offset - $rdlength + 6);
-                $rdata = self::decodeName($data, $tempOffset);
+                $rdata = Domain::decode($data, $tempOffset);
                 break;
 
             case Record::TYPE_SOA:
                 $tempOffset = (int) ($offset - $rdlength);
-                $mname = self::decodeName($data, $tempOffset);
-                $rname = self::decodeName($data, $tempOffset);
+                $mname = Domain::decode($data, $tempOffset);
+                $rname = Domain::decode($data, $tempOffset);
 
-                if ($mname !== '') {
-                    $mname .= '.';
-                }
-                if ($rname !== '') {
-                    $rname .= '.';
-                }
                 $timingData = substr($data, $tempOffset, 20);
                 if (strlen($timingData) < 20) {
-                    throw new \InvalidArgumentException('Invalid SOA record length');
+                    throw new DecodingException('Invalid SOA record length');
                 }
 
                 $fields = unpack('Nserial/Nrefresh/Nretry/Nexpire/Nminimum', $timingData);
                 if (!is_array($fields)) {
-                    throw new \InvalidArgumentException('Unable to unpack SOA timings');
+                    throw new DecodingException('Unable to unpack SOA timings');
+                }
+
+                // Convert signed to unsigned for serial
+                $serial = $fields['serial'];
+                if ($serial < 0) {
+                    $serial += 4294967296;
                 }
 
                 $rdata = sprintf(
                     '%s %s %u %u %u %u %u',
                     $mname,
                     $rname,
-                    $fields['serial'],
+                    $serial,
                     $fields['refresh'],
                     $fields['retry'],
                     $fields['expire'],
@@ -262,24 +267,32 @@ final class Record
 
             case Record::TYPE_TXT:
                 if ($rdlength < 1) {
-                    throw new \InvalidArgumentException('Invalid TXT RDATA length: 0');
+                    throw new DecodingException('Invalid TXT RDATA length: 0');
                 }
-                $len = ord($rdataRaw[0]);
-                if ($len > $rdlength - 1) {
-                    throw new \InvalidArgumentException('TXT length octet exceeds RDATA size');
+
+                // Handle multiple character strings
+                $chunks = [];
+                $pos = 0;
+                while ($pos < $rdlength) {
+                    $len = ord($rdataRaw[$pos]);
+                    if ($pos + 1 + $len > $rdlength) {
+                        throw new DecodingException('TXT chunk length exceeds RDATA size');
+                    }
+                    $chunks[] = substr($rdataRaw, $pos + 1, $len);
+                    $pos += $len + 1;
                 }
-                $rdata = substr($rdataRaw, 1, $len);
+                $rdata = implode('', $chunks);
                 break;
 
             case Record::TYPE_CAA:
                 if ($rdlength < 2) {
-                    throw new \InvalidArgumentException('Invalid CAA record length');
+                    throw new DecodingException('Invalid CAA record length');
                 }
 
                 $flags = ord($rdataRaw[0]);
                 $tagLength = ord($rdataRaw[1]);
                 if ($tagLength > strlen($rdataRaw) - 2) {
-                    throw new \InvalidArgumentException('Invalid CAA tag length');
+                    throw new DecodingException('Invalid CAA tag length');
                 }
 
                 $tag = substr($rdataRaw, 2, $tagLength);
@@ -306,67 +319,14 @@ final class Record
     }
 
     /**
-     * Parse a domain name from the packet, handling compression.
+     * Create a new record with the same data but a different name.
+     *
+     * @param string $name New name for the record
+     * @return self New record instance with the updated name
      */
-    /**
-     * @param-out int $offset
-     */
-    private static function decodeName(string $data, int &$offset): string
+    public function withName(string $name): self
     {
-        $labels = [];
-        $jumped = false;
-        $pos = $offset;
-        $dataLength = strlen($data);
-        $loopGuard = 0;
-
-        while (true) {
-            if ($loopGuard++ > $dataLength) {
-                throw new \InvalidArgumentException('Possible compression pointer loop while decoding domain name');
-            }
-
-            if ($pos >= $dataLength) {
-                throw new \InvalidArgumentException('Unexpected end of data while decoding domain name');
-            }
-
-            $len = ord($data[$pos]);
-            if ($len === 0) {
-                if (!$jumped) {
-                    $offset = $pos + 1;
-                }
-                break;
-            }
-
-            // Handle compression pointer (0xC0)
-            if (($len & 0xC0) === 0xC0) {
-                if ($pos + 1 >= $dataLength) {
-                    throw new \InvalidArgumentException('Truncated compression pointer in domain name');
-                }
-
-                $pointer = (($len & 0x3F) << 8) | ord($data[$pos + 1]);
-                if ($pointer >= $dataLength) {
-                    throw new \InvalidArgumentException('Compression pointer out of bounds in domain name');
-                }
-                if (!$jumped) {
-                    $offset = $pos + 2;
-                }
-                $pos = $pointer;
-                $jumped = true;
-                continue;
-            }
-
-            if ($pos + 1 + $len > $dataLength) {
-                throw new \InvalidArgumentException('Label length exceeds remaining data while decoding domain name');
-            }
-
-            $labels[] = substr($data, $pos + 1, $len);
-            $pos += $len + 1;
-
-            if (!$jumped) {
-                $offset = $pos;
-            }
-        }
-
-        return implode('.', $labels);
+        return new self($name, $this->type, $this->class, $this->ttl, $this->rdata, $this->priority, $this->weight, $this->port);
     }
 
     /**
@@ -408,7 +368,7 @@ final class Record
             case self::TYPE_A:
                 $packed = inet_pton($this->rdata);
                 if ($packed === false || strlen($packed) !== self::IPV4_LEN) {
-                    throw new \InvalidArgumentException("Invalid IPv4 address: {$this->rdata}");
+                    throw new \InvalidArgumentException("Invalid IPv4 address: $this->rdata");
                 }
 
                 return $packed;
@@ -416,7 +376,7 @@ final class Record
             case self::TYPE_AAAA:
                 $packed = inet_pton($this->rdata);
                 if ($packed === false || strlen($packed) !== self::IPV6_LEN) {
-                    throw new \InvalidArgumentException("Invalid IPv6 address: {$this->rdata}");
+                    throw new \InvalidArgumentException("Invalid IPv6 address: $this->rdata");
                 }
 
                 return $packed;
@@ -545,7 +505,7 @@ final class Record
 
         $pattern = '/^(?:(\d+)\s+)?([A-Za-z0-9-]+)\s+"((?:\\\\.|[^"])*)"$/';
         if (!preg_match($pattern, $input, $matches)) {
-            throw new \InvalidArgumentException('Invalid CAA RDATA format: ' . $this->rdata);
+            throw new \InvalidArgumentException("Invalid CAA RDATA format: $this->rdata");
         }
 
         $flags = (int) $matches[1];

@@ -2,6 +2,8 @@
 
 namespace Utopia\DNS;
 
+use Utopia\DNS\Exception\DecodingException;
+use Utopia\DNS\Exception\PartialDecodingException;
 use Utopia\DNS\Message\Header;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
@@ -20,15 +22,22 @@ final class Message
     public const int RCODE_NOTAUTH = 9;
     public const int RCODE_NOTZONE = 10;
 
+    /**
+     * @param Header $header The header of the message.
+     * @param Question[] $questions The question records.
+     * @param list<Record> $answers The answer records.
+     * @param list<Record> $authority The authority records.
+     * @param list<Record> $additional The additional records.
+     */
     public function __construct(
         public readonly Header $header,
         /** @var Question[] */
         public readonly array $questions = [],
-        /** @var Record[] */
+        /** @var list<Record> */
         public readonly array $answers = [],
-        /** @var Record[] */
+        /** @var list<Record> */
         public readonly array $authority = [],
-        /** @var Record[] */
+        /** @var list<Record> */
         public readonly array $additional = []
     ) {
         if ($header->questionCount !== count($questions)) {
@@ -43,7 +52,7 @@ final class Message
         if ($header->additionalCount !== count($additional)) {
             throw new \InvalidArgumentException('Invalid DNS response: additional count mismatch');
         }
-        if ($header->isResponse && !array_any($this->authority, fn ($record) => $record->type === Record::TYPE_SOA)) {
+        if ($header->isResponse && $header->authoritative && !array_any($this->authority, fn ($record) => $record->type === Record::TYPE_SOA)) {
             if ($header->responseCode === self::RCODE_NXDOMAIN) {
                 throw new \InvalidArgumentException('NXDOMAIN requires SOA in authority');
             }
@@ -83,19 +92,21 @@ final class Message
     /**
      * Create a response message.
      *
-     * @param Message $query The query message to respond to.
+     * @param Header $header The header of the query message to respond to.
      * @param int $responseCode The response code.
-     * @param array<Record> $answers The answer records.
-     * @param array<Record> $authority The authority records.
-     * @param array<Record> $additional The additional records.
+     * @param array<Question> $questions The question records.
+     * @param list<Record> $answers The answer records.
+     * @param list<Record> $authority The authority records.
+     * @param list<Record> $additional The additional records.
      * @param bool $authoritative Whether the response is authoritative.
      * @param bool $truncated Whether the response is truncated.
      * @param bool $recursionAvailable Whether recursion is available.
      * @return self The response message.
      */
     public static function response(
-        Message $query,
+        Header $header,
         int $responseCode,
+        array $questions = [],
         array $answers = [],
         array $authority = [],
         array $additional = [],
@@ -104,59 +115,64 @@ final class Message
         bool $recursionAvailable = false
     ): self {
         $header = new Header(
-            id: $query->header->id,
+            id: $header->id,
             isResponse: true,
-            opcode: $query->header->opcode,
+            opcode: $header->opcode,
             authoritative: $authoritative,
             truncated: $truncated,
-            recursionDesired: $query->header->recursionDesired,
+            recursionDesired: $header->recursionDesired,
             recursionAvailable: $recursionAvailable,
             responseCode: $responseCode,
-            questionCount: count($query->questions),
+            questionCount: count($questions),
             answerCount: count($answers),
             authorityCount: count($authority),
             additionalCount: count($additional)
         );
 
-        return new self($header, $query->questions, $answers, $authority, $additional);
+
+        return new self($header, $questions, $answers, $authority, $additional);
     }
 
     public static function decode(string $packet): self
     {
         if (strlen($packet) < Header::LENGTH) {
-            throw new \InvalidArgumentException('Invalid DNS response: header too short');
+            throw new DecodingException('Invalid DNS response: header too short');
         }
 
         // --- Parse header (12 bytes) ---
         $header = Header::decode($packet);
 
         // --- Parse Question Section ---
-        $offset = Header::LENGTH;
-        $questions = [];
-        for ($i = 0; $i < $header->questionCount; $i++) {
-            $questions[] = Question::decode($packet, $offset);
-        }
+        try {
+            $offset = Header::LENGTH;
+            $questions = [];
+            for ($i = 0; $i < $header->questionCount; $i++) {
+                $questions[] = Question::decode($packet, $offset);
+            }
 
-        // --- Decode Answer Section ---
-        $answers = [];
-        for ($i = 0; $i < $header->answerCount; $i++) {
-            $answers[] = Record::decode($packet, $offset);
-        }
+            // --- Decode Answer Section ---
+            $answers = [];
+            for ($i = 0; $i < $header->answerCount; $i++) {
+                $answers[] = Record::decode($packet, $offset);
+            }
 
-        // --- Decode Authority Section ---
-        $authority = [];
-        for ($i = 0; $i < $header->authorityCount; $i++) {
-            $authority[] = Record::decode($packet, $offset);
-        }
+            // --- Decode Authority Section ---
+            $authority = [];
+            for ($i = 0; $i < $header->authorityCount; $i++) {
+                $authority[] = Record::decode($packet, $offset);
+            }
 
-        // --- Decode Additional Section ---
-        $additional = [];
-        for ($i = 0; $i < $header->additionalCount; $i++) {
-            $additional[] = Record::decode($packet, $offset);
-        }
+            // --- Decode Additional Section ---
+            $additional = [];
+            for ($i = 0; $i < $header->additionalCount; $i++) {
+                $additional[] = Record::decode($packet, $offset);
+            }
 
-        if ($offset !== strlen($packet)) {
-            throw new \InvalidArgumentException('Invalid packet length');
+            if ($offset !== strlen($packet)) {
+                throw new DecodingException('Invalid packet length');
+            }
+        } catch (DecodingException $e) {
+            throw new PartialDecodingException($header, $e->getMessage(), $e);
         }
 
         return new self($header, $questions, $answers, $authority, $additional);

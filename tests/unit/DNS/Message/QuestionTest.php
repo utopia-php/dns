@@ -12,13 +12,13 @@ final class QuestionTest extends TestCase
     {
         $question = new Question('www.example.com', Record::TYPE_A, Record::CLASS_IN);
 
-        $expected = "\x03www\x07example\x03com\x00\x00\x01\x00\x01";
+        $expected = "\x03www\x07example\x03com\x00\x00\x01\x00\x01"; // www.example.com IN A
         $this->assertSame($expected, $question->encode());
     }
 
     public function testDecodeParsesExpectedFields(): void
     {
-        $data = "\x03api\x07example\x03com\x00\x00\x1C\x00\x01";
+        $data = "\x03api\x07example\x03com\x00\x00\x1C\x00\x01"; // api.example.com IN AAAA
         $offset = 0;
 
         $question = Question::decode($data, $offset);
@@ -32,8 +32,8 @@ final class QuestionTest extends TestCase
     public function testDecodeHandlesCompressionPointer(): void
     {
         $offset = 0;
-        $firstQuestion = "\x05first\x07example\x03com\x00\x00\x01\x00\x01";
-        $pointerQuestion = "\xC0\x00\x00\x1C\x00\x01";
+        $firstQuestion = "\x05first\x07example\x03com\x00\x00\x01\x00\x01"; // first.example.com IN A
+        $pointerQuestion = "\xC0\x00\x00\x1C\x00\x01"; // pointer to first name, type AAAA
         $message = $firstQuestion . $pointerQuestion;
 
         $parsedFirst = Question::decode($message, $offset);

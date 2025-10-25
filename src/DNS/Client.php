@@ -3,7 +3,6 @@
 namespace Utopia\DNS;
 
 use Exception;
-use Utopia\DNS\Message\Question;
 
 class Client
 {
@@ -33,42 +32,37 @@ class Client
     }
 
     /**
-     * @param Question $question
+     * @param Message $message
      * @return Message
      */
-    public function query(Question $question): Message
+    public function query(Message $message): Message
     {
-        try {
-            $message = Message::query($question);
-            $packet = $message->encode();
-            if (socket_sendto($this->socket, $packet, strlen($packet), 0, $this->server, $this->port) === false) {
-                throw new Exception('Failed to send data: ' . socket_strerror(socket_last_error($this->socket)));
-            }
-
-            $response = '';
-            $from = '';
-            $port = 0;
-
-            $result = socket_recvfrom($this->socket, $response, 512, 0, $from, $port);
-
-            if ($result === false) {
-                $error = socket_last_error($this->socket);
-                $errorMessage = socket_strerror($error);
-                throw new Exception("Failed to receive data from {$this->server}: {$errorMessage} (Error code: {$error})");
-            }
-
-            if (empty($response)) {
-                throw new Exception("Empty response received from {$this->server}:{$this->port}");
-            }
-
-            $response = Message::decode($response);
-            if ($response->header->id !== $message->header->id) {
-                throw new Exception("Mismatched DNS transaction ID. Expected {$message->header->id}, got {$response->header->id}");
-            }
-
-            return $response;
-        } catch (Exception $e) {
-            throw new Exception($e->getMessage(), $e->getCode(), $e);
+        $packet = $message->encode();
+        if (socket_sendto($this->socket, $packet, strlen($packet), 0, $this->server, $this->port) === false) {
+            throw new Exception('Failed to send data: ' . socket_strerror(socket_last_error($this->socket)));
         }
+
+        $data = '';
+        $from = '';
+        $port = 0;
+
+        $result = socket_recvfrom($this->socket, $data, 512, 0, $from, $port);
+
+        if ($result === false) {
+            $error = socket_last_error($this->socket);
+            $errorMessage = socket_strerror($error);
+            throw new Exception("Failed to receive data from $this->server: $errorMessage (Error code: $error)");
+        }
+
+        if (empty($data)) {
+            throw new Exception("Empty response received from $this->server:$this->port");
+        }
+
+        $response = Message::decode($data);
+        if ($response->header->id !== $message->header->id) {
+            throw new Exception("Mismatched DNS transaction ID. Expected {$message->header->id}, got {$response->header->id}");
+        }
+
+        return $response;
     }
 }

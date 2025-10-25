@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\Tests\DNS\Resolver;
+namespace Tests\Unit\Utopia\DNS\Resolver;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\DNS\Message;

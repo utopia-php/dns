@@ -22,6 +22,6 @@ class Cloudflare extends Proxy
      */
     public function getName(): string
     {
-        return "Cloudflare DNS ({$this->server})";
+        return "Cloudflare DNS ($this->server)";
     }
 }

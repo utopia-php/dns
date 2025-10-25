@@ -3,6 +3,7 @@
 namespace Tests\Unit\Utopia\DNS\Message;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\DNS\Exception\DecodingException;
 use Utopia\DNS\Message\Header;
 
 final class HeaderTest extends TestCase
@@ -43,7 +44,7 @@ final class HeaderTest extends TestCase
 
     public function testDecodeThrowsOnShortData(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(DecodingException::class);
         Header::decode("\x00\x01");
     }
 
@@ -95,7 +96,7 @@ final class HeaderTest extends TestCase
 
     public function testOpcodeValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(DecodingException::class);
         $this->expectExceptionMessage('Opcode must be 0-15');
 
         new Header(
@@ -116,7 +117,7 @@ final class HeaderTest extends TestCase
 
     public function testResponseCodeValidation(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(DecodingException::class);
         $this->expectExceptionMessage('Response code must be 0-15');
 
         new Header(

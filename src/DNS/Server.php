@@ -2,8 +2,9 @@
 
 namespace Utopia\DNS;
 
-use Utopia\Console;
 use Throwable;
+use Utopia\Console;
+use Utopia\DNS\Exception\PartialDecodingException;
 use Utopia\Telemetry\Adapter as Telemetry;
 use Utopia\Telemetry\Adapter\None as NoTelemetry;
 use Utopia\Telemetry\Counter;
@@ -140,6 +141,129 @@ class Server
         }
     }
 
+    /**
+     * Handle packet
+     *
+     * @param string $buffer
+     * @param string $ip
+     * @param int $port
+     *
+     * @return string
+     */
+    protected function onPacket(string $buffer, string $ip, int $port): string
+    {
+        $startTime = microtime(true);
+        Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from $ip:$port");
+
+        // 1. Parse Message.
+        $decodeStart = microtime(true);
+        try {
+            $query = Message::decode($buffer);
+        } catch (PartialDecodingException $e) {
+            Console::error("[ERROR] Failed to decode packet: " . $e->getMessage());
+            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
+            Console::error("[ERROR] Processing time: " . (microtime(true) - $startTime) . "s");
+
+            $this->handleError($e);
+
+            $response = Message::response(
+                $e->getHeader(),
+                Message::RCODE_FORMERR,
+                authoritative: false
+            );
+            return $response->encode();
+        } catch (Throwable $e) {
+            Console::error("[ERROR] Failed to decode packet: " . $e->getMessage());
+            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
+            Console::error("[ERROR] Processing time: " . (microtime(true) - $startTime) . "s");
+
+            $this->handleError($e);
+
+            // Returning SERVFAIL is unsafe here - just drop the packet
+            return '';
+        }
+
+        $question = $query->questions[0] ?? null;
+        if ($question === null) {
+            $response = Message::response(
+                $query->header,
+                Message::RCODE_FORMERR,
+                authoritative: false
+            );
+            return $response->encode();
+        }
+
+        $this->queriesTotal?->add(1, [
+            'type' => $question->type ?? null,
+        ]);
+        $this->duration?->record(microtime(true) - $decodeStart, ['phase' => 'decode']);
+
+        // 2. Resolve query
+        $resolveStart = microtime(true);
+        try {
+            $response = $this->resolver->resolve($query);
+        } catch (Throwable $e) {
+            Console::error("[ERROR] Failed to resolve zone $question->name (Type: $question->type): " . $e->getMessage());
+            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
+
+            $this->handleError($e);
+
+            $this->duration?->record(microtime(true) - $resolveStart, [
+                'phase' => 'resolve',
+                'responseCode' => Message::RCODE_SERVFAIL,
+            ]);
+
+            $response = Message::response(
+                $query->header,
+                Message::RCODE_SERVFAIL,
+                questions: $query->questions,
+                authoritative: false
+            );
+        }
+
+        Console::info("[PACKET] DNS Header - ID: {$query->header->id}, Questions: {$query->header->questionCount}, Answers: {$query->header->answerCount}");
+
+        if ($this->debug) {
+            Console::info("[QUERY] Query for domain: $question->name (Type: $question->type)");
+        }
+
+        if (empty($response->answers)) {
+            Console::warning("[RESPONSE] No answers found for $question->name ($question->type)");
+        }
+
+        // 3. Encode response
+        $encodeStart = microtime(true);
+        try {
+            return $response->encode();
+        } catch (Throwable $e) {
+            Console::error("[ERROR] Failed to encode message: " . $e->getMessage());
+            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
+
+            $this->handleError($e);
+
+            $response = Message::response(
+                $query->header,
+                Message::RCODE_SERVFAIL,
+                questions: $query->questions,
+                authoritative: false
+            );
+            return $response->encode();
+        } finally {
+            $this->responsesTotal?->add(1, [
+                'type' => $question->type ?? null,
+                'responseCode' => $response->header->responseCode
+            ]);
+            $this->duration?->record(microtime(true) - $encodeStart, [
+                'phase' => 'encode',
+                'responseCode' => $response->header->responseCode
+            ]);
+
+            $fullDuration = microtime(true) - $startTime;
+            Console::info("[PACKET] Processing completed in $fullDuration\s");
+            $this->duration?->record($fullDuration, ['phase' => 'full']);
+        }
+    }
+
     public function start(): void
     {
         try {
@@ -155,96 +279,10 @@ class Server
 
             Console::success('[DNS] Server is ready to accept connections');
 
-            $this->adapter->onPacket(function (string $buffer, string $ip, int $port) {
-                $startTime = microtime(true);
-                Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from {$ip}:{$port}");
-
-                $decodeStart = microtime(true);
-                try {
-                    $query = Message::decode($buffer);
-                    $question = $query->questions[0];
-                    if ($query->header->questionCount < 1) {
-                        throw new \RuntimeException('DNS request missing question section');
-                    }
-                } catch (Throwable $e) {
-                    Console::error("[ERROR] Failed to decode packet: " . $e->getMessage());
-                    Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-                    Console::error("[ERROR] Processing time: " . (microtime(true) - $startTime) . "s");
-
-                    $this->handleError($e);
-
-                    // Returning SERVFAIL is unsafe here - just drop the packet
-                    return '';
-                }
-                $this->duration?->record(microtime(true) - $decodeStart, ['phase' => 'decode']);
-
-                $resolveStart = microtime(true);
-                try {
-                    Console::info("[PACKET] DNS Header - ID: {$query->header->id}, Questions: {$query->header->questionCount}, Answers: {$query->header->answerCount}");
-                    $this->queriesTotal?->add(1, [
-                        'type' => $question->type,
-                    ]);
-
-                    if ($this->debug) {
-                        Console::info("[QUERY] Query for domain: {$question->name} (Type: {$question->type})");
-                    }
-
-                    $response = $this->resolve($query);
-                } catch (Throwable $e) {
-                    Console::error("[ERROR] Failed to resolve question {$question->name} (Type: {$question->type}): " . $e->getMessage());
-                    Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-
-                    $this->handleError($e);
-
-                    $response = Message::response($query, Message::RCODE_SERVFAIL, authoritative: false);
-                }
-                $this->duration?->record(microtime(true) - $resolveStart, [
-                    'phase' => 'resolve'
-                ]);
-
-                if (empty($response->answers)) {
-                    Console::warning("[RESPONSE] No answers found for {$question->name} ({$question->type})");
-                }
-
-                $this->responsesTotal?->add(1, [
-                    'code' => $response->header->responseCode,
-                    'type' => $question->type,
-                ]);
-
-                $encodeStart = microtime(true);
-                try {
-                    $packet = $response->encode();
-                } catch (Throwable $e) {
-                    Console::error("[ERROR] Failed to encode message: " . $e->getMessage());
-                    Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-
-                    $this->handleError($e);
-                }
-                if (empty($packet)) {
-                    Console::warning("[PACKET] Generated empty response for {$question->name} ({$question->type})");
-                }
-                $this->duration?->record(microtime(true) - $encodeStart, ['phase' => 'encode']);
-
-                $duration = microtime(true) - $startTime;
-                $this->duration?->record($duration, ['phase' => 'total']);
-                Console::info("[PACKET] Processing completed in {$duration}s");
-
-                return $packet ?? '';
-            });
-
+            $this->adapter->onPacket($this->onPacket(...));
             $this->adapter->start();
         } catch (Throwable $error) {
             $this->handleError($error);
         }
-    }
-    /**
-     * Resolve domain name to IP by record type
-     *
-     * @param Message $query
-     * @return Message
-     */
-    protected function resolve(Message $query): Message
-    {
-        return $this->resolver->resolve($query);
     }
 }
