@@ -1,192 +1,124 @@
 # Utopia DNS
 
-[![Build Status](https://travis-ci.org/utopia-php/dns.svg?branch=master)](https://travis-ci.com/utopia-php/dns)
-![Total Downloads](https://img.shields.io/packagist/dt/utopia-php/dns.svg)
+[![Tests](https://github.com/utopia-php/dns/actions/workflows/tests.yml/badge.svg)](https://github.com/utopia-php/dns/actions/workflows/tests.yml)
+[![Packagist Version](https://img.shields.io/packagist/v/utopia-php/dns.svg)](https://packagist.org/packages/utopia-php/dns)
+![Packagist Downloads](https://img.shields.io/packagist/dt/utopia-php/dns.svg)
 [![Discord](https://img.shields.io/discord/564160730845151244)](https://appwrite.io/discord)
 
-Utopia DNS is a simple and lite abstraction layer for quickly setting up a DNS server. This library is aiming to be as simple and easy to learn and use. This library is maintained by the Appwrite team.
+Utopia DNS is a modern PHP 8.4 toolkit for building DNS servers and clients. It provides a fully-typed DNS message encoder/decoder, pluggable resolvers, and telemetry hooks so you can stand up custom authoritative or proxy DNS services with minimal effort.
 
-Although this library is part of the [Utopia Framework](https://github.com/utopia-php/framework) project it is dependency free, and can be used as standalone with any other PHP project or framework.
+Although part of the [Utopia Framework](https://github.com/utopia-php/framework) family, the library is framework-agnostic and can be used in any PHP project.
 
-## Getting started
+## Installation
 
-Install using composer:
 ```bash
 composer require utopia-php/dns
 ```
 
-## Using the DNS server
+The library requires PHP 8.4+ with the `ext-sockets` extension. The Swoole adapter additionally needs the `ext-swoole` extension.
 
-Init your DNS server with your preferred adapter and resolver. The adapter is used for running the UDP server to serve DNS requests, and the resolver will be used to answering DNS queries with proper results. You can and in most cases should implement your own resolver by extending [src/DNS/Resolver.php](src/DNS/Resolver.php)
+## Quick start
+
+Create an authoritative DNS server by wiring an adapter (UDP socket implementation) and a resolver (how records are answered). The example below uses the native PHP socket adapter and the in-memory zone resolver.
 
 ```php
 <?php
 
-require_once __DIR__.'/init.php';
+require __DIR__ . '/vendor/autoload.php';
 
-use Appwrite\DNS\Server;
-use Appwrite\DNS\Adapter\Swoole;
-use Appwrite\DNS\Resolver\Mock;
+use Utopia\DNS\Adapter\Native;
+use Utopia\DNS\Message\Record;
+use Utopia\DNS\Resolver\Memory;
+use Utopia\DNS\Server;
+use Utopia\DNS\Zone;
 
-$server = new Swoole('0.0.0.0', 8000); // Swoole based UDP server running on port 8000
-$resolver = new Mock(); // Mock resolver. Always returns 127.0.0.1 as the result
+$adapter = new Native('0.0.0.0', 5300);
 
-$dns = new Server($server, $resolver);
+$zone = new Zone(
+    name: 'example.test',
+    records: [
+        new Record(name: 'example.test', type: Record::TYPE_A, rdata: '127.0.0.1', ttl: 60),
+        new Record(name: 'www.example.test', type: Record::TYPE_CNAME, rdata: 'example.test', ttl: 60),
+        new Record(name: 'example.test', type: Record::TYPE_TXT, rdata: '"demo record"', ttl: 60),
+    ],
+    soa: new Record(
+        name: 'example.test',
+        type: Record::TYPE_SOA,
+        rdata: 'ns1.example.test hostmaster.example.test 1 7200 1800 1209600 3600',
+        ttl: 60
+    ),
+);
 
-$dns->start();
+$server = new Server($adapter, new Memory($zone));
+$server->setDebug(true);
+
+$server->start();
 ```
 
-## Using the DNS client
+The server listens on UDP port `5300` and answers queries for `example.test` from the in-memory zone. Implement the [`Utopia\DNS\Resolver`](src/DNS/Resolver.php) interface to serve records from databases, APIs, or other stores.
 
-Utopia DNS also provides a simple, dependency‑free DNS client that can be used to perform queries against any DNS server. This client is ideal for applications that need to look up records on demand. It supports querying all sorts of DNS records (A, MX, TXT, AAAA, SRV, etc.).
+## Resolvers
+- `Memory`: authoritative resolver backed by a `Zone` object
+- `Proxy`: forwards queries to another DNS server
+- `Cloudflare`: proxy resolver preconfigured for `1.1.1.1` / `1.0.0.1`
+- `Google`: proxy resolver preconfigured for `8.8.8.8` / `8.8.4.4`
 
-Example Usage
+Resolvers can be combined with any adapter. Implementing the `Resolver` interface allows you to plug in custom logic while reusing the message encoding/decoding and telemetry tooling.
 
-Below is an example of how to use the DNS client:
+## Adapters
+- `Native`: pure PHP UDP server based on `ext-sockets`
+- `Swoole`: non-blocking server built on the Swoole UDP runtime
 
-```php 
+Adapters are responsible only for receiving and returning raw packets. They call back into the server with the payload, source IP, and port so your resolver logic stays isolated.
+
+## DNS client
+
+The bundled client can query any DNS server and returns fully decoded messages.
+
+```php
 <?php
 
-require_once __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
 use Utopia\DNS\Client;
+use Utopia\DNS\Message;
+use Utopia\DNS\Message\Question;
+use Utopia\DNS\Message\Record;
 
-$client = new Client('8.8.8.8'); // Query against Google's public DNS
+$client = new Client('1.1.1.1');
 
-try {
-    // Query for A records for example.com
-    $records = $client->query('example.com', 'A');
-    
-    foreach ($records as $record) {
-        echo 'Name: '   . $record->getName()   . "\n";
-        echo 'Type: '   . $record->getTypeName() . "\n";
-        echo 'TTL: '    . $record->getTTL()      . "\n";
-        echo 'Data: '   . $record->getRdata()    . "\n\n";
-    }
-    
-    // Query for other record types (e.g. MX, TXT, AAAA, SRV)
-    // $mxRecords = $client->query('example.com', 'MX');
-    // $txtRecords = $client->query('example.com', 'TXT');
-    // ...
-    
-} catch (Exception $e) {
-    echo "DNS query failed: " . $e->getMessage();
+$query = Message::query(
+    new Question('example.com', Record::TYPE_A)
+);
+
+$response = $client->query($query);
+
+foreach ($response->answers as $answer) {
+    echo "{$answer->name} {$answer->ttl} {$answer->getTypeName()} {$answer->rdata}\n";
 }
 ```
 
-### How it works
+## Telemetry
 
-#### Instantiate the client
+`Server::setTelemetry()` accepts any adapter from [`utopia-php/telemetry`](https://github.com/utopia-php/telemetry). Counters (`dns.queries.total`, `dns.responses.total`) and a histogram (`dns.query.duration`) are emitted automatically, enabling Prometheus or OpenTelemetry pipelines with minimal configuration.
 
-Create a new instance of the Client class and specify the DNS server you wish to query. In the example above, we use Google's DNS server (8.8.8.8).
-
-#### Perform a query
-
-Use the query() method with the desired domain and record type (for example, 'A' for an IPv4 address) to retrieve DNS records.
-
-The client returns an array of Record objects. These objects contain the queried domain name, type (both numeric and human‑readable), TTL, and record data.
-Optional fields (such as priority, weight, and port for MX and SRV records) are available via their getters.
-
-#### Error handling
-
-The query is wrapped in a try‑catch block to handle any exceptions that may occur during the DNS lookup.
-
-## Supported DNS records
-
-* A
-* NS
-* CNAME
-* SOA
-* WKS
-* PTR
-* HINFO
-* MX
-* TXT
-* RP
-* SIG
-* KEY
-* LOC
-* NXT
-* AAAA
-* CERT
-* A6
-* AXFR
-* IXFR
-* *
-
-### Adapters
-
-Below is a list of supported server adapters, and their compatibly tested versions alongside a list of supported features and relevant limits.
-
-| Adapter | Status | Info | Version |
-|---------|---------|---|---|
-| Native | ✅ | A native PHP Socket | 8.0 |
-| Swoole | ✅ | PHP Swoole UDP Server | 4.8.4 |
-| Workerman | 🛠 | - | - |
-| ReactPHP | 🛠 | - | - |
-
-` ✅  - supported, 🛠  - work in progress`
-
-### Future possibilities
-
-Currently this library only support DNS over UDP. We could add support for both DNS over TLS and HTTPS. We should also add better support for query flags, and possibly create some more predefined resolvers.
-
-## System requirements
-
-Utopia Framework requires PHP 8.0 or later. We recommend using the latest PHP version whenever possible.
-
-## Running tests
-
-Run tests for this library using the provided Docker container.
-
-```sh
-docker compose exec -t dns-server vendor/bin/phpunit --configuration phpunit.xml
-```
+## Development
+- Install dependencies: `composer install`
+- Static analysis: `composer check`
+- Coding standards: `composer lint` (use `composer format` to auto-fix)
+- Tests: `composer test`
+- Sample Swoole server for manual testing: `docker compose up`
 
 ## Benchmarking
 
-The library includes a benchmarking tool to measure DNS server performance under load. The benchmark tests various record types and provides detailed performance metrics.
-
-### Running the benchmark
+Run the bundled benchmark tool to measure throughput against your server:
 
 ```bash
-# Run with default settings
-php tests/benchmark.php
-
-# Run with custom configuration
 php tests/benchmark.php --server=127.0.0.1 --port=5300 --iterations=1000 --concurrency=20
 ```
 
-### Options
-- `--server`: DNS server IP address (default: 127.0.0.1)
-- `--port`: DNS server port (default: 5300)
-- `--iterations`: Number of queries per record type (default: 10000)
-- `--concurrency`: Number of concurrent requests (default: 10)
+The script reports requests per second, latency distribution, and error counts across common record types.
 
-### Metrics Provided
-- Requests per second (RPS)
-- Response time statistics (min, max, avg)
-- Latency distribution (p50, p75, p90, p95, p99)
-- Time series analysis
-- Success/failure rates
-- Detailed error reporting
+## License
 
-### Example Output
-```
---- Benchmark Results ---
-Total Requests: 40000
-Successful: 40000
-Failed: 0
-Total Time: 25.34 seconds
-Requests Per Second: 1578.93 req/s
-Min Response Time: 12.45 ms
-Max Response Time: 45.67 ms
-Avg Response Time: 23.45 ms
-
---- Latency Distribution ---
-p50: 22.34 ms
-p75: 28.56 ms
-p90: 35.78 ms
-p95: 39.12 ms
-p99: 42.89 ms
-```
+MIT

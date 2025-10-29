@@ -4,8 +4,9 @@ namespace Utopia\DNS\Resolver;
 
 use Utopia\DNS\Client;
 use Utopia\DNS\Resolver;
+use Utopia\DNS\Message;
 
-class Proxy extends Resolver
+class Proxy implements Resolver
 {
     protected Client $client;
     protected string $server;
@@ -27,14 +28,12 @@ class Proxy extends Resolver
     /**
      * Resolve DNS Record by proxying to another DNS server
      *
-     * @param array<string, string> $question
-     * @return array<int, \Utopia\DNS\Record>
+     * @param Message $query
+     * @return Message
      */
-    public function resolve(array $question): array
+    public function resolve(Message $query): Message
     {
-        $records = $this->client->query($question['name'], $question['type']);
-
-        return $records;
+        return $this->client->query($query);
     }
 
     /**
@@ -44,6 +43,6 @@ class Proxy extends Resolver
      */
     public function getName(): string
     {
-        return "Proxy ({$this->server}:{$this->port})";
+        return "Proxy ($this->server:$this->port)";
     }
 }

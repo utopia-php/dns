@@ -1,4 +1,4 @@
-FROM composer:2.0 as composer
+FROM composer:2.8 as composer
 
 ARG TESTING=false
 ENV TESTING=$TESTING
@@ -11,7 +11,7 @@ COPY composer.json /usr/local/src/
 RUN composer install --ignore-platform-reqs --optimize-autoloader \
     --no-plugins --no-scripts --prefer-dist
 
-FROM appwrite/base:0.9.0 as final
+FROM appwrite/base:0.11.3 as final
 
 LABEL maintainer="team@appwrite.io"
 
