@@ -5,7 +5,7 @@
 ![Packagist Downloads](https://img.shields.io/packagist/dt/utopia-php/dns.svg)
 [![Discord](https://img.shields.io/discord/564160730845151244)](https://appwrite.io/discord)
 
-Utopia DNS is a modern PHP 8.4 toolkit for building DNS servers and clients. It provides a fully-typed DNS message encoder/decoder, pluggable resolvers, and telemetry hooks so you can stand up custom authoritative or proxy DNS services with minimal effort.
+Utopia DNS is a modern PHP 8.3 toolkit for building DNS servers and clients. It provides a fully-typed DNS message encoder/decoder, pluggable resolvers, and telemetry hooks so you can stand up custom authoritative or proxy DNS services with minimal effort.
 
 Although part of the [Utopia Framework](https://github.com/utopia-php/framework) family, the library is framework-agnostic and can be used in any PHP project.
 
@@ -15,7 +15,7 @@ Although part of the [Utopia Framework](https://github.com/utopia-php/framework)
 composer require utopia-php/dns
 ```
 
-The library requires PHP 8.4+ with the `ext-sockets` extension. The Swoole adapter additionally needs the `ext-swoole` extension.
+The library requires PHP 8.3+ with the `ext-sockets` extension. The Swoole adapter additionally needs the `ext-swoole` extension.
 
 ## Quick start
 
