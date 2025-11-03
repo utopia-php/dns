@@ -16,7 +16,7 @@ final class FileTest extends TestCase
     {
         $content = (string) file_get_contents(__DIR__ . '/../../../resources/zone-valid-example.com.txt');
 
-        $zone = File::import('example.com', $content);
+        $zone = File::import($content);
 
         $this->assertSame('example.com', $zone->name);
         $this->assertNotEmpty($zone->records);
@@ -26,7 +26,7 @@ final class FileTest extends TestCase
     {
         $content = (string) file_get_contents(__DIR__ . '/../../../resources/zone-valid-redhat.txt');
 
-        $zone = File::import('example.com', $content);
+        $zone = File::import($content);
 
         $this->assertSame('example.com', $zone->name);
         $this->assertNotEmpty($zone->records);
@@ -36,7 +36,7 @@ final class FileTest extends TestCase
     {
         $content = (string) file_get_contents(__DIR__ . '/../../../resources/zone-valid-oracle1.txt');
 
-        $zone = File::import('example.com', $content);
+        $zone = File::import($content, 'example.com');
 
         $this->assertSame('example.com', $zone->name);
         $this->assertNotEmpty($zone->records);
@@ -46,7 +46,7 @@ final class FileTest extends TestCase
     {
         $content = (string) file_get_contents(__DIR__ . '/../../../resources/zone-valid-oracle2.txt');
 
-        $zone = File::import('example.com', $content);
+        $zone = File::import($content);
 
         $this->assertSame('example.com', $zone->name);
         $this->assertNotEmpty($zone->records);
@@ -56,7 +56,7 @@ final class FileTest extends TestCase
     {
         $content = (string) file_get_contents(__DIR__ . '/../../../resources/zone-valid-localhost.txt');
 
-        $zone = File::import('localhost', $content);
+        $zone = File::import($content);
 
         $this->assertSame('localhost', $zone->name);
         $this->assertNotEmpty($zone->records);
@@ -75,7 +75,7 @@ mail 300 IN MX 10 mail
 _sip._tcp 600 IN SRV 5 10 5060 sip
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertSame(1800, $zone->soa->ttl);
         $this->assertCount(3, $zone->records);
@@ -106,7 +106,7 @@ ZONE;
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('$INCLUDE directive is not supported');
 
-        File::import('example.com', <<<ZONE
+        File::import(<<<ZONE
 \$ORIGIN example.com.
 \$INCLUDE other.zone
 ZONE);
@@ -124,7 +124,7 @@ ZONE);
 www 300 IN BADTYPE data
 ZONE;
 
-        File::import('example.com', $contents);
+        File::import($contents);
     }
 
     public function testImportFailsWhenMxPriorityMissing(): void
@@ -139,7 +139,7 @@ ZONE;
 mail 3600 IN MX mail.example.com.
 ZONE;
 
-        File::import('example.com', $contents);
+        File::import($contents);
     }
 
     public function testImportFailsWhenSrvFieldsMissing(): void
@@ -154,7 +154,7 @@ ZONE;
 _sip._tcp 600 IN SRV 5 10 5060
 ZONE;
 
-        File::import('example.com', $contents);
+        File::import($contents);
     }
 
     public function testImportHandlesBlankLinesAndComments(): void
@@ -169,7 +169,7 @@ ZONE;
 @ 3600 IN A 127.0.0.1
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertCount(1, $zone->records);
         $this->assertSame('example.com', $zone->records[0]->name);
@@ -184,9 +184,22 @@ ZONE;
 @ 0 IN A 127.0.0.1
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertSame(0, $zone->records[0]->ttl);
+    }
+
+    public function testImportUsesDefaultOriginWhenDirectiveMissing(): void
+    {
+        $contents = <<<'ZONE'
+@ IN SOA ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800
+www 600 IN A 192.0.2.10
+ZONE;
+
+        $zone = File::import($contents, 'example.com');
+
+        $this->assertSame('example.com', $zone->name);
+        $this->assertSame('www.example.com', $zone->records[0]->name);
     }
 
     public function testImportFailsWhenSoaDataMissing(): void
@@ -194,7 +207,7 @@ ZONE;
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('SOA requires MNAME, RNAME, SERIAL, REFRESH, RETRY, EXPIRE, MINIMUM');
 
-        File::import('example.com', '@ IN SOA ns1.example.com. admin.example.com.');
+        File::import('@ IN SOA ns1.example.com. admin.example.com.', 'example.com');
     }
 
     public function testImportWithRelativeNamesExpandsToZone(): void
@@ -208,7 +221,7 @@ mail    IN  MX  10 mail
 alias   IN  CNAME   www
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertSame('example.com', $zone->soa->name);
 
@@ -230,7 +243,7 @@ ZONE;
 @ IN 3600 A 192.0.2.10
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $record = $zone->records[0];
         $this->assertSame(Record::CLASS_IN, $record->class);
@@ -246,7 +259,7 @@ ZONE;
 @ 600 A 192.0.2.11
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $record = $zone->records[0];
         $this->assertSame(Record::CLASS_IN, $record->class);
@@ -264,7 +277,7 @@ multiline 600 IN TXT (
 )
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $txt = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($txt);
         $this->assertSame('foobar', $txt->rdata);
@@ -279,7 +292,7 @@ ZONE;
 escaped 600 IN TXT "foo\\010bar"
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $txt = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($txt);
         $this->assertSame("foo" . chr(10) . "bar", $txt->rdata);
@@ -295,7 +308,7 @@ ZONE;
 www IN A 192.168.1.10
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertCount(1, $zone->records);
         $this->assertSame('www.example.com', $zone->records[0]->name);
@@ -310,7 +323,7 @@ ZONE;
 @ 3600 IN TXT "v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;"
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($record);
         $this->assertSame('v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;', $record->rdata);
@@ -331,7 +344,7 @@ ZONE;
         $exported = File::export($zone, includeComments: false);
         $this->assertSame($expected, $exported);
 
-        $roundTrip = File::import('example.com', $exported);
+        $roundTrip = File::import($exported);
         $roundTripTxt = $this->findRecord($roundTrip->records, Record::TYPE_TXT);
 
         $this->assertNotNull($roundTripTxt);
@@ -348,11 +361,11 @@ www IN A 192.168.1.10
 mail 600 IN MX 10 mail
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $this->assertCount(2, $zone->records);
 
         $exported = File::export($zone, includeComments: false);
-        $roundTrip = File::import('example.com', $exported);
+        $roundTrip = File::import($exported);
 
         $this->assertSame($zone->name, $roundTrip->name);
         $this->assertSame($zone->soa->rdata, $roundTrip->soa->rdata);
@@ -377,7 +390,7 @@ ZONE;
         $output = File::export($zone, includeComments: false);
         $this->assertSame($expected, $output);
 
-        $roundTrip = File::import('example.com', $output);
+        $roundTrip = File::import($output);
         $this->assertCount(3, $roundTrip->records);
         $this->assertSame('mail.example.com', $roundTrip->records[2]->name);
     }
@@ -391,7 +404,7 @@ ZONE;
 1 3600 IN PTR host.example.com.
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $ptr = $this->findRecord($zone->records, Record::TYPE_PTR);
         $this->assertNotNull($ptr);
         $this->assertSame('1.example.com', $ptr->name);
@@ -414,7 +427,7 @@ $ORIGIN example.com.
 www 1800 IN A 192.0.2.10
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertSame('ns1.example.com admin.example.com 2025011801 7200 3600 1209600 1800', $zone->soa->rdata);
         $this->assertSame('www.example.com', $zone->records[0]->name);
@@ -433,7 +446,7 @@ www IN A 192.0.2.10
 api IN CNAME www
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertSame('www.example.com', $zone->records[0]->name);
         $this->assertSame('sub.example.com', $zone->records[1]->name);
@@ -451,7 +464,7 @@ www IN A 192.0.2.10
     IN AAAA 2001:db8::1
 ZONE;
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
 
         $this->assertSame('www.example.com', $zone->records[0]->name);
         $this->assertSame('www.example.com', $zone->records[1]->name);
@@ -469,7 +482,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($record);
         $this->assertSame('foo;bar', $record->rdata);
@@ -486,7 +499,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($record);
         $this->assertSame('not a comment; still text', $record->rdata);
@@ -503,11 +516,11 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $this->assertSame(Record::TYPE_AAAA, $zone->records[0]->type);
 
         $exported = File::export($zone, includeComments: false);
-        $roundTrip = File::import('example.com', $exported);
+        $roundTrip = File::import($exported);
 
         $this->assertSame($zone->records[0]->rdata, $roundTrip->records[0]->rdata);
     }
@@ -523,13 +536,13 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_CAA);
         $this->assertNotNull($record);
         $this->assertSame('0 issue "letsencrypt.org"', $record->rdata);
 
         $exported = File::export($zone, includeComments: false);
-        $roundTrip = File::import('example.com', $exported);
+        $roundTrip = File::import($exported);
         $roundTripCaa = $this->findRecord($roundTrip->records, Record::TYPE_CAA);
 
         $this->assertNotNull($roundTripCaa);
@@ -550,7 +563,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        File::import('example.com', $contents);
+        File::import($contents);
     }
 
     public function testImportPtrWithReverseOrigin(): void
@@ -561,7 +574,7 @@ $ORIGIN 2.0.192.in-addr.arpa.
 1 3600 IN PTR host.example.com.
 ZONE;
 
-        $zone = File::import('2.0.192.in-addr.arpa.', $contents);
+        $zone = File::import($contents);
         $ptr = $this->findRecord($zone->records, Record::TYPE_PTR);
         $this->assertNotNull($ptr);
         $this->assertSame('1.2.0.192.in-addr.arpa', $ptr->name);
@@ -578,7 +591,7 @@ $ORIGIN example.com.
 @ IN SOA ns2.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800
 ZONE;
 
-        File::import('example.com', $contents);
+        File::import($contents);
     }
 
     public function testImportRejectsTtlWithSuffix(): void
@@ -595,7 +608,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        File::import('example.com', $contents);
+        File::import($contents);
     }
 
     public function testImportSupportsAlternativeClasses(): void
@@ -609,7 +622,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_A);
         $this->assertNotNull($record);
         $this->assertSame(Record::CLASS_CS, $record->class);
@@ -626,7 +639,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($record);
         $this->assertSame('a "quote" and a \\ backslash', $record->rdata);
@@ -643,7 +656,7 @@ ZONE,
             self::DEFAULT_SOA
         );
 
-        $zone = File::import('example.com', $contents);
+        $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
         $this->assertNotNull($record);
         $this->assertSame("foo" . chr(10) . "0bar", $record->rdata);
@@ -654,7 +667,7 @@ ZONE,
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('SOA requires MNAME, RNAME, SERIAL, REFRESH, RETRY, EXPIRE, MINIMUM');
 
-        File::import('example.com', '@ IN SOA ns1.example.com. admin.example.com. 2025011801 7200 3600');
+        File::import('@ IN SOA ns1.example.com. admin.example.com. 2025011801 7200 3600', 'example.com');
     }
 
     public function testImportFailsWithoutSoa(): void
@@ -662,7 +675,7 @@ ZONE,
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('No SOA record found in zone file');
 
-        File::import('example.com', "www IN A 192.168.1.10\n");
+        File::import("www IN A 192.168.1.10\n", 'example.com');
     }
 
     public function testImportFailsWhenOwnerOmittedWithoutContext(): void
@@ -670,7 +683,7 @@ ZONE,
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Owner omitted but no previous owner available');
 
-        File::import('example.com', <<<ZONE
+        File::import(<<<ZONE
 \$ORIGIN example.com.
     IN A 127.0.0.1
 @ IN SOA ns1.example.com. admin.example.com. 2025011801 7200 3600 1209600 1800

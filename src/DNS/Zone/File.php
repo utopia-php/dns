@@ -27,25 +27,31 @@ final readonly class File
     /**
      * Import a zone from RFC 1035 master file format string.
      *
-     * @param string      $name          Zone name
      * @param string      $content       Zone file content
-     * @param string|null $defaultOrigin Default origin if not specified in file
+     * @param string|null $defaultOrigin Default origin if $ORIGIN is not specified
      * @param int         $defaultTTL    Default TTL if not specified (default: 3600)
      *
      * @throws InvalidArgumentException
      */
-    public static function import(string $name, string $content, ?string $defaultOrigin = null, int $defaultTTL = 3600): Zone
+    public static function import(string $content, ?string $defaultOrigin = null, int $defaultTTL = 3600): Zone
     {
-        $zoneName = self::canonicalizeName($name);
-        if ($zoneName === null) {
-            throw new InvalidArgumentException('Zone name must not be empty');
-        }
-
         $normalizedLines = self::preprocess($content); // array<array{line:string,num:int}>
         $records = [];
         $soa = null;
 
-        $origin = $defaultOrigin !== null ? self::canonicalizeName($defaultOrigin) : $zoneName;
+        $origin = null;
+        $zoneName = null;
+        $zoneNameFromDefault = false;
+
+        if ($defaultOrigin !== null) {
+            $origin = self::canonicalizeName($defaultOrigin);
+            if ($origin === null) {
+                throw new InvalidArgumentException('Default origin must not be empty');
+            }
+            $zoneName = $origin;
+            $zoneNameFromDefault = true;
+        }
+
         $lastOwner = null;
         $lastTTL   = $defaultTTL;
         $lastClass = Record::CLASS_IN;
@@ -56,7 +62,17 @@ final readonly class File
             }
 
             // Directives
-            if (self::handleDirectives($line, $origin, $lastTTL)) {
+            $directive = self::handleDirectives($line, $origin, $lastTTL);
+            if ($directive !== null) {
+                if ($directive === 'origin') {
+                    if ($origin === null) {
+                        throw new InvalidArgumentException('$ORIGIN directive must not be empty');
+                    }
+                    if ($zoneName === null || $zoneNameFromDefault) {
+                        $zoneName = $origin;
+                        $zoneNameFromDefault = false;
+                    }
+                }
                 continue;
             }
 
@@ -99,6 +115,10 @@ final readonly class File
 
         if ($soa === null) {
             throw new InvalidArgumentException('No SOA record found in zone file');
+        }
+
+        if ($zoneName === null) {
+            throw new InvalidArgumentException('Unable to determine zone name: provide an $ORIGIN directive or defaultOrigin.');
         }
 
         return new Zone($zoneName, $records, $soa);
@@ -240,28 +260,29 @@ final readonly class File
     }
 
     /**
-     * Handle $ORIGIN / $TTL directives. Returns true if the line was a directive.
+     * Handle $ORIGIN / $TTL directives.
      *
      * @param-out string|null $origin
      * @param-out int         $lastTTL
+     * @return 'origin'|'ttl'|null
      */
-    private static function handleDirectives(string $line, ?string &$origin, int &$lastTTL): bool
+    private static function handleDirectives(string $line, ?string &$origin, int &$lastTTL): ?string
     {
         if (preg_match('/^\s*\$ORIGIN\s+(\S+)\s*$/i', $line, $m) === 1) {
             $origin = self::canonicalizeName($m[1]);
-            return true;
+            return 'origin';
         }
 
         if (preg_match('/^\s*\$TTL\s+(\d+)\s*$/i', $line, $m) === 1) {
             $lastTTL = (int) $m[1];
-            return true;
+            return 'ttl';
         }
 
         if (preg_match('/^\s*\$INCLUDE\b/i', $line) === 1) {
             throw new InvalidArgumentException('$INCLUDE directive is not supported');
         }
 
-        return false;
+        return null;
     }
 
     /**
