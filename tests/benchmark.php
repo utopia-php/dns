@@ -68,10 +68,9 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
     // Create temporary directory for process communication
     $tmpDir = sys_get_temp_dir() . '/dns_benchmark_' . uniqid();
     if (!mkdir($tmpDir, 0777, true)) {
-        Console::error("Failed to create temporary directory: {$tmpDir}");
+        Console::error("Failed to create temporary directory: $tmpDir");
         exit(1);
     }
-
     foreach ($testCases as $domain => $queryTypes) {
         foreach ($queryTypes as $queryType) {
             for ($i = 0; $i < $iterations; $i += $concurrency) {
@@ -81,7 +80,7 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
 
                 // Start concurrent processes
                 for ($j = 0; $j < $batch; $j++) {
-                    $resultFile = "{$tmpDir}/result_{$j}.json";
+                    $resultFile = "$tmpDir/result_$j.json";
                     $cmd = PHP_BINARY . ' -r \'
                         require_once "' . __DIR__ . '/../vendor/autoload.php";
                         $client = new \Utopia\DNS\Client("' . $server . '", ' . $port . ');
@@ -91,10 +90,16 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                             if (!is_dir($tmpDir)) {
                                 mkdir($tmpDir, 0777, true);
                             }
-                            $records = $client->query("' . $domain . '", "' . $queryType . '");
+                            $typeCode = \Utopia\DNS\Message\Record::typeNameToCode("' . $queryType . '");
+                            if ($typeCode === null) {
+                                throw new \InvalidArgumentException("Unsupported record type: ' . $queryType . '");
+                            }
+                            $question = new \Utopia\DNS\Message\Question("' . $domain . '", $typeCode);
+                            $message = $client->query($question);
+                            $answers = $message->answers;
                             $time = (microtime(true) - $start) * 1000;
                             $result = json_encode([
-                                "success" => count($records) > 0,
+                                "success" => count($answers) > 0,
                                 "time" => $time,
                                 "domain" => "' . $domain . '",
                                 "type" => "' . $queryType . '"
@@ -122,7 +127,7 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                 // Wait for all processes to complete and collect results
                 foreach ($processes as $j => $process) {
                     proc_close($process);
-                    $resultFile = "{$tmpDir}/result_{$j}.json";
+                    $resultFile = "$tmpDir/result_$j.json";
 
                     // Wait for result file with timeout
                     $timeout = 5; // 5 seconds timeout
@@ -134,13 +139,13 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                     if (file_exists($resultFile)) {
                         $content = file_get_contents($resultFile);
                         if ($content === false) {
-                            Console::error("Failed to read result file: {$resultFile}");
+                            Console::error("Failed to read result file: $resultFile");
                             continue;
                         }
 
                         $result = json_decode($content, true);
                         if ($result === null) {
-                            Console::error("Failed to decode JSON from file: {$resultFile}");
+                            Console::error("Failed to decode JSON from file: $resultFile");
                             continue;
                         }
 
@@ -344,7 +349,7 @@ $options = getopt('', [
 ]);
 
 $server = $options['server'] ?? '127.0.0.1';
-$port = (int)($options['port'] ?? 5300);
+$port = (int)($options['port'] ?? 53);
 $iterations = (int)($options['iterations'] ?? 10000);
 $concurrency = (int)($options['concurrency'] ?? 10);
 
