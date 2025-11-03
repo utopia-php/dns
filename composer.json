@@ -21,7 +21,7 @@
         "psr-4": {"Utopia\\DNS\\": "src/DNS"}
     },
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.3",
         "utopia-php/console": "0.0.*",
         "utopia-php/telemetry": "0.1.*"
     },

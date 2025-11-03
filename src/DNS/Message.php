@@ -52,7 +52,12 @@ final class Message
         if ($header->additionalCount !== count($additional)) {
             throw new \InvalidArgumentException('Invalid DNS response: additional count mismatch');
         }
-        if ($header->isResponse && $header->authoritative && !array_any($this->authority, fn ($record) => $record->type === Record::TYPE_SOA)) {
+        $soaAuthorityCount = count(array_filter(
+            $this->authority,
+            fn ($record) => $record->type === Record::TYPE_SOA
+        ));
+
+        if ($header->isResponse && $header->authoritative && $soaAuthorityCount < 1) {
             if ($header->responseCode === self::RCODE_NXDOMAIN) {
                 throw new \InvalidArgumentException('NXDOMAIN requires SOA in authority');
             }
