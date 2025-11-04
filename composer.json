@@ -23,7 +23,9 @@
     "require": {
         "php": ">=8.3",
         "utopia-php/console": "0.0.*",
-        "utopia-php/telemetry": "0.1.*"
+        "utopia-php/telemetry": "0.1.*",
+        "utopia-php/validators": "^0.0.2",
+        "utopia-php/domains": "0.9.*"
     },
     "require-dev": {
         "swoole/ide-helper": "5.1.8",
