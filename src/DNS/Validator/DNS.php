@@ -28,6 +28,9 @@ class DNS extends Validator
 
     public string $domain = '';
     public string $resolver = '';
+    /**
+     * @var array<string>
+     */
     public array $recordValues = [];
     public int $count = 0;
     public string $reason = '';
@@ -103,7 +106,7 @@ class DNS extends Validator
     /**
      * Check if DNS record value matches specific value
      *
-     * @param mixed $domain
+     * @param mixed $value
      * @return bool
      */
     public function isValid(mixed $value): bool
@@ -114,7 +117,7 @@ class DNS extends Validator
     /**
      * Check if DNS record value matches specific value on a specific DNS server
      *
-     * @param mixed $domain
+     * @param mixed $value
      * @param string $dnsServer
      * @return bool
      */
@@ -134,7 +137,12 @@ class DNS extends Validator
         $dns = new Client($dnsServer);
 
         try {
-            $question = new Question($value, Record::typeNameToCode($this->type));
+            $typeCode = Record::typeNameToCode($this->type);
+            if ($typeCode === null) {
+                $this->reason = self::FAILURE_REASON_INTERNAL;
+                return false;
+            }
+            $question = new Question($value, $typeCode);
             $queryMessage = Message::query($question, recursionDesired: true);
             $response = $dns->query($queryMessage);
             $rawQuery = $response->answers;
@@ -181,7 +189,7 @@ class DNS extends Validator
                 $rdata = $record->rdata; // 255 issuewild "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"
                 $rdata = \explode(' ', $rdata, 3)[2] ?? ''; // "certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600"
                 $rdata = \trim($rdata, '"'); // certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600
-                $rdata = \explode(';', $rdata, 2)[0] ?? ''; // certainly.com
+                $rdata = \explode(';', $rdata, 2)[0]; // certainly.com
 
                 $this->recordValues[] = $rdata;
                 if ($rdata === $this->target) {
