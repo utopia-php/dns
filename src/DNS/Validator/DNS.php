@@ -110,11 +110,11 @@ class DNS extends Validator
             $question = new Question($value, $this->type);
             $queryMessage = Message::query($question, recursionDesired: true);
             $response = $dns->query($queryMessage);
-            $rawQuery = $response->answers;
+            $answers = $response->answers;
 
             // Some DNS servers return all records, not only type that's asked for
             // Likely occurs when no records of specific type are found
-            $query = array_filter($rawQuery, function ($record) {
+            $query = array_filter($answers, function ($record) {
                 return $record->type === $this->type;
             });
 
