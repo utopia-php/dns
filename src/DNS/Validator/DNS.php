@@ -146,6 +146,7 @@ class DNS extends Validator
             $queryMessage = Message::query($question, recursionDesired: true);
             $response = $dns->query($queryMessage);
             $rawQuery = $response->answers;
+            var_dump($rawQuery);
 
             // Some DNS servers return all records, not only type that's asked for
             // Likely occurs when no records of specific type are found
@@ -156,6 +157,7 @@ class DNS extends Validator
 
             $this->logs = $query;
         } catch (\Exception $e) {
+            var_dump("error in isValidWithDNSServer");
             $this->reason = self::FAILURE_REASON_QUERY;
             $this->logs = ['error' => $e->getMessage()];
             return false;
