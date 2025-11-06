@@ -14,7 +14,7 @@ final class ClientTest extends TestCase
 
     public function testARecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('dev.appwrite.io', Record::TYPE_A)
         ));
@@ -49,7 +49,7 @@ final class ClientTest extends TestCase
 
     public function testAAAARecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('dev.appwrite.io', Record::TYPE_AAAA)
         ));
@@ -79,7 +79,7 @@ final class ClientTest extends TestCase
 
     public function testCnameRecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('alias.appwrite.io', Record::TYPE_CNAME)
         ));
@@ -102,7 +102,7 @@ final class ClientTest extends TestCase
 
     public function testTxtRecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('dev.appwrite.io', Record::TYPE_TXT)
         ));
@@ -128,7 +128,7 @@ final class ClientTest extends TestCase
 
     public function testNsRecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('delegated.appwrite.io', Record::TYPE_NS)
         ));
@@ -161,7 +161,7 @@ final class ClientTest extends TestCase
 
     public function testCaaRecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('dev.appwrite.io', Record::TYPE_CAA)
         ));
@@ -187,7 +187,7 @@ final class ClientTest extends TestCase
 
     public function testSoaRecords(): void
     {
-        $client = new Client('localhost', self::PORT);
+        $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
             new Question('appwrite.io', Record::TYPE_SOA)
         ));
@@ -219,5 +219,40 @@ final class ClientTest extends TestCase
         $this->assertStringContainsString('ns1.appwrite.zone', $rdata);
         $this->assertStringContainsString('team.appwrite.io', $rdata);
         $this->assertStringContainsString('1 7200 1800 1209600 3600', $rdata);
+    }
+
+    public function testInvalidServer(): void
+    {
+        try {
+            new Client('not-ip-address', self::PORT);
+            $this->fail('Expected invalid IP address exception');
+        } catch (\Exception $e) {
+            $this->assertEquals('Server must be an IP address.', $e->getMessage());
+        }
+
+        try {
+            new Client('ns1.digitalocean.com', self::PORT);
+            $this->fail('Expected invalid IP address exception');
+        } catch (\Exception $e) {
+            $this->assertEquals('Server must be an IP address.', $e->getMessage());
+        }
+
+        try {
+            $client = new Client('172.64.52.210', self::PORT);
+            $this->assertNotEmpty($client);
+            $client = new Client('127.0.0.1', self::PORT);
+            $this->assertNotEmpty($client);
+        } catch (\Exception $e) {
+            $this->fail('IPv4 threw unexpected error');
+        }
+
+        try {
+            $client = new Client('::1', self::PORT);
+            $this->assertNotEmpty($client);
+            $client = new Client('2606:4700:52::ac40:34d2', self::PORT);
+            $this->assertNotEmpty($client);
+        } catch (\Exception $e) {
+            $this->fail('IPv6 threw unexpected error');
+        }
     }
 }

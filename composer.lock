@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6066b2a2f004e02fb621af633a6bfb16",
+    "content-hash": "b3d5d530fc4a220560a71f728d223f6f",
     "packages": [
         {
             "name": "brick/math",
@@ -1863,6 +1863,58 @@
             "time": "2025-06-29T15:42:06+00:00"
         },
         {
+            "name": "utopia-php/cache",
+            "version": "0.13.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/utopia-php/cache.git",
+                "reference": "97220cb3b3822b166ee016d1646e2ae2815dc540"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/utopia-php/cache/zipball/97220cb3b3822b166ee016d1646e2ae2815dc540",
+                "reference": "97220cb3b3822b166ee016d1646e2ae2815dc540",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-memcached": "*",
+                "ext-redis": "*",
+                "php": ">=8.0",
+                "utopia-php/pools": "0.8.*",
+                "utopia-php/telemetry": "0.1.*"
+            },
+            "require-dev": {
+                "laravel/pint": "1.2.*",
+                "phpstan/phpstan": "^1.12",
+                "phpunit/phpunit": "^9.3",
+                "vimeo/psalm": "4.13.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Utopia\\Cache\\": "src/Cache"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A simple cache library to manage application cache storing, loading and purging",
+            "keywords": [
+                "cache",
+                "framework",
+                "php",
+                "upf",
+                "utopia"
+            ],
+            "support": {
+                "issues": "https://github.com/utopia-php/cache/issues",
+                "source": "https://github.com/utopia-php/cache/tree/0.13.1"
+            },
+            "time": "2025-05-09T14:43:52+00:00"
+        },
+        {
             "name": "utopia-php/console",
             "version": "0.0.1",
             "source": {
@@ -1909,6 +1961,120 @@
                 "source": "https://github.com/utopia-php/console/tree/0.0.1"
             },
             "time": "2025-10-20T14:41:36+00:00"
+        },
+        {
+            "name": "utopia-php/domains",
+            "version": "0.9.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/utopia-php/domains.git",
+                "reference": "99b4ec95d5d6b7a5c990a66c56412212d9af37e7"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/utopia-php/domains/zipball/99b4ec95d5d6b7a5c990a66c56412212d9af37e7",
+                "reference": "99b4ec95d5d6b7a5c990a66c56412212d9af37e7",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.0",
+                "utopia-php/cache": "0.13.*",
+                "utopia-php/validators": "0.0.*"
+            },
+            "require-dev": {
+                "laravel/pint": "1.2.*",
+                "phpstan/phpstan": "1.9.x-dev",
+                "phpunit/phpunit": "^9.3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Utopia\\Domains\\": "src/Domains"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Eldad Fux",
+                    "email": "eldad@appwrite.io"
+                },
+                {
+                    "name": "Wess Cope",
+                    "email": "wess@appwrite.io"
+                }
+            ],
+            "description": "Utopia Domains library is simple and lite library for parsing web domains. This library is aiming to be as simple and easy to learn and use.",
+            "keywords": [
+                "domains",
+                "framework",
+                "icann",
+                "php",
+                "public suffix",
+                "tld",
+                "tld extract",
+                "upf",
+                "utopia"
+            ],
+            "support": {
+                "issues": "https://github.com/utopia-php/domains/issues",
+                "source": "https://github.com/utopia-php/domains/tree/0.9.1"
+            },
+            "time": "2025-10-21T14:52:27+00:00"
+        },
+        {
+            "name": "utopia-php/pools",
+            "version": "0.8.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/utopia-php/pools.git",
+                "reference": "05c67aba42eb68ac65489cc1e7fc5db83db2dd4d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/utopia-php/pools/zipball/05c67aba42eb68ac65489cc1e7fc5db83db2dd4d",
+                "reference": "05c67aba42eb68ac65489cc1e7fc5db83db2dd4d",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.3",
+                "utopia-php/telemetry": "0.1.*"
+            },
+            "require-dev": {
+                "laravel/pint": "1.*",
+                "phpstan/phpstan": "1.*",
+                "phpunit/phpunit": "11.*"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Utopia\\Pools\\": "src/Pools"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Team Appwrite",
+                    "email": "team@appwrite.io"
+                }
+            ],
+            "description": "A simple library to manage connection pools",
+            "keywords": [
+                "framework",
+                "php",
+                "pools",
+                "utopia"
+            ],
+            "support": {
+                "issues": "https://github.com/utopia-php/pools/issues",
+                "source": "https://github.com/utopia-php/pools/tree/0.8.2"
+            },
+            "time": "2025-04-17T02:04:54+00:00"
         },
         {
             "name": "utopia-php/telemetry",
@@ -1959,6 +2125,52 @@
                 "source": "https://github.com/utopia-php/telemetry/tree/0.1.1"
             },
             "time": "2025-03-17T11:57:52+00:00"
+        },
+        {
+            "name": "utopia-php/validators",
+            "version": "0.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/utopia-php/validators.git",
+                "reference": "894210695c5d35fa248fb65f7fe7237b6ff4fb0b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/utopia-php/validators/zipball/894210695c5d35fa248fb65f7fe7237b6ff4fb0b",
+                "reference": "894210695c5d35fa248fb65f7fe7237b6ff4fb0b",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "ext-xdebug": "*",
+                "laravel/pint": "^1.2",
+                "phpstan/phpstan": "1.*",
+                "phpunit/phpunit": "^9.5.25"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Utopia\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A lightweight collection of reusable validators for Utopia projects",
+            "keywords": [
+                "php",
+                "utopia",
+                "validation",
+                "validator"
+            ],
+            "support": {
+                "issues": "https://github.com/utopia-php/validators/issues",
+                "source": "https://github.com/utopia-php/validators/tree/0.0.2"
+            },
+            "time": "2025-10-20T21:52:28+00:00"
         }
     ],
     "packages-dev": [
@@ -2658,16 +2870,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "12.4.1",
+            "version": "12.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "fc5413a2e6d240d2f6d9317bdf7f0a24e73de194"
+                "reference": "a94ea4d26d865875803b23aaf78c3c2c670ea2ea"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/fc5413a2e6d240d2f6d9317bdf7f0a24e73de194",
-                "reference": "fc5413a2e6d240d2f6d9317bdf7f0a24e73de194",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/a94ea4d26d865875803b23aaf78c3c2c670ea2ea",
+                "reference": "a94ea4d26d865875803b23aaf78c3c2c670ea2ea",
                 "shasum": ""
             },
             "require": {
@@ -2735,7 +2947,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.4.1"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.4.2"
             },
             "funding": [
                 {
@@ -2759,7 +2971,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-10-09T14:08:29+00:00"
+            "time": "2025-10-30T08:41:39+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -3795,12 +4007,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.3"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.3.0"
 }
