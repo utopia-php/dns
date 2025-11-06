@@ -256,7 +256,6 @@ final readonly class Resolver
 
         if (!empty($exactTypeRecords)) {
             // Synthesize records with the query name
-            /** @var list<Record> */
             $synthesizedRecords = array_map(
                 fn ($r) => $r->withName($question->name),
                 $exactTypeRecords
@@ -266,7 +265,7 @@ final readonly class Resolver
                 header: $query->header,
                 responseCode: Message::RCODE_NOERROR,
                 questions: $query->questions,
-                answers: $synthesizedRecords,
+                answers: array_values($synthesizedRecords),
                 authoritative: true,
                 recursionAvailable: false
             );
@@ -277,7 +276,6 @@ final readonly class Resolver
 
         if (!empty($cnameRecords)) {
             // W2: CNAME in wildcard
-            /** @var list<Record> */
             $synthesizedRecords = array_map(
                 fn ($r) => $r->withName($question->name),
                 $cnameRecords
@@ -287,7 +285,7 @@ final readonly class Resolver
                 header: $query->header,
                 responseCode: Message::RCODE_NOERROR,
                 questions: $query->questions,
-                answers: $synthesizedRecords,
+                answers: array_values($synthesizedRecords),
                 authoritative: true,
                 recursionAvailable: false
             );
