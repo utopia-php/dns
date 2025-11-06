@@ -123,7 +123,9 @@ class DNS extends Validator
      */
     public function isValidWithDNSServer(mixed $value, string $dnsServer): bool
     {
+        var_dump("value is " . $value);
         if (!\is_string($value)) {
+            var_dump("value is not a string");
             $this->reason = self::FAILURE_REASON_INTERNAL;
             return false;
         }
