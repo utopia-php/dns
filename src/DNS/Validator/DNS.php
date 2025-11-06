@@ -160,6 +160,7 @@ class DNS extends Validator
             $this->logs = $query;
         } catch (\Exception $e) {
             var_dump("error in isValidWithDNSServer");
+            var_dump($e->getMessage());
             $this->reason = self::FAILURE_REASON_QUERY;
             $this->logs = ['error' => $e->getMessage()];
             return false;
