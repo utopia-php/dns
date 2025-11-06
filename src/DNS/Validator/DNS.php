@@ -14,37 +14,47 @@ class DNS extends Validator
     public const RECORD_A = 'A';
     public const RECORD_AAAA = 'AAAA';
     public const RECORD_CNAME = 'CNAME';
-    public const RECORD_CAA = 'CAA'; // You can provide domain only (as $target) for CAA validation
+    public const RECORD_CAA = 'CAA'; // When using CAA type, you can provide exact match, or just issuer domain as $target
 
     protected const FAILURE_REASON_QUERY = 'DNS query failed.';
     protected const FAILURE_REASON_INTERNAL = 'Internal error occurred.';
     protected const FAILURE_REASON_UNKNOWN = '';
     protected const DEFAULT_DNS_SERVER = '8.8.8.8';
 
+    // Memory from isValid to be used in getDescription
     /**
      * @var mixed
      */
     protected mixed $logs = [];
-
-    public string $domain = '';
-    public string $resolver = '';
     /**
      * @var array<string>
      */
     public array $recordValues = [];
+    public string $domain = '';
     public int $count = 0;
     public string $reason = '';
 
     /**
-     * @param string $target
+     * @param string $target Expected value for the DNS record
+     * @param string $type Type of DNS record to validate
+     * @param string $dnsServer DNS server IP or domain to use for validation
      */
-    public function __construct(protected string $target, protected string $type = self::RECORD_CNAME, string $dnsServer = '')
+    public function __construct(protected string $target, protected string $type = self::RECORD_CNAME, protected string $dnsServer = self::DEFAULT_DNS_SERVER)
     {
-        if (empty($dnsServer)) {
-            $dnsServer = self::DEFAULT_DNS_SERVER;
+        if (!filter_var($dnsServer, FILTER_VALIDATE_IP)) {
+            $dns = new Client(self::DEFAULT_DNS_SERVER);
+            $question = new Question($dnsServer, Record::typeNameToCode('A')); // TODO: ipv6 support
+            $query = Message::query($question, recursionDesired: true);
+            $response = $dns->query($query);
+            $answer = $response->answers[0] ?? null;
+            $aRecord = $answer->rdata ?? '';
+            
+            if(empty($aRecord)) {
+                throw new \Exception('Invalid DNS server.');
+            }
+            
+            $this->dnsServer = $aRecord;
         }
-
-        $this->resolver = $dnsServer;
     }
 
     /**
@@ -58,7 +68,7 @@ class DNS extends Validator
 
         $messages = [];
 
-        $messages[] = "DNS verification failed with resolver {$this->resolver}";
+        $messages[] = "DNS verification failed with resolver {$this->dnsServer}";
 
         if ($this->count === 0) {
             $messages[] = 'Domain ' . $this->domain . ' is missing ' . $this->type . ' record';
@@ -111,18 +121,6 @@ class DNS extends Validator
      */
     public function isValid(mixed $value): bool
     {
-        return $this->isValidWithDNSServer($value, $this->resolver);
-    }
-
-    /**
-     * Check if DNS record value matches specific value on a specific DNS server
-     *
-     * @param mixed $value
-     * @param string $dnsServer
-     * @return bool
-     */
-    public function isValidWithDNSServer(mixed $value, string $dnsServer): bool
-    {
         if (!\is_string($value)) {
             $this->reason = self::FAILURE_REASON_INTERNAL;
             return false;
@@ -132,9 +130,8 @@ class DNS extends Validator
         $this->domain = \strval($value);
         $this->reason = self::FAILURE_REASON_UNKNOWN;
         $this->recordValues = [];
-        $this->resolver = $dnsServer;
 
-        $dns = new Client($dnsServer);
+        $dns = new Client($this->dnsServer);
 
         try {
             $typeCode = Record::typeNameToCode($this->type);
@@ -175,8 +172,8 @@ class DNS extends Validator
                 $parts = \explode('.', $value);
                 \array_shift($parts);
                 $parentDomain = \implode('.', $parts);
-                $validator = new self($this->target, DNS::RECORD_CAA, $dnsServer);
-                return $validator->isValidWithDNSServer($parentDomain, $dnsServer);
+                $validator = new self($this->target, $this->type, $this->dnsServer);
+                return $validator->isValid($parentDomain);
             }
 
             return false;
