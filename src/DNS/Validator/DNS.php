@@ -18,16 +18,12 @@ class DNS extends Validator
 
     // Memory from isValid to be used in getDescription
     /**
-     * @var mixed
-     */
-    protected mixed $logs = [];
-    /**
      * @var array<string>
      */
-    public array $recordValues = [];
-    public string $domain = '';
-    public int $count = 0;
-    public string $reason = '';
+    public array $records = []; // Records found, even if wrong value
+    public string $value = ''; // Domain being validated
+    public int $count = 0; // Amount of records found
+    public string $reason = ''; // Override for when reason is known ahead of time
 
     /**
      * @param string $target Expected value for the DNS record
@@ -56,11 +52,11 @@ class DNS extends Validator
         $messages[] = "DNS verification failed with resolver {$this->dnsServer}";
 
         if ($this->count === 0) {
-            $messages[] = 'Domain ' . $this->domain . ' is missing ' . $typeVerbose . ' record';
+            $messages[] = 'Domain ' . $this->value . ' is missing ' . $typeVerbose . ' record';
             return implode('. ', $messages) . '.';
         }
 
-        $recordValuesVerbose = implode("', '", $this->recordValues);
+        $records = implode("', '", $this->records);
 
         $countVerbose = match($this->count) {
             1 => 'one',
@@ -77,10 +73,10 @@ class DNS extends Validator
         };
 
         if ($this->count === 1) {
-            $messages[] = "Domain {$this->domain} has incorrect {$typeVerbose} value '{$recordValuesVerbose}'";
+            $messages[] = "Domain {$this->value} has incorrect {$typeVerbose} value '{$records}'";
         } else {
             // Two or more
-            $messages[] = "Domain {$this->domain} has {$countVerbose} incompatible {$typeVerbose} records: '{$recordValuesVerbose}'";
+            $messages[] = "Domain {$this->value} has {$countVerbose} incompatible {$typeVerbose} records: '{$records}'";
         }
 
         if ($this->type === Record::TYPE_CAA) {
@@ -88,14 +84,6 @@ class DNS extends Validator
         }
 
         return implode('. ', $messages) . '.';
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getLogs(): mixed
-    {
-        return $this->logs;
     }
 
     /**
@@ -112,9 +100,9 @@ class DNS extends Validator
         }
 
         $this->count = 0;
-        $this->domain = \strval($value);
+        $this->value = \strval($value);
         $this->reason = self::FAILURE_REASON_UNKNOWN;
-        $this->recordValues = [];
+        $this->records = [];
 
         $dns = new Client($this->dnsServer);
 
@@ -130,10 +118,8 @@ class DNS extends Validator
                 return $record->type === $this->type;
             });
 
-            $this->logs = $query;
         } catch (\Exception $e) {
             $this->reason = self::FAILURE_REASON_QUERY;
-            $this->logs = ['error' => $e->getMessage()];
             return false;
         }
 
@@ -152,7 +138,12 @@ class DNS extends Validator
                 \array_shift($parts);
                 $parentDomain = \implode('.', $parts);
                 $validator = new self($this->target, $this->type, $this->dnsServer);
-                return $validator->isValid($parentDomain);
+                $result = $validator->isValid($parentDomain);
+                $this->records = $validator->records;
+                $this->value = $validator->value;
+                $this->count = $validator->count;
+                $this->reason = $validator->reason;
+                return $result;
             }
 
             return false;
@@ -167,12 +158,12 @@ class DNS extends Validator
                 $rdata = \trim($rdata, '"'); // certainly.com;validationmethods=tls-alpn-01;retrytimeout=3600
                 $rdata = \explode(';', $rdata, 2)[0]; // certainly.com
 
-                $this->recordValues[] = $rdata;
+                $this->records[] = $rdata;
                 if ($rdata === $this->target) {
                     return true;
                 }
             } else {
-                $this->recordValues[] = $record->rdata;
+                $this->records[] = $record->rdata;
             }
 
             if ($record->rdata === $this->target) {
