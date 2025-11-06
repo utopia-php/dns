@@ -3,6 +3,7 @@
 namespace Tests\Unit\Utopia\DNS\Validator;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\DNS\Message\Record;
 use Utopia\DNS\Validator\DNS;
 
 /**
@@ -31,7 +32,7 @@ final class DNSTest extends TestCase
 
     public function testCNAME(): void
     {
-        $validator = new DNS('appwrite.io', DNS::RECORD_CNAME);
+        $validator = new DNS('appwrite.io', Record::TYPE_CNAME);
 
         $this->assertEquals($validator->isValid(''), false);
         $this->assertEquals($validator->isValid(null), false);
@@ -43,7 +44,7 @@ final class DNSTest extends TestCase
     public function testA(): void
     {
         // IPv4 for documentation purposes
-        $validator = new DNS('203.0.113.1', DNS::RECORD_A);
+        $validator = new DNS('203.0.113.1', Record::TYPE_A);
 
         $this->assertEquals($validator->isValid(''), false);
         $this->assertEquals($validator->isValid(null), false);
@@ -55,7 +56,7 @@ final class DNSTest extends TestCase
     public function testAAAA(): void
     {
         // IPv6 for documentation purposes
-        $validator = new DNS('2001:db8::1', DNS::RECORD_AAAA);
+        $validator = new DNS('2001:db8::1', Record::TYPE_AAAA);
 
         $this->assertEquals($validator->isValid(''), false);
         $this->assertEquals($validator->isValid(null), false);
@@ -73,8 +74,8 @@ final class DNSTest extends TestCase
     public function testCAA(): void
     {
         $digitalOceanIp = '172.64.52.210'; // ping ns1.digitalocean.com
-        $certainly = new DNS('certainly.com', DNS::RECORD_CAA, $digitalOceanIp);
-        $letsencrypt = new DNS('letsencrypt.org', DNS::RECORD_CAA, $digitalOceanIp);
+        $certainly = new DNS('certainly.com', Record::TYPE_CAA, $digitalOceanIp);
+        $letsencrypt = new DNS('letsencrypt.org', Record::TYPE_CAA, $digitalOceanIp);
 
         // No CAA record succeeds on main domain & subdomains for any issuer
         $this->assertEquals($certainly->isValid('caa.appwrite.org'), true);
@@ -89,11 +90,11 @@ final class DNSTest extends TestCase
         $this->assertEquals($letsencrypt->isValid('certainly-full.caa.appwrite.org'), false);
 
         // Custom flags&tag are not allowed if validator includes specific flags&tag
-        $certainlyFull = new DNS('0 issue "certainly.com"', DNS::RECORD_CAA, $digitalOceanIp);
+        $certainlyFull = new DNS('0 issue "certainly.com"', Record::TYPE_CAA, $digitalOceanIp);
         $this->assertEquals($certainlyFull->isValid('certainly-full.caa.appwrite.org'), false);
 
         // Custom flags&tag still allows if they match exactly
-        $certainlyFull = new DNS('128 issuewild "certainly.com;account=123456;validationmethods=dns-01"', DNS::RECORD_CAA, $digitalOceanIp);
+        $certainlyFull = new DNS('128 issuewild "certainly.com;account=123456;validationmethods=dns-01"', Record::TYPE_CAA, $digitalOceanIp);
         $this->assertEquals($certainlyFull->isValid('certainly-full.caa.appwrite.org'), true);
 
         // Certainly CAA allows Certainly, but not LetsEncrypt; Same for subdomains
