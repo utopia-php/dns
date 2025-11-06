@@ -4,6 +4,9 @@ namespace Utopia\DNS\Message;
 
 use Utopia\DNS\Exception\DecodingException;
 
+/**
+ * A DNS record.
+ */
 final readonly class Record
 {
     public string $name;
@@ -95,6 +98,18 @@ final readonly class Record
         self::TYPE_CAA => 'CAA',
     ];
 
+    /**
+     * Creates a DNS record.
+     *
+     * @param string $name Domain names are absolute, lowercase and without a trailing dot.
+     * @param int $type Record type. One of `Record::TYPE_*` constants.
+     * @param int $class Record class. One of `Record::CLASS_*` constants. Defaults to `Record::CLASS_IN`.
+     * @param int $ttl Time to live in seconds. Defaults to 0.
+     * @param string $rdata Record data.
+     * @param int|null $priority Priority. Used for MX and SRV records.
+     * @param int|null $weight Weight. Used for SRV records.
+     * @param int|null $port Port. Used for SRV records.
+     */
     public function __construct(
         string $name,
         public int $type,

@@ -525,6 +525,47 @@ ZONE,
         $this->assertSame($zone->records[0]->rdata, $roundTrip->records[0]->rdata);
     }
 
+    public function testCanExportZoneWithTemplateRecords(): void
+    {
+        $soa = new Record(
+            'example.com',
+            Record::TYPE_SOA,
+            ttl: 3600,
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+        );
+        $records = [
+            new Record('api.example.com', Record::TYPE_A, ttl: 120, rdata: 'a.a.a.a'),
+            new Record('api.example.com', Record::TYPE_A, ttl: 120, rdata: 'b:b::b:b:b'),
+        ];
+
+        $zone = new Zone('example.com', $records, $soa);
+        $this->assertInstanceOf(Zone::class, $zone);
+
+        $contents = File::export($zone);
+
+        $this->assertStringContainsString('a.a.a.a', $contents);
+        $this->assertStringContainsString('b:b::b:b:b', $contents);
+    }
+
+    public function testCanImportZoneWithTemplateRecords(): void
+    {
+        $contents = sprintf(
+            <<<'ZONE'
+$ORIGIN example.com.
+%s
+www 600 IN AAAA b:b::b:b:b
+ZONE,
+            self::DEFAULT_SOA
+        );
+
+        $zone = File::import($contents);
+
+        $this->assertInstanceOf(Zone::class, $zone);
+        $this->assertCount(1, $zone->records);
+        $this->assertSame('www.example.com', $zone->records[0]->name);
+        $this->assertSame('b:b::b:b:b', $zone->records[0]->rdata);
+    }
+
     public function testImportExportRoundTripForCaa(): void
     {
         $contents = sprintf(

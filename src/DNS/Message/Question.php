@@ -6,11 +6,14 @@ use Utopia\DNS\Exception\DecodingException;
 
 final readonly class Question
 {
+    public string $name;
+
     public function __construct(
-        public string $name,
+        string $name,
         public int $type,
         public int $class = Record::CLASS_IN
     ) {
+        $this->name = strtolower($name);
     }
 
     /**

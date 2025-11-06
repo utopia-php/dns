@@ -8,6 +8,20 @@ use Utopia\DNS\Message\Record;
 
 final class QuestionTest extends TestCase
 {
+    public function testConstructorSetsName(): void
+    {
+        $question = new Question('www.example.com', Record::TYPE_A, Record::CLASS_IN);
+
+        $this->assertSame('www.example.com', $question->name);
+    }
+
+    public function testConstructorSetsNameCaseInsensitive(): void
+    {
+        $question = new Question('WWW.EXAMPLE.COM', Record::TYPE_A, Record::CLASS_IN);
+
+        $this->assertSame('www.example.com', $question->name);
+    }
+
     public function testEncodeProducesExactBytes(): void
     {
         $question = new Question('www.example.com', Record::TYPE_A, Record::CLASS_IN);
