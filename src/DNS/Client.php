@@ -20,7 +20,13 @@ class Client
         if (!filter_var($server, FILTER_VALIDATE_IP)) {
             $resolved = gethostbyname($server);
             if ($resolved === $server) {
-                throw new Exception("Failed to resolve DNS server hostname: {$server}");
+                // Fallback: try dns_get_record if gethostbyname fails
+                $records = dns_get_record($server, DNS_A);
+                if (!empty($records) && isset($records[0]['ip'])) {
+                    $resolved = $records[0]['ip'];
+                } else {
+                    throw new Exception("Failed to resolve DNS server hostname: {$server}");
+                }
             }
             $this->server = $resolved;
         } else {
