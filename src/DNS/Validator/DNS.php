@@ -123,9 +123,7 @@ class DNS extends Validator
      */
     public function isValidWithDNSServer(mixed $value, string $dnsServer): bool
     {
-        var_dump("value is " . $value);
         if (!\is_string($value)) {
-            var_dump("value is not a string");
             $this->reason = self::FAILURE_REASON_INTERNAL;
             return false;
         }
@@ -148,7 +146,6 @@ class DNS extends Validator
             $queryMessage = Message::query($question, recursionDesired: true);
             $response = $dns->query($queryMessage);
             $rawQuery = $response->answers;
-            var_dump($rawQuery);
 
             // Some DNS servers return all records, not only type that's asked for
             // Likely occurs when no records of specific type are found
@@ -159,8 +156,6 @@ class DNS extends Validator
 
             $this->logs = $query;
         } catch (\Exception $e) {
-            var_dump("error in isValidWithDNSServer");
-            var_dump($e->getMessage());
             $this->reason = self::FAILURE_REASON_QUERY;
             $this->logs = ['error' => $e->getMessage()];
             return false;

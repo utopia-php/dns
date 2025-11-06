@@ -14,24 +14,9 @@ class Client
 
     public function __construct(string $server = '127.0.0.1', int $port = 53, int $timeout = 5)
     {
+        $this->server = $server;
         $this->port = $port;
         $this->timeout = $timeout;
-
-        if (!filter_var($server, FILTER_VALIDATE_IP)) {
-            $resolved = gethostbyname($server);
-            if ($resolved === $server) {
-                // Fallback: try dns_get_record if gethostbyname fails
-                $records = dns_get_record($server, DNS_A);
-                if (!empty($records) && isset($records[0]['ip'])) {
-                    $resolved = $records[0]['ip'];
-                } else {
-                    throw new Exception("Failed to resolve DNS server hostname: {$server}");
-                }
-            }
-            $this->server = $resolved;
-        } else {
-            $this->server = $server;
-        }
 
         $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 
