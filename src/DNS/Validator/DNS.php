@@ -43,16 +43,16 @@ class DNS extends Validator
     {
         if (!filter_var($dnsServer, FILTER_VALIDATE_IP)) {
             $dns = new Client(self::DEFAULT_DNS_SERVER);
-            $question = new Question($dnsServer, Record::typeNameToCode('A')); // TODO: ipv6 support
+            $question = new Question($dnsServer, Record::TYPE_A); // TODO: ipv6 support
             $query = Message::query($question, recursionDesired: true);
             $response = $dns->query($query);
             $answer = $response->answers[0] ?? null;
             $aRecord = $answer->rdata ?? '';
-            
-            if(empty($aRecord)) {
+
+            if (empty($aRecord)) {
                 throw new \Exception('Invalid DNS server.');
             }
-            
+
             $this->dnsServer = $aRecord;
         }
     }
