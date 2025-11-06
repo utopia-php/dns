@@ -349,6 +349,35 @@ final class ResolverTest extends TestCase
         $this->assertSame(Record::TYPE_A, $answer->type);
     }
 
+    public function testLookupResolvesWildcardCnameQuery(): void
+    {
+        $soa = new Record(
+            'test-dns.appwrite.org',
+            Record::TYPE_SOA,
+            ttl: 300,
+            rdata: 'ns1-stage.appwrite.zone team.appwrite.io 1 3600 600 86400 300'
+        );
+
+        $zone = new Zone('test-dns.appwrite.org', [
+            new Record('test-dns.appwrite.org', Record::TYPE_NS, ttl: 3600, rdata: 'ns1.example.org'),
+            new Record('*.wildcard.test-dns.appwrite.org', Record::TYPE_CNAME, ttl: 3600, rdata: 'stage.appwrite.network'),
+        ], $soa);
+
+        $question = new Question('baz.wildcard.test-dns.appwrite.org', Record::TYPE_CNAME);
+        $query = Message::query($question);
+
+        $response = Resolver::lookup($query, $zone);
+
+        $this->assertSame(Message::RCODE_NOERROR, $response->header->responseCode);
+        $this->assertTrue($response->header->authoritative);
+        $this->assertCount(1, $response->answers);
+        $answer = $response->answers[0];
+        $this->assertSame('baz.wildcard.test-dns.appwrite.org', $answer->name);
+        $this->assertSame(Record::TYPE_CNAME, $answer->type);
+        $this->assertSame('stage.appwrite.network', $answer->rdata);
+        $this->assertSame(3600, $answer->ttl);
+    }
+
     public function testIsAuthoritativeDetectsDelegation(): void
     {
         $soa = new Record(
