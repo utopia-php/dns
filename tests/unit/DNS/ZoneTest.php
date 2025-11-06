@@ -106,4 +106,23 @@ final class ZoneTest extends TestCase
         $this->assertInstanceOf(Zone::class, $zone);
         $this->assertCount(2, $zone->records);
     }
+
+    public function testConstructorAcceptsTemplateRecords(): void
+    {
+        $soa = new Record(
+            'example.com',
+            Record::TYPE_SOA,
+            ttl: 3600,
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+        );
+        $records = [
+            new Record('api.example.com', Record::TYPE_A, ttl: 120, rdata: 'a.a.a.a'),
+            new Record('api.example.com', Record::TYPE_AAAA, ttl: 120, rdata: 'b:b::b:b:b'),
+        ];
+
+        $zone = new Zone('example.com', $records, $soa);
+
+        $this->assertInstanceOf(Zone::class, $zone);
+        $this->assertCount(2, $zone->records);
+    }
 }
