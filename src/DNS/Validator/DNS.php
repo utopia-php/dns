@@ -41,20 +41,6 @@ class DNS extends Validator
      */
     public function __construct(protected string $target, protected string $type = self::RECORD_CNAME, protected string $dnsServer = self::DEFAULT_DNS_SERVER)
     {
-        if (!filter_var($dnsServer, FILTER_VALIDATE_IP)) {
-            $dns = new Client(self::DEFAULT_DNS_SERVER);
-            $question = new Question($dnsServer, Record::TYPE_A); // TODO: ipv6 support
-            $query = Message::query($question, recursionDesired: true);
-            $response = $dns->query($query);
-            $answer = $response->answers[0] ?? null;
-            $aRecord = $answer->rdata ?? '';
-
-            if (empty($aRecord)) {
-                throw new \Exception('Invalid DNS server.');
-            }
-
-            $this->dnsServer = $aRecord;
-        }
     }
 
     /**
