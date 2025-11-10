@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\DNS\Exception;
+namespace Utopia\DNS\Exception\Message;
 
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Header;

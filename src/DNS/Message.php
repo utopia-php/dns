@@ -2,8 +2,8 @@
 
 namespace Utopia\DNS;
 
-use Utopia\DNS\Exception\DecodingException;
-use Utopia\DNS\Exception\PartialDecodingException;
+use Utopia\DNS\Exception\Message\DecodingException;
+use Utopia\DNS\Exception\Message\PartialDecodingException;
 use Utopia\DNS\Message\Header;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;

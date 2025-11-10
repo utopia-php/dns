@@ -3,7 +3,7 @@
 namespace Tests\Unit\Utopia\DNS\Message;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\DNS\Exception\DecodingException;
+use Utopia\DNS\Exception\Message\DecodingException;
 use Utopia\DNS\Message\Domain;
 use PHPUnit\Framework\Attributes\DataProvider;
 
