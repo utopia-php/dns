@@ -2,8 +2,8 @@
 
 namespace Tests\Utopia\DNS\Zone;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Utopia\DNS\Exception\Zone\ImportException;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Zone;
 use Utopia\DNS\Zone\File;
@@ -103,7 +103,7 @@ ZONE;
 
     public function testImportFailsWithUnsupportedDirective(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('$INCLUDE directive is not supported');
 
         File::import(<<<ZONE
@@ -114,8 +114,8 @@ ZONE);
 
     public function testImportFailsWithUnknownRecordType(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Unknown record type 'BADTYPE'");
+        $this->expectException(ImportException::class);
+        $this->expectExceptionMessage("Invalid record type 'BADTYPE' (line 3).");
 
         $soa = self::DEFAULT_SOA;
         $contents = <<<ZONE
@@ -129,7 +129,7 @@ ZONE;
 
     public function testImportFailsWhenMxPriorityMissing(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('MX requires numeric priority and exchange');
 
         $soa = self::DEFAULT_SOA;
@@ -144,7 +144,7 @@ ZONE;
 
     public function testImportFailsWhenSrvFieldsMissing(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('SRV requires priority, weight, port, target');
 
         $soa = self::DEFAULT_SOA;
@@ -204,7 +204,7 @@ ZONE;
 
     public function testImportFailsWhenSoaDataMissing(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('SOA requires MNAME, RNAME, SERIAL, REFRESH, RETRY, EXPIRE, MINIMUM');
 
         File::import('@ IN SOA ns1.example.com. admin.example.com.', 'example.com');
@@ -592,7 +592,7 @@ ZONE,
 
     public function testImportCaaMissingQuotedValueFails(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessageMatches('/CAA value must be quoted/');
 
         $contents = sprintf(
@@ -623,7 +623,7 @@ ZONE;
 
     public function testImportFailsWithDuplicateSoa(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('Multiple SOA records found');
 
         $contents = <<<'ZONE'
@@ -637,8 +637,8 @@ ZONE;
 
     public function testImportRejectsTtlWithSuffix(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Unknown record type '1H'");
+        $this->expectException(ImportException::class);
+        $this->expectExceptionMessage("Invalid record type '1H' (line 3).");
 
         $contents = sprintf(
             <<<'ZONE'
@@ -705,7 +705,7 @@ ZONE,
 
     public function testImportFailsWhenSoaHasTooFewFields(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('SOA requires MNAME, RNAME, SERIAL, REFRESH, RETRY, EXPIRE, MINIMUM');
 
         File::import('@ IN SOA ns1.example.com. admin.example.com. 2025011801 7200 3600', 'example.com');
@@ -713,7 +713,7 @@ ZONE,
 
     public function testImportFailsWithoutSoa(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('No SOA record found in zone file');
 
         File::import("www IN A 192.168.1.10\n", 'example.com');
@@ -721,7 +721,7 @@ ZONE,
 
     public function testImportFailsWhenOwnerOmittedWithoutContext(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ImportException::class);
         $this->expectExceptionMessage('Owner omitted but no previous owner available');
 
         File::import(<<<ZONE

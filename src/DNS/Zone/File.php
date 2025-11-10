@@ -3,6 +3,7 @@
 namespace Utopia\DNS\Zone;
 
 use InvalidArgumentException;
+use Utopia\DNS\Exception\Zone\ImportException;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Zone;
 
@@ -31,7 +32,7 @@ final readonly class File
      * @param string|null $defaultOrigin Default origin if $ORIGIN is not specified
      * @param int         $defaultTTL    Default TTL if not specified (default: 3600)
      *
-     * @throws InvalidArgumentException
+     * @throws ImportException
      */
     public static function import(string $content, ?string $defaultOrigin = null, int $defaultTTL = 3600): Zone
     {
@@ -46,7 +47,7 @@ final readonly class File
         if ($defaultOrigin !== null) {
             $origin = self::canonicalizeName($defaultOrigin);
             if ($origin === null) {
-                throw new InvalidArgumentException('Default origin must not be empty');
+                throw new ImportException($content, 'Default origin must not be empty');
             }
             $zoneName = $origin;
             $zoneNameFromDefault = true;
@@ -62,11 +63,16 @@ final readonly class File
             }
 
             // Directives
-            $directive = self::handleDirectives($line, $origin, $lastTTL);
+            try {
+                $directive = self::handleDirectives($line, $origin, $lastTTL);
+            } catch (InvalidArgumentException $e) {
+                throw new ImportException($content, $e->getMessage(), previous: $e);
+            }
+
             if ($directive !== null) {
                 if ($directive === 'origin') {
                     if ($origin === null) {
-                        throw new InvalidArgumentException('$ORIGIN directive must not be empty');
+                        throw new ImportException($content, '$ORIGIN directive must not be empty');
                     }
                     if ($zoneName === null || $zoneNameFromDefault) {
                         $zoneName = $origin;
@@ -84,7 +90,11 @@ final readonly class File
             $ownerOmitted = $line[0] === ' ' || $line[0] === "\t";
             $line = ltrim($line);
 
-            $rr = self::parseResourceRecord($line, $origin, $lastOwner, $lastTTL, $lastClass, $ownerOmitted, $num);
+            try {
+                $rr = self::parseResourceRecord($line, $origin, $lastOwner, $lastTTL, $lastClass, $ownerOmitted, $num);
+            } catch (InvalidArgumentException $e) {
+                throw new ImportException($content, $e->getMessage(), previous: $e);
+            }
 
             // Update state from parsed RR
             $lastOwner = $rr['name'];
@@ -104,7 +114,7 @@ final readonly class File
 
             if ($rr['type'] === Record::TYPE_SOA) {
                 if ($soa !== null) {
-                    throw new InvalidArgumentException("Multiple SOA records found (line $num).");
+                    throw new ImportException($content, "Multiple SOA records found (line $num).");
                 }
                 $soa = $record;
                 continue;
@@ -114,11 +124,11 @@ final readonly class File
         }
 
         if ($soa === null) {
-            throw new InvalidArgumentException('No SOA record found in zone file');
+            throw new ImportException($content, 'No SOA record found in zone file');
         }
 
         if ($zoneName === null) {
-            throw new InvalidArgumentException('Unable to determine zone name: provide an $ORIGIN directive or defaultOrigin.');
+            throw new ImportException($content, 'Unable to determine zone name: provide an $ORIGIN directive or defaultOrigin.');
         }
 
         return new Zone($zoneName, $records, $soa);
@@ -357,7 +367,11 @@ final readonly class File
         }
 
         $typeString = strtoupper($tokens[$i]);
-        $type = self::parseType($typeString);
+        $type = Record::typeNameToCode($typeString);
+        if ($type === null) {
+            throw new InvalidArgumentException("Invalid record type '$typeString' (line $lineNum).");
+        }
+
         $i++;
 
         $rdataTokens = array_slice($tokens, $i);
@@ -596,15 +610,6 @@ final readonly class File
         }
 
         return $name;
-    }
-
-    private static function parseType(string $typeString): int
-    {
-        $type = Record::typeNameToCode($typeString);
-        if ($type === null) {
-            throw new InvalidArgumentException("Unknown record type '$typeString'");
-        }
-        return $type;
     }
 
     private static function getTypeString(int $type): string

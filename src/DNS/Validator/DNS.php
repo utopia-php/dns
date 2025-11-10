@@ -11,10 +11,10 @@ use Utopia\Validator;
 
 class DNS extends Validator
 {
-    protected const FAILURE_REASON_QUERY = 'DNS query failed.';
-    protected const FAILURE_REASON_INTERNAL = 'Internal error occurred.';
-    protected const FAILURE_REASON_UNKNOWN = '';
-    protected const DEFAULT_DNS_SERVER = '8.8.8.8';
+    protected const string FAILURE_REASON_QUERY = 'DNS query failed.';
+    protected const string FAILURE_REASON_INTERNAL = 'Internal error occurred.';
+    protected const string FAILURE_REASON_UNKNOWN = '';
+    protected const string DEFAULT_DNS_SERVER = '8.8.8.8';
 
     // Memory from isValid to be used in getDescription
     /**

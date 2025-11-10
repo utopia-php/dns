@@ -4,7 +4,7 @@ namespace Utopia\DNS;
 
 use Throwable;
 use Utopia\Console;
-use Utopia\DNS\Exception\PartialDecodingException;
+use Utopia\DNS\Exception\Message\PartialDecodingException;
 use Utopia\Telemetry\Adapter as Telemetry;
 use Utopia\Telemetry\Adapter\None as NoTelemetry;
 use Utopia\Telemetry\Counter;

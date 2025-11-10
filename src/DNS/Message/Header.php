@@ -2,7 +2,7 @@
 
 namespace Utopia\DNS\Message;
 
-use Utopia\DNS\Exception\DecodingException;
+use Utopia\DNS\Exception\Message\DecodingException;
 
 final readonly class Header
 {

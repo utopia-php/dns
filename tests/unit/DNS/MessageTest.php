@@ -3,6 +3,8 @@
 namespace Tests\Unit\Utopia\DNS;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\DNS\Exception\Message\DecodingException;
+use Utopia\DNS\Exception\Message\PartialDecodingException;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Header;
 use Utopia\DNS\Message\Record;
@@ -189,7 +191,7 @@ final class MessageTest extends TestCase
     {
         $packet = "\x00\x01\x00"; // shorter than 12-byte DNS header
 
-        $this->expectException(\Utopia\DNS\Exception\DecodingException::class);
+        $this->expectException(DecodingException::class);
         $this->expectExceptionMessage('Invalid DNS response: header too short');
 
         Message::decode($packet);
@@ -206,7 +208,7 @@ final class MessageTest extends TestCase
         try {
             Message::decode($packet);
             $this->fail('Expected PartialDecodingException');
-        } catch (\Utopia\DNS\Exception\PartialDecodingException $e) {
+        } catch (PartialDecodingException $e) {
             $header = $e->getHeader();
             $this->assertSame(0x1234, $header->id);
             $this->assertSame(1, $header->questionCount);
@@ -229,7 +231,7 @@ final class MessageTest extends TestCase
         try {
             Message::decode($header . $question . $answer);
             $this->fail('Expected PartialDecodingException');
-        } catch (\Utopia\DNS\Exception\PartialDecodingException $e) {
+        } catch (PartialDecodingException $e) {
             $this->assertSame(0xABCD, $e->getHeader()->id);
             $this->assertSame('RDATA exceeds packet bounds', $e->getMessage());
         }
@@ -249,7 +251,7 @@ final class MessageTest extends TestCase
             "\x5D\xB8\xD8\x22" .
             "\xFF"; // extra byte
 
-        $this->expectException(\Utopia\DNS\Exception\PartialDecodingException::class);
+        $this->expectException(PartialDecodingException::class);
         $this->expectExceptionMessage('Invalid packet length');
 
         Message::decode($message);
