@@ -61,8 +61,10 @@ class Server
 {
     protected Adapter $adapter;
     protected Resolver $resolver;
+
     /** @var array<int, callable> */
     protected array $errors = [];
+
     protected bool $debug = false;
 
     /**
@@ -107,6 +109,22 @@ class Server
     public function error(callable $handler): self
     {
         $this->errors[] = $handler;
+        return $this;
+    }
+
+    /**
+     * On Worker Start
+     *
+     * @param callable(Server $server, int $workerId): void $handler
+     * @phpstan-param callable(Server $server, int $workerId): void $handler
+     * @return self
+     */
+    public function onWorkerStart(callable $handler): self
+    {
+        $this->adapter->onWorkerStart(function (int $workerId) use ($handler) {
+            \call_user_func($handler, $this, $workerId);
+        });
+
         return $this;
     }
 
@@ -279,7 +297,9 @@ class Server
 
             Console::success('[DNS] Server is ready to accept connections');
 
-            $this->adapter->onPacket($this->onPacket(...));
+            /** @phpstan-var \Closure(string $buffer, string $ip, int $port):string $onPacket */
+            $onPacket = $this->onPacket(...);
+            $this->adapter->onPacket($onPacket);
             $this->adapter->start();
         } catch (Throwable $error) {
             $this->handleError($error);
