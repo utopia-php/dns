@@ -2,6 +2,7 @@
 
 require __DIR__ . '/../../vendor/autoload.php';
 
+use Utopia\Console;
 use Utopia\DNS\Server;
 use Utopia\DNS\Adapter\Swoole;
 use Utopia\DNS\Message\Record;
@@ -52,5 +53,9 @@ $zone = new Zone(
 
 $dns = new Server($server, new Memory($zone));
 $dns->setDebug(false);
+
+$dns->onWorkerStart(function (Server $server, int $workerId) {
+    Console::log("Worker $workerId started");
+});
 
 $dns->start();

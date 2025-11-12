@@ -2,12 +2,17 @@
 
 namespace Utopia\DNS\Adapter;
 
+use Swoole\Runtime;
 use Utopia\DNS\Adapter;
 use Swoole\Server;
 
 class Swoole extends Adapter
 {
     protected Server $server;
+
+    /** @var callable(string $buffer, string $ip, int $port): string */
+    protected mixed $onPacket;
+
     protected string $host;
     protected int $port;
 
@@ -19,17 +24,32 @@ class Swoole extends Adapter
     }
 
     /**
+     * Worker start callback
+     *
+     * @param callable(int $workerId): void $callback
+     */
+    public function onWorkerStart(callable $callback): void
+    {
+        $this->server->on('WorkerStart', function ($server, $workerId) use ($callback) {
+            \call_user_func($callback, $workerId);
+        });
+    }
+
+    /**
      * @param callable $callback
+     * @phpstan-param callable(string $buffer, string $ip, int $port):string $callback
      */
     public function onPacket(callable $callback): void
     {
-        $this->server->on('Packet', function ($server, $data, $clientInfo) use ($callback) {
+        $this->onPacket = $callback;
+
+        $this->server->on('Packet', function ($server, $data, $clientInfo) {
             $ip = $clientInfo['address'] ?? '';
             $port = $clientInfo['port'] ?? '';
-            $answer = call_user_func($callback, $data, $ip, $port);
+            $answer = \call_user_func($this->onPacket, $data, $ip, $port);
 
             // Swoole UDP sockets reject zero-length payloads; skip responding instead.
-            if ($answer === '' || $answer === null) {
+            if ($answer === '') {
                 return;
             }
 
@@ -42,6 +62,7 @@ class Swoole extends Adapter
      */
     public function start(): void
     {
+        Runtime::enableCoroutine();
         $this->server->start();
     }
 

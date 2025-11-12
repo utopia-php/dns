@@ -9,7 +9,13 @@ use Utopia\DNS\Adapter;
 class Native extends Adapter
 {
     protected Socket $server;
-    protected mixed $callback;
+
+    /** @var callable(string $buffer, string $ip, int $port): string */
+    protected mixed $onPacket;
+
+    /** @var list<callable(int $workerId): void> */
+    protected array $onWorkerStart = [];
+
     protected string $host;
     protected int $port;
 
@@ -29,9 +35,24 @@ class Native extends Adapter
         $this->server = $server;
     }
 
+    /**
+     * Worker start callback
+     *
+     * @param callable(int $workerId): void $callback
+     * @phpstan-param callable(int $workerId): void $callback
+     */
+    public function onWorkerStart(callable $callback): void
+    {
+        $this->onWorkerStart[] = $callback;
+    }
+
+    /**
+     * @param callable $callback
+     * @phpstan-param callable(string $buffer, string $ip, int $port):string $callback
+     */
     public function onPacket(callable $callback): void
     {
-        $this->callback = $callback;
+        $this->onPacket = $callback;
     }
 
     /**
@@ -43,6 +64,10 @@ class Native extends Adapter
             throw new Exception('Could not bind server to a server.');
         }
 
+        foreach ($this->onWorkerStart as $callback) {
+            \call_user_func($callback, 0);
+        }
+
         /** @phpstan-ignore-next-line */
         while (1) {
             $buf = '';
@@ -51,7 +76,7 @@ class Native extends Adapter
             $len = socket_recvfrom($this->server, $buf, 1024 * 4, 0, $ip, $port);
 
             if ($len > 0) {
-                $answer = call_user_func($this->callback, $buf, $ip, $port);
+                $answer = call_user_func($this->onPacket, $buf, $ip, $port);
 
                 if (socket_sendto($this->server, $answer, strlen($answer), 0, $ip, $port) === false) {
                     printf('Error in socket\n');

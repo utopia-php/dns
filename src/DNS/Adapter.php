@@ -5,9 +5,18 @@ namespace Utopia\DNS;
 abstract class Adapter
 {
     /**
-     * Packet Callback
+     * Worker start
      *
-     * @param callable $callback
+     * @param callable(int $workerId): void $callback
+     * @phpstan-param callable(int $workerId): void $callback
+     */
+    abstract public function onWorkerStart(callable $callback): void;
+
+    /**
+     * Packet handler
+     *
+     * @param callable(string $buffer, string $ip, int $port): string $callback
+     * @phpstan-param callable(string $buffer, string $ip, int $port):string $callback
      */
     abstract public function onPacket(callable $callback): void;
 
