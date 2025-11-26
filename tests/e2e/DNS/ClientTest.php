@@ -227,14 +227,14 @@ final class ClientTest extends TestCase
             new Client('not-ip-address', self::PORT);
             $this->fail('Expected invalid IP address exception');
         } catch (\Exception $e) {
-            $this->assertEquals('Server must be an IP address.', $e->getMessage());
+            $this->assertSame('Server must be an IP address.', $e->getMessage());
         }
 
         try {
             new Client('ns1.digitalocean.com', self::PORT);
             $this->fail('Expected invalid IP address exception');
         } catch (\Exception $e) {
-            $this->assertEquals('Server must be an IP address.', $e->getMessage());
+            $this->assertSame('Server must be an IP address.', $e->getMessage());
         }
 
         try {

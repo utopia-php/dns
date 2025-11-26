@@ -26,8 +26,8 @@ class CloudflareTest extends TestCase
 
         /** @var Record $record */
         $record = $response->answers[0];
-        $this->assertEquals(Record::TYPE_A, $record->type);
-        $this->assertEquals('google.com', $record->name);
+        $this->assertSame(Record::TYPE_A, $record->type);
+        $this->assertSame('google.com', $record->name);
         $this->assertNotFalse(filter_var($record->rdata, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4));
     }
 
@@ -47,8 +47,8 @@ class CloudflareTest extends TestCase
 
         /** @var Record $record */
         $record = $response->answers[0];
-        $this->assertEquals(Record::TYPE_AAAA, $record->type);
-        $this->assertEquals('google.com', $record->name);
+        $this->assertSame(Record::TYPE_AAAA, $record->type);
+        $this->assertSame('google.com', $record->name);
         $this->assertNotFalse(filter_var($record->rdata, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6));
     }
 }
