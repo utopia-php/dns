@@ -16,7 +16,7 @@ class CAA extends Validator
 
     public const string FAILURE_REASON_INVALID_VALUE = 'Value must be a non-empty string and must be enclosed in quotes';
 
-    public const string FAILURE_REASON_INVALID_FORMAT = 'CAA record must be in the format flags tag "value"';
+    public const string FAILURE_REASON_INVALID_FORMAT = 'CAA record must be in the format <flags> <tag> "<value>"';
 
     public string $reason = '';
 
