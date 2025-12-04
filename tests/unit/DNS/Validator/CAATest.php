@@ -17,6 +17,7 @@ final class CAATest extends TestCase
             '0 issuewild "certainly.com"',
             '0 iodef "mailto:security@example.com"',
             '0 issue ";"',
+            '0 issue "certainly.com; validationmethods=dns-01"',
         ];
         
         foreach ($validValues as $value) {

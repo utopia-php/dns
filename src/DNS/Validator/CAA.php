@@ -33,7 +33,7 @@ class CAA extends Validator
             return false;
         }
 
-        $parts = explode(" ", $data);
+        $parts = explode(" ", $data, 3);
 
         if (count($parts) !== 3) {
             $this->reason = self::FAILURE_REASON_INVALID_FORMAT;
