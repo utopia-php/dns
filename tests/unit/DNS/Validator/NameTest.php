@@ -52,4 +52,3 @@ final class NameTest extends TestCase
 
     }
 }
-

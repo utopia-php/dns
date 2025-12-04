@@ -16,7 +16,7 @@ class Name extends Validator
         // DNS names are made up of labels separated by dots.
         // Each label: 1-63 chars, letters, digits, hyphens, can't start/end w/ hyphen.
         // Full name: <=255 chars, labels separated by single dots, no empty labels unless root.
-        
+
         if (strlen($name) < 1 || strlen($name) > Domain::MAX_DOMAIN_NAME_LEN) {
             return false;
         }

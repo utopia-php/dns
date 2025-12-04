@@ -11,9 +11,9 @@ class CAA extends Validator
     protected const int CAA_FLAG_MAX = 255;
 
     protected const string FAILURE_REASON_INVALID_FLAGS = 'Invalid flags';
-    
+
     protected const string FAILURE_REASON_INVALID_TAG = 'Invalid tag';
-    
+
     protected const string FAILURE_REASON_INVALID_VALUE = 'Invalid value';
 
     protected const string FAILURE_REASON_INVALID_FORMAT = 'Invalid format';
@@ -23,7 +23,7 @@ class CAA extends Validator
     /**
      * Check if the provided value matches the CAA record format
      *
-     * @param mixed $value
+     * @param mixed $data
      * @return bool
      */
     public function isValid(mixed $data): bool
@@ -57,13 +57,13 @@ class CAA extends Validator
             $this->reason = self::FAILURE_REASON_INVALID_FLAGS;
             return false;
         }
-        
+
         // Check tag is not empty
         if (strlen($tag) === 0) {
             $this->reason = self::FAILURE_REASON_INVALID_TAG;
             return false;
         }
-        
+
         // Check value is not empty and starts with " and ends with "
         if (strlen($value) === 0 || $value[0] !== '"' || $value[strlen($value) - 1] !== '"') {
             $this->reason = self::FAILURE_REASON_INVALID_VALUE;
