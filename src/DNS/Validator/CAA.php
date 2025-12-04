@@ -6,17 +6,17 @@ use Utopia\Validator;
 
 class CAA extends Validator
 {
-    protected const int CAA_FLAG_MIN = 0;
+    public const int CAA_FLAG_MIN = 0;
 
-    protected const int CAA_FLAG_MAX = 255;
+    public const int CAA_FLAG_MAX = 255;
 
-    protected const string FAILURE_REASON_INVALID_FLAGS = 'Invalid flags';
+    public const string FAILURE_REASON_INVALID_FLAGS = 'Flags must be a number between 0 and 255';
 
-    protected const string FAILURE_REASON_INVALID_TAG = 'Invalid tag';
+    public const string FAILURE_REASON_INVALID_TAG = 'Tag must be a non-empty string';
 
-    protected const string FAILURE_REASON_INVALID_VALUE = 'Invalid value';
+    public const string FAILURE_REASON_INVALID_VALUE = 'Value must be a non-empty string and must be enclosed in quotes';
 
-    protected const string FAILURE_REASON_INVALID_FORMAT = 'Invalid format';
+    public const string FAILURE_REASON_INVALID_FORMAT = 'CAA record must be in the format flags tag "value"';
 
     public string $reason = '';
 
@@ -84,11 +84,11 @@ class CAA extends Validator
 
     public function getDescription(): string
     {
-        $messages = ['CAA verification failed'];
+        if (!empty($this->reason)) {
+            return $this->reason;
+        }
 
-        $messages[] = !empty($this->reason) ? $this->reason : self::FAILURE_REASON_INVALID_FORMAT;
-
-        return implode('. ', $messages) . '.';
+        return self::FAILURE_REASON_INVALID_FORMAT;
     }
 
     /**

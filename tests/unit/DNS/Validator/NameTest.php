@@ -33,21 +33,22 @@ final class NameTest extends TestCase
         $validator = new Name();
 
         $invalidValues = [
-            '',
-            '-example.com',
-            'example-.com',
-            'exa_mple.com',
-            'example..com',
-            str_repeat('a', 64) . '.com',
-            123,
-            '.example.com',
-            'example.com..',
-            'exa mple.com',
+            ['value' => 123, 'description' => Name::FAILURE_REASON_GENERAL],
+            ['value' => '', 'description' => Name::FAILURE_REASON_INVALID_NAME_LENGTH],
+            ['value' => str_repeat('a', 256) . '.com', 'description' => Name::FAILURE_REASON_INVALID_NAME_LENGTH],
+            ['value' => str_repeat('a', 64) . '.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_LENGTH],
+            ['value' => '-example.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
+            ['value' => 'example-.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
+            ['value' => 'exa_mple.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
+            ['value' => 'example..com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
+            ['value' => '.example.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
+            ['value' => 'example.com..', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
+            ['value' => 'exa mple.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS],
         ];
 
         foreach ($invalidValues as $value) {
-            $this->assertFalse($validator->isValid($value), 'Expected invalid value');
-            $this->assertSame('Invalid name for DNS record', $validator->getDescription());
+            $this->assertFalse($validator->isValid($value['value']), "Expected invalid: {$value['value']}");
+            $this->assertSame($value['description'], $validator->getDescription());
         }
 
     }

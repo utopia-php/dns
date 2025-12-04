@@ -30,15 +30,16 @@ final class CAATest extends TestCase
         $validator = new CAA();
 
         $invalidValues = [
-            ['value' => 'issue "letsencrypt.org"', 'description' => 'Invalid format'],
-            ['value' => '256 issue "letsencrypt.org"', 'description' => 'Invalid flags'],
-            ['value' => '0 issue letsencrypt.org', 'description' => 'Invalid value'],
-            ['value' => '0 issue ""', 'description' => 'Invalid value'],
+            ['value' => 'issue "letsencrypt.org"', 'description' => CAA::FAILURE_REASON_INVALID_FORMAT],
+            ['value' => '0 ""', 'description' => CAA::FAILURE_REASON_INVALID_FORMAT],
+            ['value' => '256 issue "letsencrypt.org"', 'description' => CAA::FAILURE_REASON_INVALID_FLAGS],
+            ['value' => '0 issue letsencrypt.org', 'description' => CAA::FAILURE_REASON_INVALID_VALUE],
+            ['value' => '0 issue ""', 'description' => CAA::FAILURE_REASON_INVALID_VALUE],
         ];
 
         foreach ($invalidValues as $invalidValue) {
             $this->assertFalse($validator->isValid($invalidValue['value']), "Expected invalid: {$invalidValue['value']}");
-            $this->assertSame("CAA verification failed. {$invalidValue['description']}.", $validator->getDescription());
+            $this->assertSame($invalidValue['description'], $validator->getDescription());
         }
     }
 }
