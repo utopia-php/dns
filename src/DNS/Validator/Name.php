@@ -44,7 +44,7 @@ class Name extends Validator
             }
 
             // Check label contains only allowed chars
-            for ($i = 0; $i < $len - 1; ++$i) {
+            for ($i = 1; $i < $len - 1; ++$i) {
                 $c = $label[$i];
                 if (!ctype_alnum($c) && $c !== '-') {
                     return false;
