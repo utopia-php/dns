@@ -13,6 +13,7 @@ final class NameTest extends TestCase
         $validator = new Name(Record::TYPE_CNAME);
 
         $validValues = [
+            '@',
             'example',
             'example.com',
             'EXAMPLE.COM',
@@ -42,6 +43,7 @@ final class NameTest extends TestCase
             ['value' => '', 'description' => Name::FAILURE_REASON_INVALID_NAME_LENGTH],
             ['value' => str_repeat('a', 256) . '.com', 'description' => Name::FAILURE_REASON_INVALID_NAME_LENGTH],
             ['value' => str_repeat('a', 64) . '.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_LENGTH],
+            ['value' => '@.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITHOUT_UNDERSCORE],
             ['value' => '-example.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITHOUT_UNDERSCORE],
             ['value' => 'example-.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITHOUT_UNDERSCORE],
             ['value' => 'exa_mple.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITHOUT_UNDERSCORE],
@@ -64,6 +66,7 @@ final class NameTest extends TestCase
             ['value' => '', 'description' => Name::FAILURE_REASON_INVALID_NAME_LENGTH],
             ['value' => str_repeat('a', 256) . '.com', 'description' => Name::FAILURE_REASON_INVALID_NAME_LENGTH],
             ['value' => str_repeat('a', 64) . '.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_LENGTH],
+            ['value' => '@.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE],
             ['value' => '-example.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE],
             ['value' => 'example-.com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE],
             ['value' => 'example..com', 'description' => Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE],

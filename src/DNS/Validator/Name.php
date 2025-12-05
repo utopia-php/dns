@@ -54,6 +54,11 @@ class Name extends Validator
             return false;
         }
 
+        // Special case for referencing the zone origin
+        if ($name === '@') {
+            return true;
+        }
+
         // If the name ends with '.', strip it (absolute FQDN); allow trailing '.'.
         $trimmed = (\substr($name, -1) === '.') ? \substr($name, 0, -1) : $name;
         $labels = \explode('.', $trimmed);
