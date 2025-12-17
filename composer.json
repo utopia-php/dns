@@ -23,7 +23,7 @@
     "require": {
         "php": ">=8.3",
         "utopia-php/console": "0.0.*",
-        "utopia-php/telemetry": "0.1.*",
+        "utopia-php/telemetry": "*",
         "utopia-php/validators": "0.*",
         "utopia-php/domains": "0.9.*"
     },
