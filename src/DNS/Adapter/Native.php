@@ -160,9 +160,8 @@ class Native extends Adapter
                     continue;
                 }
 
-                if ($socket instanceof Socket) {
-                    $this->handleTcpClient($socket);
-                }
+                // Remaining readable sockets are TCP clients.
+                $this->handleTcpClient($socket);
             }
         }
     }
