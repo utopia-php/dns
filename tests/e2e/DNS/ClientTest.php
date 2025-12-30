@@ -12,6 +12,21 @@ final class ClientTest extends TestCase
 {
     public const int PORT = 5300;
 
+    public function testTcpQueries(): void
+    {
+        $client = new Client('127.0.0.1', self::PORT, 5, true);
+
+        $response = $client->query(Message::query(
+            new Question('dev2.appwrite.io', Record::TYPE_A)
+        ));
+
+        $records = $response->answers;
+
+        $this->assertCount(2, $records);
+        $this->assertSame('dev2.appwrite.io', $records[0]->name);
+        $this->assertSame(Record::TYPE_A, $records[0]->type);
+    }
+
     public function testARecords(): void
     {
         $client = new Client('127.0.0.1', self::PORT);
