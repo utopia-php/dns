@@ -58,7 +58,7 @@ class DNS extends Validator
 
         $records = implode("', '", $this->records);
 
-        $countVerbose = match($this->count) {
+        $countVerbose = match ($this->count) {
             1 => 'one',
             2 => 'two',
             3 => 'three',
@@ -117,7 +117,6 @@ class DNS extends Validator
             $query = array_filter($answers, function ($record) {
                 return $record->type === $this->type;
             });
-
         } catch (\Exception $e) {
             $this->reason = self::FAILURE_REASON_QUERY;
             return false;
