@@ -151,7 +151,7 @@ class Client
                 break;
             }
 
-            $chunk = fread($socket, max(1, $remaining));
+            $chunk = fread($socket, $remaining);
 
             if ($chunk === false) {
                 break;
