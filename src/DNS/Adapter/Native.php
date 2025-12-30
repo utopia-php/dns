@@ -234,6 +234,14 @@ class Native extends Adapter
             $written = @socket_write($client, substr($frame, $sent));
 
             if ($written === false) {
+                $error = socket_last_error($client);
+
+                if (in_array($error, [SOCKET_EAGAIN, SOCKET_EWOULDBLOCK], true)) {
+                    socket_clear_error($client);
+                    usleep(1000);
+                    continue;
+                }
+
                 $this->closeTcpClient($client);
                 return;
             }
