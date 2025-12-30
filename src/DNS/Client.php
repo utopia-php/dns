@@ -151,7 +151,7 @@ class Client
                 break;
             }
 
-            $chunk = fread($socket, $remaining);
+            $chunk = fread($socket, max(1, $remaining));
 
             if ($chunk === false) {
                 break;
@@ -160,7 +160,7 @@ class Client
             if ($chunk === '') {
                 $meta = stream_get_meta_data($socket);
 
-                if (!empty($meta['timed_out'])) {
+                if (!empty($meta['timed_out']) || !empty($meta['eof'])) {
                     break;
                 }
 
