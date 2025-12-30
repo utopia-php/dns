@@ -54,6 +54,10 @@ class Client
             return $this->queryTcp($message);
         }
 
+        if (!$this->socket instanceof \Socket) {
+            throw new Exception('UDP socket not initialized.');
+        }
+
         $packet = $message->encode();
         if (socket_sendto($this->socket, $packet, strlen($packet), 0, $this->server, $this->port) === false) {
             throw new Exception('Failed to send data: ' . socket_strerror(socket_last_error($this->socket)));
@@ -141,7 +145,13 @@ class Client
         $data = '';
 
         while (strlen($data) < $length) {
-            $chunk = fread($socket, $length - strlen($data));
+            $remaining = $length - strlen($data);
+
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $chunk = fread($socket, max(1, $remaining));
 
             if ($chunk === false) {
                 break;
