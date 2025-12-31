@@ -7,6 +7,7 @@ use Utopia\DNS\Client;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
+use Utopia\DNS\Adapter\Native;
 
 final class ClientTest extends TestCase
 {
@@ -269,5 +270,35 @@ final class ClientTest extends TestCase
         } catch (\Exception $e) {
             $this->fail('IPv6 threw unexpected error');
         }
+    }
+
+    public function testUdpTruncationSetsTcFlag(): void
+    {
+        $native = new Native('127.0.0.1', 0, true);
+
+        $question = new Question('example.com', Record::TYPE_TXT);
+        $query = Message::query($question, id: 0x1234);
+
+        $answer = new Record('example.com', Record::TYPE_TXT, str_repeat('a', 600), Record::CLASS_IN, 60);
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: [$answer],
+            authority: [],
+            additional: []
+        );
+
+        $truncate = new \ReflectionMethod($native, 'truncateResponse');
+        $truncate->setAccessible(true);
+
+        $truncated = $truncate->invoke($native, $response->encode());
+        $decoded = Message::decode($truncated);
+
+        $this->assertTrue($decoded->header->truncated, 'TC flag should be set on truncated UDP response');
+        $this->assertCount(0, $decoded->answers, 'Answers should be cleared when truncated');
+        $this->assertCount(0, $decoded->authority, 'Authority should be cleared when truncated');
+        $this->assertCount(0, $decoded->additional, 'Additional should be cleared when truncated');
+        $this->assertSame($query->questions[0]->name, $decoded->questions[0]->name);
     }
 }
