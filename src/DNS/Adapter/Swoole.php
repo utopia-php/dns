@@ -32,7 +32,7 @@ class Swoole extends Adapter
         $this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
 
         if ($this->enableTcp) {
-            $this->tcpPort = $this->server->addlistener($this->host, $this->port, SWOOLE_SOCK_TCP);
+            $this->tcpPort = $this->server->addListener($this->host, $this->port, SWOOLE_SOCK_TCP);
 
             $this->tcpPort->set([
                 'open_length_check' => true,
