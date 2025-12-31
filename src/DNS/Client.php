@@ -7,25 +7,18 @@ use Utopia\Validator\IP;
 
 class Client
 {
-    /** @var \Socket|null */
-    protected $socket = null;
-    protected string $server;
-    protected int $port;
-    protected int $timeout;
-
-    protected bool $useTcp;
-
-    public function __construct(string $server = '127.0.0.1', int $port = 53, int $timeout = 5, bool $useTcp = false)
-    {
+    public function __construct(
+        protected string $server = '127.0.0.1',
+        protected int $port = 53,
+        protected int $timeout = 5,
+        protected bool $useTcp = false,
+        /** @var \Socket|null */
+        protected ?\Socket $socket = null
+    ) {
         $validator = new IP(IP::ALL); // IPv4 + IPv6
         if (!$validator->isValid($server)) {
             throw new Exception('Server must be an IP address.');
         }
-
-        $this->server = $server;
-        $this->port = $port;
-        $this->timeout = $timeout;
-        $this->useTcp = $useTcp;
 
         if ($this->useTcp) {
             return;

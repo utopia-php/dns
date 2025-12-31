@@ -16,16 +16,11 @@ class Swoole extends Adapter
     /** @var callable(string $buffer, string $ip, int $port, ?int $maxResponseSize): string */
     protected mixed $onPacket;
 
-    protected string $host;
-    protected int $port;
-
-    protected bool $enableTcp;
-
-    public function __construct(string $host = '0.0.0.0', int $port = 53, bool $enableTcp = true)
-    {
-        $this->host = $host;
-        $this->port = $port;
-        $this->enableTcp = $enableTcp;
+    public function __construct(
+        protected string $host = '0.0.0.0',
+        protected int $port = 53,
+        protected bool $enableTcp = true
+    ) {
         $this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
 
         if ($this->enableTcp) {
