@@ -144,28 +144,28 @@ final readonly class Record
             throw new DecodingException('Truncated RR header');
         }
         $typeData = unpack('ntype', substr($data, $offset, 2));
-        if (!is_array($typeData) || !array_key_exists('type', $typeData)) {
+        if (!is_array($typeData) || !array_key_exists('type', $typeData) || !is_int($typeData['type'])) {
             throw new DecodingException('Failed to unpack record type');
         }
         $type = $typeData['type'];
         $offset += 2;
 
         $classData = unpack('nclass', substr($data, $offset, 2));
-        if (!is_array($classData) || !array_key_exists('class', $classData)) {
+        if (!is_array($classData) || !array_key_exists('class', $classData) || !is_int($classData['class'])) {
             throw new DecodingException('Failed to unpack record class');
         }
         $class = $classData['class'];
         $offset += 2;
 
         $ttlData = unpack('Nttl', substr($data, $offset, 4));
-        if (!is_array($ttlData) || !array_key_exists('ttl', $ttlData)) {
+        if (!is_array($ttlData) || !array_key_exists('ttl', $ttlData) || !is_int($ttlData['ttl'])) {
             throw new DecodingException('Failed to unpack record TTL');
         }
         $ttl = $ttlData['ttl'];
         $offset += 4;
 
         $rdLengthData = unpack('nlength', substr($data, $offset, 2));
-        if (!is_array($rdLengthData) || !array_key_exists('length', $rdLengthData)) {
+        if (!is_array($rdLengthData) || !array_key_exists('length', $rdLengthData) || !is_int($rdLengthData['length'])) {
             throw new DecodingException('Failed to unpack record length');
         }
         $rdlength = $rdLengthData['length'];
@@ -216,7 +216,7 @@ final readonly class Record
                     throw new DecodingException('Invalid MX RDATA length: ' . strlen($rdataRaw));
                 }
                 $priorityData = unpack('npriority', substr($rdataRaw, 0, 2));
-                if (!is_array($priorityData) || !array_key_exists('priority', $priorityData)) {
+                if (!is_array($priorityData) || !array_key_exists('priority', $priorityData) || !is_int($priorityData['priority'])) {
                     throw new DecodingException('Failed to unpack MX priority');
                 }
                 $priority = $priorityData['priority'];
@@ -231,13 +231,13 @@ final readonly class Record
                 $priorityData = unpack('npriority', substr($rdataRaw, 0, 2));
                 $weightData = unpack('nweight', substr($rdataRaw, 2, 2));
                 $portData = unpack('nport', substr($rdataRaw, 4, 2));
-                if (!is_array($priorityData) || !array_key_exists('priority', $priorityData)) {
+                if (!is_array($priorityData) || !array_key_exists('priority', $priorityData) || !is_int($priorityData['priority'])) {
                     throw new DecodingException('Failed to unpack SRV priority');
                 }
-                if (!is_array($weightData) || !array_key_exists('weight', $weightData)) {
+                if (!is_array($weightData) || !array_key_exists('weight', $weightData) || !is_int($weightData['weight'])) {
                     throw new DecodingException('Failed to unpack SRV weight');
                 }
-                if (!is_array($portData) || !array_key_exists('port', $portData)) {
+                if (!is_array($portData) || !array_key_exists('port', $portData) || !is_int($portData['port'])) {
                     throw new DecodingException('Failed to unpack SRV port');
                 }
                 $priority = $priorityData['priority'];
@@ -258,12 +258,23 @@ final readonly class Record
                 }
 
                 $fields = unpack('Nserial/Nrefresh/Nretry/Nexpire/Nminimum', $timingData);
-                if (!is_array($fields)) {
+                if (!is_array($fields)
+                    || !isset($fields['serial'], $fields['refresh'], $fields['retry'], $fields['expire'], $fields['minimum'])
+                    || !is_int($fields['serial'])
+                    || !is_int($fields['refresh'])
+                    || !is_int($fields['retry'])
+                    || !is_int($fields['expire'])
+                    || !is_int($fields['minimum'])
+                ) {
                     throw new DecodingException('Unable to unpack SOA timings');
                 }
 
                 // Convert signed to unsigned for serial
                 $serial = $fields['serial'];
+                $refresh = $fields['refresh'];
+                $retry = $fields['retry'];
+                $expire = $fields['expire'];
+                $minimum = $fields['minimum'];
                 if ($serial < 0) {
                     $serial += 4294967296;
                 }
@@ -273,10 +284,10 @@ final readonly class Record
                     $mname,
                     $rname,
                     $serial,
-                    $fields['refresh'],
-                    $fields['retry'],
-                    $fields['expire'],
-                    $fields['minimum']
+                    $refresh,
+                    $retry,
+                    $expire,
+                    $minimum
                 );
                 break;
 

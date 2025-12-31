@@ -109,7 +109,7 @@ class Client
             }
 
             $unpacked = unpack('nlen', $lengthBytes);
-            $length = is_array($unpacked) && isset($unpacked['len']) ? (int) $unpacked['len'] : 0;
+            $length = (is_array($unpacked) && isset($unpacked['len']) && is_int($unpacked['len'])) ? $unpacked['len'] : 0;
 
             if ($length === 0) {
                 throw new Exception('Received empty DNS TCP response.');
