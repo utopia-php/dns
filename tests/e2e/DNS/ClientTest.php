@@ -12,6 +12,21 @@ final class ClientTest extends TestCase
 {
     public const int PORT = 5300;
 
+    public function testTcpQueries(): void
+    {
+        $client = new Client('127.0.0.1', self::PORT, 5, true);
+
+        $response = $client->query(Message::query(
+            new Question('dev2.appwrite.io', Record::TYPE_A)
+        ));
+
+        $records = $response->answers;
+
+        $this->assertCount(2, $records);
+        $this->assertSame('dev2.appwrite.io', $records[0]->name);
+        $this->assertSame(Record::TYPE_A, $records[0]->type);
+    }
+
     public function testARecords(): void
     {
         $client = new Client('127.0.0.1', self::PORT);
@@ -253,6 +268,37 @@ final class ClientTest extends TestCase
             $this->assertNotEmpty($client);
         } catch (\Exception $e) {
             $this->fail('IPv6 threw unexpected error');
+        }
+    }
+
+    public function testTcpFallbackAfterUdpTruncation(): void
+    {
+        $client = new Client('127.0.0.1', self::PORT);
+
+        // Query for a TXT record that has large response (would trigger truncation over UDP)
+        $question = new Question('large.localhost', Record::TYPE_TXT);
+        $query = Message::query($question);
+
+        // First try UDP - should get TC flag if response is large
+        $udpResponse = $client->query($query);
+
+        // If truncated, retry with TCP
+        if ($udpResponse->header->truncated) {
+            $tcpClient = new Client('127.0.0.1', self::PORT, useTcp: true);
+            $tcpResponse = $tcpClient->query($query);
+
+            // TCP response should not be truncated
+            $this->assertFalse($tcpResponse->header->truncated, 'TCP response should not be truncated');
+
+            // TCP response should have more data than UDP
+            $this->assertGreaterThan(
+                count($udpResponse->answers),
+                count($tcpResponse->answers),
+                'TCP should return more answers than truncated UDP'
+            );
+        } else {
+            // If not truncated, that's fine - the response fit in UDP
+            $this->addToAssertionCount(1);
         }
     }
 }

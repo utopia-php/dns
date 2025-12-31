@@ -37,12 +37,8 @@ $adapter = new Native('0.0.0.0', 5300);
 $zone = new Zone(
     name: 'example.test',
     records: [
-        new Record(name: 'example.test', type: Record::TYPE_A, rdata: '127.0.0.1', ttl: 60),
+The server listens on UDP and TCP port `5300` (RFC 5966) and answers queries for `example.test` from the in-memory zone. Implement the [`Utopia\DNS\Resolver`](src/DNS/Resolver.php) interface to serve records from databases, APIs, or other stores.
         new Record(name: 'www.example.test', type: Record::TYPE_CNAME, rdata: 'example.test', ttl: 60),
-        new Record(name: 'example.test', type: Record::TYPE_TXT, rdata: '"demo record"', ttl: 60),
-    ],
-    soa: new Record(
-        name: 'example.test',
         type: Record::TYPE_SOA,
         rdata: 'ns1.example.test hostmaster.example.test 1 7200 1800 1209600 3600',
         ttl: 60
