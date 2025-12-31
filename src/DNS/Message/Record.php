@@ -258,7 +258,8 @@ final readonly class Record
                 }
 
                 $fields = unpack('Nserial/Nrefresh/Nretry/Nexpire/Nminimum', $timingData);
-                if (!is_array($fields)
+                if (
+                    !is_array($fields)
                     || !isset($fields['serial'], $fields['refresh'], $fields['retry'], $fields['expire'], $fields['minimum'])
                     || !is_int($fields['serial'])
                     || !is_int($fields['refresh'])
@@ -444,7 +445,7 @@ final readonly class Record
                 }
 
                 return pack('nnn', $priority, $weight, $port) .
-                       Domain::encode($this->rdata);
+                    Domain::encode($this->rdata);
 
             case self::TYPE_TXT:
                 $len = strlen($this->rdata);

@@ -39,7 +39,8 @@ final readonly class Header
         $chunk = substr($data, $offset, self::LENGTH);
         $values = unpack('nid/nflags/nqdcount/nancount/nnscount/narcount', $chunk);
 
-        if (!is_array($values)
+        if (
+            !is_array($values)
             || !isset($values['id'], $values['flags'], $values['qdcount'], $values['ancount'], $values['nscount'], $values['arcount'])
             || !is_int($values['id'])
             || !is_int($values['flags'])
