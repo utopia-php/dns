@@ -39,14 +39,27 @@ final readonly class Header
         $chunk = substr($data, $offset, self::LENGTH);
         $values = unpack('nid/nflags/nqdcount/nancount/nnscount/narcount', $chunk);
 
-        if (!is_array($values)) {
+        if (!is_array($values)
+            || !isset($values['id'], $values['flags'], $values['qdcount'], $values['ancount'], $values['nscount'], $values['arcount'])
+            || !is_int($values['id'])
+            || !is_int($values['flags'])
+            || !is_int($values['qdcount'])
+            || !is_int($values['ancount'])
+            || !is_int($values['nscount'])
+            || !is_int($values['arcount'])
+        ) {
             throw new DecodingException('Failed to unpack DNS header');
         }
 
+        $id = $values['id'];
         $flags = $values['flags'];
+        $qdcount = $values['qdcount'];
+        $ancount = $values['ancount'];
+        $nscount = $values['nscount'];
+        $arcount = $values['arcount'];
 
         return new self(
-            id: $values['id'],
+            id: $id,
             isResponse: (bool) (($flags >> 15) & 0x1),
             opcode: ($flags >> 11) & 0xF,
             authoritative: (bool) (($flags >> 10) & 0x1),
@@ -54,10 +67,10 @@ final readonly class Header
             recursionDesired: (bool) (($flags >> 8) & 0x1),
             recursionAvailable: (bool) (($flags >> 7) & 0x1),
             responseCode: $flags & 0xF,
-            questionCount: $values['qdcount'],
-            answerCount: $values['ancount'],
-            authorityCount: $values['nscount'],
-            additionalCount: $values['arcount']
+            questionCount: $qdcount,
+            answerCount: $ancount,
+            authorityCount: $nscount,
+            additionalCount: $arcount
         );
     }
 
