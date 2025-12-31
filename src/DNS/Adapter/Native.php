@@ -29,15 +29,20 @@ class Native extends Adapter
 
     protected bool $enableTcp;
 
+    protected int $maxTcpClients;
+
     /**
      * @param string $host
      * @param int $port
+     * @param bool $enableTcp
+     * @param int $maxTcpClients
      */
-    public function __construct(string $host = '0.0.0.0', int $port = 8053, bool $enableTcp = true)
+    public function __construct(string $host = '0.0.0.0', int $port = 8053, bool $enableTcp = true, int $maxTcpClients = 100)
     {
         $this->host = $host;
         $this->port = $port;
         $this->enableTcp = $enableTcp;
+        $this->maxTcpClients = $maxTcpClients;
 
         $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$server) {
@@ -148,6 +153,11 @@ class Native extends Adapter
                     $client = @socket_accept($this->tcpServer);
 
                     if ($client instanceof Socket) {
+                        if (count($this->tcpClients) >= $this->maxTcpClients) {
+                            @socket_close($client);
+                            continue;
+                        }
+
                         if (@socket_set_nonblock($client) === false) {
                             @socket_close($client);
                             continue;
