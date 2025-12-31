@@ -75,7 +75,7 @@ class Client
             throw new Exception("Failed to receive data from $this->server: $errorMessage (Error code: $error)");
         }
 
-        if (empty($data)) {
+        if (empty($data) || !is_string($data)) {
             throw new Exception("Empty response received from $this->server:$this->port");
         }
 
@@ -87,10 +87,14 @@ class Client
         $targetHost = $this->formatTcpHost($this->server);
         $uri = "tcp://{$targetHost}:{$this->port}";
 
+        $errno = 0;
+        $errstr = '';
         $socket = @stream_socket_client($uri, $errno, $errstr, $this->timeout, STREAM_CLIENT_CONNECT);
 
         if ($socket === false) {
-            throw new Exception("Failed to connect to {$this->server}:{$this->port} over TCP: $errstr ($errno)");
+            $errCode = is_int($errno) ? $errno : 0;
+            $errMsg = is_string($errstr) ? $errstr : 'Unknown error';
+            throw new Exception("Failed to connect to {$this->server}:{$this->port} over TCP: $errMsg ($errCode)");
         }
 
         try {
@@ -111,7 +115,8 @@ class Client
                 throw new Exception('Failed to read DNS TCP length prefix.');
             }
 
-            $length = unpack('nlen', $lengthBytes)['len'] ?? 0;
+            $unpacked = unpack('nlen', $lengthBytes);
+            $length = is_array($unpacked) && isset($unpacked['len']) ? (int) $unpacked['len'] : 0;
 
             if ($length === 0) {
                 throw new Exception('Received empty DNS TCP response.');
@@ -142,6 +147,10 @@ class Client
 
     protected function readBytes(mixed $socket, int $length): string
     {
+        if (!is_resource($socket)) {
+            return '';
+        }
+
         $data = '';
 
         while (strlen($data) < $length) {
