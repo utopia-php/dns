@@ -29,15 +29,18 @@ class Swoole extends Adapter
         $this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
 
         if ($this->enableTcp) {
-            $this->tcpPort = $this->server->addListener($this->host, $this->port, SWOOLE_SOCK_TCP);
+            $port = $this->server->addListener($this->host, $this->port, SWOOLE_SOCK_TCP);
 
-            $this->tcpPort->set([
-                'open_length_check' => true,
-                'package_length_type' => 'n',
-                'package_length_offset' => 0,
-                'package_body_offset' => 2,
-                'package_max_length' => 65537,
-            ]);
+            if ($port instanceof Port) {
+                $this->tcpPort = $port;
+                $this->tcpPort->set([
+                    'open_length_check' => true,
+                    'package_length_type' => 'n',
+                    'package_length_offset' => 0,
+                    'package_body_offset' => 2,
+                    'package_max_length' => 65537,
+                ]);
+            }
         }
     }
 
@@ -49,7 +52,9 @@ class Swoole extends Adapter
     public function onWorkerStart(callable $callback): void
     {
         $this->server->on('WorkerStart', function ($server, $workerId) use ($callback) {
-            \call_user_func($callback, $workerId);
+            if (is_int($workerId)) {
+                \call_user_func($callback, $workerId);
+            }
         });
     }
 
@@ -63,19 +68,33 @@ class Swoole extends Adapter
 
         // UDP handler - enforces 512-byte limit per RFC 1035
         $this->server->on('Packet', function ($server, $data, $clientInfo) {
-            $response = \call_user_func($this->onPacket, $data, $clientInfo['address'] ?? '', (int) ($clientInfo['port'] ?? 0), 512);
+            if (!is_string($data) || !is_array($clientInfo)) {
+                return;
+            }
 
-            if ($response !== '') {
-                $server->sendto($clientInfo['address'], $clientInfo['port'], $response);
+            $ip = is_string($clientInfo['address'] ?? null) ? $clientInfo['address'] : '';
+            $port = is_int($clientInfo['port'] ?? null) ? $clientInfo['port'] : 0;
+
+            $response = \call_user_func($this->onPacket, $data, $ip, $port, 512);
+
+            if ($response !== '' && $server instanceof Server) {
+                $server->sendto($ip, $port, $response);
             }
         });
 
         // TCP handler - supports larger responses with length-prefixed framing per RFC 5966
         if ($this->tcpPort instanceof Port) {
             $this->tcpPort->on('Receive', function (Server $server, int $fd, int $reactorId, string $data) {
-                $info = $server->getClientInfo($fd, $reactorId) ?: [];
+                $info = $server->getClientInfo($fd, $reactorId);
+                if (!is_array($info)) {
+                    return;
+                }
+
                 $payload = substr($data, 2); // strip 2-byte length prefix
-                $response = \call_user_func($this->onPacket, $payload, $info['remote_ip'] ?? '', $info['remote_port'] ?? 0, null);
+                $ip = is_string($info['remote_ip'] ?? null) ? $info['remote_ip'] : '';
+                $port = is_int($info['remote_port'] ?? null) ? $info['remote_port'] : 0;
+
+                $response = \call_user_func($this->onPacket, $payload, $ip, $port, null);
 
                 if ($response !== '') {
                     $server->send($fd, pack('n', strlen($response)) . $response);
