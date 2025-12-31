@@ -276,15 +276,19 @@ final class ClientTest extends TestCase
     {
         $native = new Native('127.0.0.1', 0, true);
 
-        $question = new Question('example.com', Record::TYPE_TXT);
+        $question = new Question('example.com', Record::TYPE_A);
         $query = Message::query($question, id: 0x1234);
 
-        $answer = new Record('example.com', Record::TYPE_TXT, Record::CLASS_IN, 60, str_repeat('a', 600));
+        $answers = [];
+        for ($i = 0; $i < 100; $i++) {
+            $answers[] = new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.' . ($i % 256) . '.' . ($i % 256));
+        }
+
         $response = Message::response(
             $query->header,
             Message::RCODE_NOERROR,
             questions: $query->questions,
-            answers: [$answer],
+            answers: $answers,
             authority: [],
             additional: []
         );
