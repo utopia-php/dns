@@ -135,10 +135,10 @@ class Native extends Adapter
                 if ($socket === $this->udpServer) {
                     $buf = '';
                     $ip = '';
-                    $port = null;
+                    $port = 0;
                     $len = socket_recvfrom($this->udpServer, $buf, 1024 * 4, 0, $ip, $port);
 
-                    if ($len > 0) {
+                    if ($len > 0 && is_string($buf) && is_string($ip) && is_int($port)) {
                         $answer = call_user_func($this->onPacket, $buf, $ip, $port, 512);
 
                         if ($answer !== '') {
@@ -220,9 +220,10 @@ class Native extends Adapter
 
         while (strlen($this->tcpBuffers[$clientId]) >= 2) {
             $length = unpack('nlen', substr($this->tcpBuffers[$clientId], 0, 2));
-            $payloadLength = $length['len'] ?? 0;
+            $unpacked = unpack('n', substr($this->tcpBuffers[$clientId], 0, 2));
+            $payloadLength = is_array($unpacked) ? ($unpacked[1] ?? 0) : 0;
 
-            if ($payloadLength === 0 || $payloadLength > $this->maxTcpFrameSize) {
+            if ($payloadLength > $this->maxTcpFrameSize) {
                 printf("Invalid TCP frame size %d for client %d\n", $payloadLength, $clientId);
                 $this->closeTcpClient($client);
                 return;
@@ -239,10 +240,12 @@ class Native extends Adapter
             $port = 0;
             socket_getpeername($client, $ip, $port);
 
-            $answer = call_user_func($this->onPacket, $message, $ip, $port, null);
+            if (is_string($ip) && is_int($port)) {
+                $answer = call_user_func($this->onPacket, $message, $ip, $port, null);
 
-            if ($answer !== '') {
-                $this->sendTcpResponse($client, $answer);
+                if ($answer !== '') {
+                    $this->sendTcpResponse($client, $answer);
+                }
             }
         }
     }
