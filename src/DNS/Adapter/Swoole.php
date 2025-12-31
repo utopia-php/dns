@@ -6,6 +6,7 @@ use Swoole\Runtime;
 use Utopia\DNS\Adapter;
 use Swoole\Server;
 use Swoole\Server\Port;
+use Utopia\DNS\Message;
 
 class Swoole extends Adapter
 {
@@ -20,6 +21,8 @@ class Swoole extends Adapter
     protected int $port;
 
     protected bool $enableTcp;
+
+    protected int $maxUdpSize = 512;
 
     public function __construct(string $host = '0.0.0.0', int $port = 53, bool $enableTcp = true)
     {
@@ -71,6 +74,10 @@ class Swoole extends Adapter
                 return;
             }
 
+            if (strlen($answer) > $this->maxUdpSize) {
+                $answer = $this->truncateResponse($answer);
+            }
+
             $server->sendto($ip, $port, $answer);
         });
 
@@ -110,5 +117,28 @@ class Swoole extends Adapter
     public function getName(): string
     {
         return 'swoole';
+    }
+
+    protected function truncateResponse(string $encodedResponse): string
+    {
+        try {
+            $message = Message::decode($encodedResponse);
+
+            $truncatedMessage = Message::response(
+                $message->header,
+                $message->header->responseCode,
+                questions: $message->questions,
+                answers: [],
+                authority: [],
+                additional: [],
+                authoritative: $message->header->authoritative,
+                truncated: true,
+                recursionAvailable: $message->header->recursionAvailable
+            );
+
+            return $truncatedMessage->encode();
+        } catch (\Throwable $e) {
+            return $encodedResponse;
+        }
     }
 }
