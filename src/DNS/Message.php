@@ -183,7 +183,7 @@ final class Message
         return new self($header, $questions, $answers, $authority, $additional);
     }
 
-    public function encode(): string
+    public function encode(?int $maxSize = null): string
     {
         $packet = $this->header->encode();
 
@@ -201,6 +201,23 @@ final class Message
 
         foreach ($this->additional as $additional) {
             $packet .= $additional->encode($packet);
+        }
+
+        // Apply truncation if size limit is set and exceeded
+        if ($maxSize !== null && strlen($packet) > $maxSize) {
+            $truncated = self::response(
+                $this->header,
+                $this->header->responseCode,
+                questions: $this->questions,
+                answers: [],
+                authority: [],
+                additional: [],
+                authoritative: $this->header->authoritative,
+                truncated: true,
+                recursionAvailable: $this->header->recursionAvailable
+            );
+
+            return $truncated->encode();
         }
 
         return $packet;

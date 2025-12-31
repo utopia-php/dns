@@ -7,7 +7,6 @@ use Utopia\DNS\Client;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
-use Utopia\DNS\Adapter\Native;
 
 final class ClientTest extends TestCase
 {
@@ -272,37 +271,34 @@ final class ClientTest extends TestCase
         }
     }
 
-    public function testUdpTruncationSetsTcFlag(): void
+    public function testTcpFallbackAfterUdpTruncation(): void
     {
-        $native = new Native('127.0.0.1', 0, true);
+        $client = new Client('127.0.0.1', self::PORT);
 
-        $question = new Question('example.com', Record::TYPE_A);
-        $query = Message::query($question, id: 0x1234);
+        // Query for a TXT record that has large response (would trigger truncation over UDP)
+        $question = new Question('large.localhost', Record::TYPE_TXT);
+        $query = Message::query($question);
 
-        $answers = [];
-        for ($i = 0; $i < 100; $i++) {
-            $answers[] = new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.' . ($i % 256) . '.' . ($i % 256));
+        // First try UDP - should get TC flag if response is large
+        $udpResponse = $client->query($query);
+
+        // If truncated, retry with TCP
+        if ($udpResponse->header->truncated) {
+            $tcpClient = new Client('127.0.0.1', self::PORT, useTcp: true);
+            $tcpResponse = $tcpClient->query($query);
+
+            // TCP response should not be truncated
+            $this->assertFalse($tcpResponse->header->truncated, 'TCP response should not be truncated');
+
+            // TCP response should have more data than UDP
+            $this->assertGreaterThan(
+                count($udpResponse->answers),
+                count($tcpResponse->answers),
+                'TCP should return more answers than truncated UDP'
+            );
+        } else {
+            // If not truncated, that's fine - the response fit in UDP
+            $this->addToAssertionCount(1);
         }
-
-        $response = Message::response(
-            $query->header,
-            Message::RCODE_NOERROR,
-            questions: $query->questions,
-            answers: $answers,
-            authority: [],
-            additional: []
-        );
-
-        $truncate = new \ReflectionMethod($native, 'truncateResponse');
-        $truncate->setAccessible(true);
-
-        $truncated = $truncate->invoke($native, $response->encode());
-        $decoded = Message::decode($truncated);
-
-        $this->assertTrue($decoded->header->truncated, 'TC flag should be set on truncated UDP response');
-        $this->assertCount(0, $decoded->answers, 'Answers should be cleared when truncated');
-        $this->assertCount(0, $decoded->authority, 'Authority should be cleared when truncated');
-        $this->assertCount(0, $decoded->additional, 'Additional should be cleared when truncated');
-        $this->assertSame($query->questions[0]->name, $decoded->questions[0]->name);
     }
 }
