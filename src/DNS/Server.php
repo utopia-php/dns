@@ -159,10 +159,11 @@ class Server
      * @param string $buffer
      * @param string $ip
      * @param int $port
+     * @param int|null $maxResponseSize
      *
      * @return string
      */
-    protected function onPacket(string $buffer, string $ip, int $port): string
+    protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
         $span = Span::init('dns.packet');
         $span->set('client.ip', $ip);
@@ -183,7 +184,7 @@ class Server
                     Message::RCODE_FORMERR,
                     authoritative: false
                 );
-                return $response->encode();
+                return $response->encode($maxResponseSize);
             } catch (Throwable $e) {
                 $span->setError($e);
                 $this->handleError($e);
@@ -193,6 +194,17 @@ class Server
             $this->duration?->record($decodeDuration, ['phase' => 'decode']);
             $span->set('dns.duration.decode', $decodeDuration);
 
+            // RFC 1035: Only OPCODE 0 (QUERY) is supported
+            // Return NOTIMP for other opcodes (IQUERY=1 is obsolete, STATUS=2, others reserved)
+            if ($query->header->opcode !== 0) {
+                $response = Message::response(
+                    $query->header,
+                    Message::RCODE_NOTIMP,
+                    authoritative: false
+                );
+                return $response->encode($maxResponseSize);
+            }
+
             $question = $query->questions[0] ?? null;
             if ($question === null) {
                 $response = Message::response(
@@ -200,7 +212,7 @@ class Server
                     Message::RCODE_FORMERR,
                     authoritative: false
                 );
-                return $response->encode();
+                return $response->encode($maxResponseSize);
             }
 
             $span->set('dns.question.name', $question->name);
@@ -235,7 +247,7 @@ class Server
             // 3. Encode response
             $encodeStart = microtime(true);
             try {
-                return $response->encode();
+                return $response->encode($maxResponseSize);
             } catch (Throwable $e) {
                 $span->setError($e);
                 $this->handleError($e);
@@ -246,7 +258,7 @@ class Server
                     questions: $query->questions,
                     authoritative: false
                 );
-                return $response->encode();
+                return $response->encode($maxResponseSize);
             } finally {
                 $encodeDuration = microtime(true) - $encodeStart;
                 $this->duration?->record($encodeDuration, [
@@ -274,7 +286,6 @@ class Server
     public function start(): void
     {
         try {
-            /** @phpstan-var \Closure(string $buffer, string $ip, int $port):string $onPacket */
             $onPacket = $this->onPacket(...);
             $this->adapter->onPacket($onPacket);
             $this->adapter->start();

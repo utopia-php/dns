@@ -290,4 +290,74 @@ final class MessageTest extends TestCase
         $this->assertSame(900, $soa->ttl);
         $this->assertSame('ns1.example.com hostmaster.example.com 1 3600 900 604800 300', $soa->rdata);
     }
+
+    public function testEncodeTruncatesWhenExceedingMaxSize(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x1234);
+
+        // Create a response with many answers that will exceed 512 bytes
+        $answers = [];
+        for ($i = 0; $i < 100; $i++) {
+            $answers[] = new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.' . ($i % 256) . '.' . ($i % 256));
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: []
+        );
+
+        // Encode with 512-byte limit (UDP max per RFC 1035)
+        $truncated = $response->encode(512);
+        $decoded = Message::decode($truncated);
+
+        // Verify TC flag is set
+        $this->assertTrue($decoded->header->truncated, 'TC flag should be set on truncated response');
+
+        // Verify sections are cleared when truncated
+        $this->assertCount(0, $decoded->answers, 'Answers should be cleared when truncated');
+        $this->assertCount(0, $decoded->authority, 'Authority should be cleared when truncated');
+        $this->assertCount(0, $decoded->additional, 'Additional should be cleared when truncated');
+
+        // Verify question is preserved
+        $this->assertCount(1, $decoded->questions);
+        $this->assertSame($query->questions[0]->name, $decoded->questions[0]->name);
+
+        // Verify truncated packet is within size limit
+        $this->assertLessThanOrEqual(512, strlen($truncated));
+    }
+
+    public function testEncodeWithoutMaxSizeDoesNotTruncate(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x1234);
+
+        $answers = [];
+        for ($i = 0; $i < 5; $i++) {
+            $answers[] = new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.' . $i);
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: []
+        );
+
+        // Encode without size limit
+        $encoded = $response->encode();
+        $decoded = Message::decode($encoded);
+
+        // Verify TC flag is NOT set
+        $this->assertFalse($decoded->header->truncated, 'TC flag should not be set on non-truncated response');
+
+        // Verify all answers are preserved
+        $this->assertCount(5, $decoded->answers);
+    }
 }
