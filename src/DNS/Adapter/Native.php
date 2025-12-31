@@ -24,29 +24,14 @@ class Native extends Adapter
     /** @var list<callable(int $workerId): void> */
     protected array $onWorkerStart = [];
 
-    protected string $host;
-    protected int $port;
-
-    protected bool $enableTcp;
-
-    protected int $maxTcpClients;
-
-    protected int $maxTcpBufferSize = 16384;
-
-    protected int $maxTcpFrameSize = 8192;
-
-    /**
-     * @param string $host
-     * @param int $port
-     * @param bool $enableTcp
-     * @param int $maxTcpClients
-     */
-    public function __construct(string $host = '0.0.0.0', int $port = 8053, bool $enableTcp = true, int $maxTcpClients = 100)
-    {
-        $this->host = $host;
-        $this->port = $port;
-        $this->enableTcp = $enableTcp;
-        $this->maxTcpClients = $maxTcpClients;
+    public function __construct(
+        protected string $host = '0.0.0.0',
+        protected int $port = 8053,
+        protected bool $enableTcp = true,
+        protected int $maxTcpClients = 100,
+        protected int $maxTcpBufferSize = 16384,
+        protected int $maxTcpFrameSize = 8192
+    ) {
 
         $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$server) {
