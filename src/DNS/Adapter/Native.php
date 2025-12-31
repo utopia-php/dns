@@ -31,6 +31,10 @@ class Native extends Adapter
 
     protected int $maxTcpClients;
 
+    protected int $maxTcpBufferSize = 16384;
+
+    protected int $maxTcpFrameSize = 8192;
+
     /**
      * @param string $host
      * @param int $port
@@ -207,13 +211,23 @@ class Native extends Adapter
             return;
         }
 
+        $currentBufferSize = strlen($this->tcpBuffers[$clientId] ?? '');
+        $chunkSize = strlen($chunk);
+
+        if ($currentBufferSize + $chunkSize > $this->maxTcpBufferSize) {
+            printf("TCP buffer size limit exceeded for client %d\n", $clientId);
+            $this->closeTcpClient($client);
+            return;
+        }
+
         $this->tcpBuffers[$clientId] = ($this->tcpBuffers[$clientId] ?? '') . $chunk;
 
         while (strlen($this->tcpBuffers[$clientId]) >= 2) {
             $length = unpack('nlen', substr($this->tcpBuffers[$clientId], 0, 2));
             $payloadLength = $length['len'] ?? 0;
 
-            if ($payloadLength === 0) {
+            if ($payloadLength === 0 || $payloadLength > $this->maxTcpFrameSize) {
+                printf("Invalid TCP frame size %d for client %d\n", $payloadLength, $clientId);
                 $this->closeTcpClient($client);
                 return;
             }
