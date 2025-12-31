@@ -204,9 +204,8 @@ class Native extends Adapter
         $this->tcpBuffers[$clientId] = ($this->tcpBuffers[$clientId] ?? '') . $chunk;
 
         while (strlen($this->tcpBuffers[$clientId]) >= 2) {
-            $length = unpack('nlen', substr($this->tcpBuffers[$clientId], 0, 2));
             $unpacked = unpack('n', substr($this->tcpBuffers[$clientId], 0, 2));
-            $payloadLength = is_array($unpacked) ? ($unpacked[1] ?? 0) : 0;
+            $payloadLength = (is_array($unpacked) && array_key_exists(1, $unpacked) && is_int($unpacked[1])) ? $unpacked[1] : 0;
 
             if ($payloadLength > $this->maxTcpFrameSize) {
                 printf("Invalid TCP frame size %d for client %d\n", $payloadLength, $clientId);

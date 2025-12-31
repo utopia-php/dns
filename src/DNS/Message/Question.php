@@ -29,14 +29,14 @@ final readonly class Question
         }
 
         $typeData = unpack('ntype', substr($data, $offset, 2));
-        if (!is_array($typeData) || !array_key_exists('type', $typeData)) {
+        if (!is_array($typeData) || !array_key_exists('type', $typeData) || !is_int($typeData['type'])) {
             throw new DecodingException('Failed to unpack question type');
         }
         $type = $typeData['type'];
         $offset += 2;
 
         $classData = unpack('nclass', substr($data, $offset, 2));
-        if (!is_array($classData) || !array_key_exists('class', $classData)) {
+        if (!is_array($classData) || !array_key_exists('class', $classData) || !is_int($classData['class'])) {
             throw new DecodingException('Failed to unpack question class');
         }
         $class = $classData['class'];
