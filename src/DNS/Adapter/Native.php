@@ -148,6 +148,11 @@ class Native extends Adapter
                     $client = @socket_accept($this->tcpServer);
 
                     if ($client instanceof Socket) {
+                        if (@socket_set_nonblock($client) === false) {
+                            @socket_close($client);
+                            continue;
+                        }
+
                         socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
                         socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 5, 'usec' => 0]);
                         socket_set_option($client, SOL_SOCKET, SO_SNDTIMEO, ['sec' => 5, 'usec' => 0]);
