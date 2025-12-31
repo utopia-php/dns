@@ -6,7 +6,6 @@ use Swoole\Runtime;
 use Utopia\DNS\Adapter;
 use Swoole\Server;
 use Swoole\Server\Port;
-use Utopia\DNS\Message;
 
 class Swoole extends Adapter
 {
@@ -14,15 +13,13 @@ class Swoole extends Adapter
 
     protected ?Port $tcpPort = null;
 
-    /** @var callable(string $buffer, string $ip, int $port): string */
+    /** @var callable(string $buffer, string $ip, int $port, ?int $maxResponseSize): string */
     protected mixed $onPacket;
 
     protected string $host;
     protected int $port;
 
     protected bool $enableTcp;
-
-    protected int $maxUdpSize = 512;
 
     public function __construct(string $host = '0.0.0.0', int $port = 53, bool $enableTcp = true)
     {
@@ -58,44 +55,31 @@ class Swoole extends Adapter
 
     /**
      * @param callable $callback
-     * @phpstan-param callable(string $buffer, string $ip, int $port):string $callback
+     * @phpstan-param callable(string $buffer, string $ip, int $port, ?int $maxResponseSize):string $callback
      */
     public function onPacket(callable $callback): void
     {
         $this->onPacket = $callback;
 
+        // UDP handler - enforces 512-byte limit per RFC 1035
         $this->server->on('Packet', function ($server, $data, $clientInfo) {
-            $ip = $clientInfo['address'] ?? '';
-            $port = (int) ($clientInfo['port'] ?? 0);
-            $answer = \call_user_func($this->onPacket, $data, $ip, $port);
+            $response = \call_user_func($this->onPacket, $data, $clientInfo['address'] ?? '', (int) ($clientInfo['port'] ?? 0), 512);
 
-            // Swoole UDP sockets reject zero-length payloads; skip responding instead.
-            if ($answer === '') {
-                return;
+            if ($response !== '') {
+                $server->sendto($clientInfo['address'], $clientInfo['port'], $response);
             }
-
-            if (strlen($answer) > $this->maxUdpSize) {
-                $answer = $this->truncateResponse($answer);
-            }
-
-            $server->sendto($ip, $port, $answer);
         });
 
+        // TCP handler - supports larger responses with length-prefixed framing per RFC 5966
         if ($this->tcpPort instanceof Port) {
             $this->tcpPort->on('Receive', function (Server $server, int $fd, int $reactorId, string $data) {
                 $info = $server->getClientInfo($fd, $reactorId) ?: [];
-                $ip = $info['remote_ip'] ?? '';
-                $port = $info['remote_port'] ?? 0;
-
                 $payload = substr($data, 2); // strip 2-byte length prefix
-                $answer = \call_user_func($this->onPacket, $payload, $ip, $port);
+                $response = \call_user_func($this->onPacket, $payload, $info['remote_ip'] ?? '', $info['remote_port'] ?? 0, null);
 
-                if ($answer === '') {
-                    return;
+                if ($response !== '') {
+                    $server->send($fd, pack('n', strlen($response)) . $response);
                 }
-
-                $frame = pack('n', strlen($answer)) . $answer;
-                $server->send($fd, $frame);
             });
         }
     }
@@ -117,28 +101,5 @@ class Swoole extends Adapter
     public function getName(): string
     {
         return 'swoole';
-    }
-
-    protected function truncateResponse(string $encodedResponse): string
-    {
-        try {
-            $message = Message::decode($encodedResponse);
-
-            $truncatedMessage = Message::response(
-                $message->header,
-                $message->header->responseCode,
-                questions: $message->questions,
-                answers: [],
-                authority: [],
-                additional: [],
-                authoritative: $message->header->authoritative,
-                truncated: true,
-                recursionAvailable: $message->header->recursionAvailable
-            );
-
-            return $truncatedMessage->encode();
-        } catch (\Throwable $e) {
-            return $encodedResponse;
-        }
     }
 }

@@ -165,10 +165,11 @@ class Server
      * @param string $buffer
      * @param string $ip
      * @param int $port
+     * @param int|null $maxResponseSize
      *
      * @return string
      */
-    protected function onPacket(string $buffer, string $ip, int $port): string
+    protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
         $startTime = microtime(true);
         Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from $ip:$port");
@@ -252,7 +253,7 @@ class Server
         // 3. Encode response
         $encodeStart = microtime(true);
         try {
-            return $response->encode();
+            return $response->encode($maxResponseSize);
         } catch (Throwable $e) {
             Console::error("[ERROR] Failed to encode message: " . $e->getMessage());
             Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
@@ -297,7 +298,6 @@ class Server
 
             Console::success('[DNS] Server is ready to accept connections');
 
-            /** @phpstan-var \Closure(string $buffer, string $ip, int $port):string $onPacket */
             $onPacket = $this->onPacket(...);
             $this->adapter->onPacket($onPacket);
             $this->adapter->start();
