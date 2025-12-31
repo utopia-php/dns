@@ -5,6 +5,7 @@ namespace Utopia\DNS\Adapter;
 use Exception;
 use Socket;
 use Utopia\DNS\Adapter;
+use Utopia\DNS\Message;
 
 class Native extends Adapter
 {
@@ -34,6 +35,8 @@ class Native extends Adapter
     protected int $maxTcpBufferSize = 16384;
 
     protected int $maxTcpFrameSize = 8192;
+
+    protected int $maxUdpSize = 512;
 
     /**
      * @param string $host
@@ -143,6 +146,10 @@ class Native extends Adapter
 
                         if ($answer === '') {
                             continue;
+                        }
+
+                        if (strlen($answer) > $this->maxUdpSize) {
+                            $answer = $this->truncateResponse($answer);
                         }
 
                         if (socket_sendto($this->udpServer, $answer, strlen($answer), 0, $ip, $port) === false) {
@@ -286,5 +293,28 @@ class Native extends Adapter
         unset($this->tcpClients[$id], $this->tcpBuffers[$id]);
 
         @socket_close($client);
+    }
+
+    protected function truncateResponse(string $encodedResponse): string
+    {
+        try {
+            $message = Message::decode($encodedResponse);
+
+            $truncatedMessage = Message::response(
+                $message->header,
+                $message->header->responseCode,
+                questions: $message->questions,
+                answers: [],
+                authority: [],
+                additional: [],
+                authoritative: $message->header->authoritative,
+                truncated: true,
+                recursionAvailable: $message->header->recursionAvailable
+            );
+
+            return $truncatedMessage->encode();
+        } catch (\Throwable $e) {
+            return $encodedResponse;
+        }
     }
 }
