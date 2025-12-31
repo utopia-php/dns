@@ -279,7 +279,7 @@ final class ClientTest extends TestCase
         $question = new Question('example.com', Record::TYPE_TXT);
         $query = Message::query($question, id: 0x1234);
 
-        $answer = new Record('example.com', Record::TYPE_TXT, str_repeat('a', 600), Record::CLASS_IN, 60);
+        $answer = new Record('example.com', Record::TYPE_TXT, Record::CLASS_IN, 60, str_repeat('a', 600));
         $response = Message::response(
             $query->header,
             Message::RCODE_NOERROR,
