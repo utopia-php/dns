@@ -73,6 +73,7 @@ class Swoole extends Adapter
     {
         $this->onPacket = $callback;
 
+<<<<<<< HEAD
         // UDP handler - enforces 512-byte limit per RFC 1035
         $this->server->on('Packet', function ($server, $data, $clientInfo) {
             if (!is_string($data) || !is_array($clientInfo)) {
@@ -106,6 +107,36 @@ class Swoole extends Adapter
                 if ($response !== '') {
                     $server->send($fd, pack('n', strlen($response)) . $response);
                 }
+=======
+        $this->server->on('Packet', function ($server, $data, $clientInfo) {
+            $ip = $clientInfo['address'] ?? '';
+            $port = (int) ($clientInfo['port'] ?? 0);
+            $answer = \call_user_func($this->onPacket, $data, $ip, $port);
+
+            // Swoole UDP sockets reject zero-length payloads; skip responding instead.
+            if ($answer === '') {
+                return;
+            }
+
+            $server->sendto($ip, $port, $answer);
+        });
+
+        if ($this->tcpPort instanceof Port) {
+            $this->tcpPort->on('Receive', function (Server $server, int $fd, int $reactorId, string $data) {
+                $info = $server->getClientInfo($fd, $reactorId) ?: [];
+                $ip = $info['remote_ip'] ?? '';
+                $port = $info['remote_port'] ?? 0;
+
+                $payload = substr($data, 2); // strip 2-byte length prefix
+                $answer = \call_user_func($this->onPacket, $payload, $ip, $port);
+
+                if ($answer === '') {
+                    return;
+                }
+
+                $frame = pack('n', strlen($answer)) . $answer;
+                $server->send($fd, $frame);
+>>>>>>> 0508f2b (make tcp secondary in swoole adapter)
             });
         }
     }
