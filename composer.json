@@ -20,9 +20,15 @@
     "autoload": {
         "psr-4": {"Utopia\\DNS\\": "src/DNS"}
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/utopia-php/span"
+        }
+    ],
     "require": {
         "php": ">=8.3",
-        "utopia-php/console": "0.0.*",
+        "utopia-php/span": "dev-main",
         "utopia-php/telemetry": "*",
         "utopia-php/validators": "0.*",
         "utopia-php/domains": "0.9.*"

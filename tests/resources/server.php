@@ -2,16 +2,21 @@
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-use Utopia\Console;
 use Utopia\DNS\Server;
 use Utopia\DNS\Adapter\Swoole;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver\Memory;
 use Utopia\DNS\Zone;
+use Utopia\Span\Span;
+use Utopia\Span\Storage;
+use Utopia\Span\Exporter;
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) {
     return;
 }
+
+Span::setStorage(new Storage\Coroutine());
+Span::addExporter(new Exporter\Stdout());
 
 $port = (int) (getenv('PORT') ?: 5300);
 $server = new Swoole('0.0.0.0', $port);
@@ -55,7 +60,10 @@ $dns = new Server($server, new Memory($zone));
 $dns->setDebug(false);
 
 $dns->onWorkerStart(function (Server $server, int $workerId) {
-    Console::log("Worker $workerId started");
+    $span = Span::init();
+    $span->set('action', 'dns.worker.start');
+    $span->set('worker.id', $workerId);
+    $span->finish();
 });
 
 $dns->start();

@@ -3,8 +3,8 @@
 namespace Utopia\DNS;
 
 use Throwable;
-use Utopia\Console;
 use Utopia\DNS\Exception\Message\PartialDecodingException;
+use Utopia\Span\Span;
 use Utopia\Telemetry\Adapter as Telemetry;
 use Utopia\Telemetry\Adapter\None as NoTelemetry;
 use Utopia\Telemetry\Counter;
@@ -148,12 +148,6 @@ class Server
      */
     protected function handleError(Throwable $error): void
     {
-        if (empty($this->errors)) {
-            // Default error handler
-            Console::error('[ERROR] ' . $error->getMessage() . ' in ' . $error->getFile() . ' on line ' . $error->getLine() . "\n" . $error->getTraceAsString());
-            return;
-        }
-
         foreach ($this->errors as $handler) {
             call_user_func($handler, $error);
         }
@@ -170,133 +164,116 @@ class Server
      */
     protected function onPacket(string $buffer, string $ip, int $port): string
     {
-        $startTime = microtime(true);
-        Console::info("[PACKET] Received packet of " . strlen($buffer) . " bytes from $ip:$port");
+        $span = Span::init();
+        $span->set('client.ip', $ip);
 
-        // 1. Parse Message.
-        $decodeStart = microtime(true);
+        $question = null;
+        $response = null;
+
         try {
-            $query = Message::decode($buffer);
-        } catch (PartialDecodingException $e) {
-            Console::error("[ERROR] Failed to decode packet: " . $e->getMessage());
-            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-            Console::error("[ERROR] Processing time: " . (microtime(true) - $startTime) . "s");
+            // 1. Parse Message.
+            $decodeStart = microtime(true);
+            try {
+                $query = Message::decode($buffer);
+            } catch (PartialDecodingException $e) {
+                $this->handleError($e);
 
-            $this->handleError($e);
+                $response = Message::response(
+                    $e->getHeader(),
+                    Message::RCODE_FORMERR,
+                    authoritative: false
+                );
+                return $response->encode();
+            } catch (Throwable $e) {
+                $span->setError($e);
+                $this->handleError($e);
+                return '';
+            }
+            $decodeDuration = microtime(true) - $decodeStart;
+            $this->duration?->record($decodeDuration, ['phase' => 'decode']);
+            $span->set('dns.duration.decode', $decodeDuration);
 
-            $response = Message::response(
-                $e->getHeader(),
-                Message::RCODE_FORMERR,
-                authoritative: false
-            );
-            return $response->encode();
-        } catch (Throwable $e) {
-            Console::error("[ERROR] Failed to decode packet: " . $e->getMessage());
-            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-            Console::error("[ERROR] Processing time: " . (microtime(true) - $startTime) . "s");
+            $question = $query->questions[0] ?? null;
+            if ($question === null) {
+                $response = Message::response(
+                    $query->header,
+                    Message::RCODE_FORMERR,
+                    authoritative: false
+                );
+                return $response->encode();
+            }
 
-            $this->handleError($e);
+            $span->set('dns.question.name', $question->name);
+            $span->set('dns.question.type', $question->type);
 
-            // Returning SERVFAIL is unsafe here - just drop the packet
-            return '';
-        }
-
-        $question = $query->questions[0] ?? null;
-        if ($question === null) {
-            $response = Message::response(
-                $query->header,
-                Message::RCODE_FORMERR,
-                authoritative: false
-            );
-            return $response->encode();
-        }
-
-        $this->queriesTotal?->add(1, [
-            'type' => $question->type ?? null,
-        ]);
-        $this->duration?->record(microtime(true) - $decodeStart, ['phase' => 'decode']);
-
-        // 2. Resolve query
-        $resolveStart = microtime(true);
-        try {
-            $response = $this->resolver->resolve($query);
-        } catch (Throwable $e) {
-            Console::error("[ERROR] Failed to resolve zone $question->name (Type: $question->type): " . $e->getMessage());
-            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-
-            $this->handleError($e);
-
-            $this->duration?->record(microtime(true) - $resolveStart, [
-                'phase' => 'resolve',
-                'responseCode' => Message::RCODE_SERVFAIL,
-            ]);
-
-            $response = Message::response(
-                $query->header,
-                Message::RCODE_SERVFAIL,
-                questions: $query->questions,
-                authoritative: false
-            );
-        }
-
-        Console::info("[PACKET] DNS Header - ID: {$query->header->id}, Questions: {$query->header->questionCount}, Answers: {$query->header->answerCount}");
-
-        if ($this->debug) {
-            Console::info("[QUERY] Query for domain: $question->name (Type: $question->type)");
-        }
-
-        if (empty($response->answers)) {
-            Console::warning("[RESPONSE] No answers found for $question->name ($question->type)");
-        }
-
-        // 3. Encode response
-        $encodeStart = microtime(true);
-        try {
-            return $response->encode();
-        } catch (Throwable $e) {
-            Console::error("[ERROR] Failed to encode message: " . $e->getMessage());
-            Console::error("[ERROR] Packet dump: " . bin2hex($buffer));
-
-            $this->handleError($e);
-
-            $response = Message::response(
-                $query->header,
-                Message::RCODE_SERVFAIL,
-                questions: $query->questions,
-                authoritative: false
-            );
-            return $response->encode();
-        } finally {
-            $this->responsesTotal?->add(1, [
+            $this->queriesTotal?->add(1, [
                 'type' => $question->type ?? null,
-                'responseCode' => $response->header->responseCode
-            ]);
-            $this->duration?->record(microtime(true) - $encodeStart, [
-                'phase' => 'encode',
-                'responseCode' => $response->header->responseCode
             ]);
 
-            $fullDuration = microtime(true) - $startTime;
-            Console::info("[PACKET] Processing completed in $fullDuration\s");
-            $this->duration?->record($fullDuration, ['phase' => 'full']);
+            // 2. Resolve query
+            $resolveStart = microtime(true);
+            try {
+                $response = $this->resolver->resolve($query);
+            } catch (Throwable $e) {
+                $span->setError($e);
+                $this->handleError($e);
+
+                $response = Message::response(
+                    $query->header,
+                    Message::RCODE_SERVFAIL,
+                    questions: $query->questions,
+                    authoritative: false
+                );
+            }
+            $resolveDuration = microtime(true) - $resolveStart;
+            $this->duration?->record($resolveDuration, [
+                'phase' => 'resolve',
+                'responseCode' => $response->header->responseCode,
+            ]);
+            $span->set('dns.duration.resolve', $resolveDuration);
+
+            // 3. Encode response
+            $encodeStart = microtime(true);
+            try {
+                return $response->encode();
+            } catch (Throwable $e) {
+                $span->setError($e);
+                $this->handleError($e);
+
+                $response = Message::response(
+                    $query->header,
+                    Message::RCODE_SERVFAIL,
+                    questions: $query->questions,
+                    authoritative: false
+                );
+                return $response->encode();
+            } finally {
+                $encodeDuration = microtime(true) - $encodeStart;
+                $this->duration?->record($encodeDuration, [
+                    'phase' => 'encode',
+                    'responseCode' => $response->header->responseCode
+                ]);
+                $span->set('dns.duration.encode', $encodeDuration);
+            }
+        } finally {
+            if ($question !== null) {
+                $this->responsesTotal?->add(1, [
+                    'type' => $question->type ?? null,
+                    'responseCode' => $response?->header->responseCode
+                ]);
+            }
+
+            if ($response !== null) {
+                $span->set('dns.response.code', $response->header->responseCode);
+                $span->set('dns.response.answer_count', $response->header->answerCount);
+            }
+            $span->finish();
         }
     }
 
     public function start(): void
     {
         try {
-            Console::success('[DNS] Starting DNS Server...');
-            Console::info('[CONFIG] Adapter: ' . $this->adapter->getName());
-            Console::info('[CONFIG] Resolver: ' . $this->resolver->getName());
-            Console::info('[CONFIG] Memory Limit: ' . ini_get('memory_limit'));
-            Console::info('[CONFIG] Max Execution Time: ' . ini_get('max_execution_time') . 's');
-            Console::info('[CONFIG] PHP Version: ' . PHP_VERSION);
-            Console::info('[CONFIG] OS: ' . PHP_OS);
-            Console::info('[CONFIG] Time: ' . date('Y-m-d H:i:s T'));
-            Console::info('[CONFIG] Debug Mode: ' . ($this->debug ? 'Enabled' : 'Disabled'));
-
-            Console::success('[DNS] Server is ready to accept connections');
-
             /** @phpstan-var \Closure(string $buffer, string $ip, int $port):string $onPacket */
             $onPacket = $this->onPacket(...);
             $this->adapter->onPacket($onPacket);
