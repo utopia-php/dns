@@ -15,12 +15,20 @@ class Swoole extends Adapter
 
     protected string $host;
     protected int $port;
+    protected int $numWorkers;
+    protected int $maxCoroutines;
 
-    public function __construct(string $host = '0.0.0.0', int $port = 53)
+    public function __construct(string $host = '0.0.0.0', int $port = 53, int $numWorkers = 1, int $maxCoroutines = 3000)
     {
         $this->host = $host;
         $this->port = $port;
+        $this->numWorkers = $numWorkers;
+        $this->maxCoroutines = $maxCoroutines;
         $this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
+        $this->server->set([
+            'worker_num' => $this->numWorkers,
+            'max_coroutine' => $this->maxCoroutines,
+        ]);
     }
 
     /**
