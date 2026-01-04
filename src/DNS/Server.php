@@ -164,7 +164,7 @@ class Server
      */
     protected function onPacket(string $buffer, string $ip, int $port): string
     {
-        $span = Span::init();
+        $span = Span::init('dns.packet');
         $span->set('client.ip', $ip);
 
         $question = null;

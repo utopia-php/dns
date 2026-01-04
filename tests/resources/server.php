@@ -60,8 +60,7 @@ $dns = new Server($server, new Memory($zone));
 $dns->setDebug(false);
 
 $dns->onWorkerStart(function (Server $server, int $workerId) {
-    $span = Span::init();
-    $span->set('action', 'dns.worker.start');
+    $span = Span::init('dns.worker.start');
     $span->set('worker.id', $workerId);
     $span->finish();
 });

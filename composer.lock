@@ -2039,12 +2039,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/span.git",
-                "reference": "3af4ad7dc38a1da2e5fb4e47f296684fb18f8aae"
+                "reference": "93fe5c9febd9be698c044c69f92d35b721ccfb29"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/span/zipball/3af4ad7dc38a1da2e5fb4e47f296684fb18f8aae",
-                "reference": "3af4ad7dc38a1da2e5fb4e47f296684fb18f8aae",
+                "url": "https://api.github.com/repos/utopia-php/span/zipball/93fe5c9febd9be698c044c69f92d35b721ccfb29",
+                "reference": "93fe5c9febd9be698c044c69f92d35b721ccfb29",
                 "shasum": ""
             },
             "require": {
@@ -2093,7 +2093,7 @@
                 "source": "https://github.com/utopia-php/span/tree/main",
                 "issues": "https://github.com/utopia-php/span/issues"
             },
-            "time": "2025-12-31T11:11:21+00:00"
+            "time": "2026-01-04T17:14:48+00:00"
         },
         {
             "name": "utopia-php/telemetry",
