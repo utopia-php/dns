@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "00e811b98c6e2e10a59e83d47dc8d976",
+    "content-hash": "c8b40c3f13a222d7bd4cab003430327c",
     "packages": [
         {
             "name": "brick/math",
@@ -2035,7 +2035,7 @@
         },
         {
             "name": "utopia-php/span",
-            "version": "dev-main",
+            "version": "1.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/span.git",
@@ -2059,7 +2059,6 @@
             "suggest": {
                 "ext-swoole": "Required for coroutine-based storage"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -2090,7 +2089,7 @@
             ],
             "description": "Simple span tracing library for PHP with coroutine support",
             "support": {
-                "source": "https://github.com/utopia-php/span/tree/main",
+                "source": "https://github.com/utopia-php/span/tree/1.0.0",
                 "issues": "https://github.com/utopia-php/span/issues"
             },
             "time": "2026-01-12T20:05:10+00:00"
@@ -4030,9 +4029,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "utopia-php/span": 20
-    },
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
