@@ -31,7 +31,7 @@
         "utopia-php/span": "dev-main",
         "utopia-php/telemetry": "*",
         "utopia-php/validators": "0.*",
-        "utopia-php/domains": "0.9.*"
+        "utopia-php/domains": "0.11.*"
     },
     "require-dev": {
         "swoole/ide-helper": "5.1.8",

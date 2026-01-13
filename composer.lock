@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5fb648213436c6830237905f57ff7f19",
+    "content-hash": "00e811b98c6e2e10a59e83d47dc8d976",
     "packages": [
         {
             "name": "brick/math",
@@ -145,16 +145,16 @@
         },
         {
             "name": "google/protobuf",
-            "version": "v4.33.2",
+            "version": "v4.33.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/protocolbuffers/protobuf-php.git",
-                "reference": "fbd96b7bf1343f4b0d8fb358526c7ba4d72f1318"
+                "reference": "22d28025cda0d223a2e48c2e16c5284ecc9f5402"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/fbd96b7bf1343f4b0d8fb358526c7ba4d72f1318",
-                "reference": "fbd96b7bf1343f4b0d8fb358526c7ba4d72f1318",
+                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/22d28025cda0d223a2e48c2e16c5284ecc9f5402",
+                "reference": "22d28025cda0d223a2e48c2e16c5284ecc9f5402",
                 "shasum": ""
             },
             "require": {
@@ -183,9 +183,9 @@
                 "proto"
             ],
             "support": {
-                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v4.33.2"
+                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v4.33.4"
             },
-            "time": "2025-12-05T22:12:22+00:00"
+            "time": "2026-01-12T17:58:43+00:00"
         },
         {
             "name": "nyholm/psr7",
@@ -1921,16 +1921,16 @@
         },
         {
             "name": "utopia-php/domains",
-            "version": "0.9.2",
+            "version": "0.11.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/domains.git",
-                "reference": "52b654f8a0e170bfa2e54cb47755b256822477c7"
+                "reference": "f333e23e721ca5cd3bd21063fa88304114b0467d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/domains/zipball/52b654f8a0e170bfa2e54cb47755b256822477c7",
-                "reference": "52b654f8a0e170bfa2e54cb47755b256822477c7",
+                "url": "https://api.github.com/repos/utopia-php/domains/zipball/f333e23e721ca5cd3bd21063fa88304114b0467d",
+                "reference": "f333e23e721ca5cd3bd21063fa88304114b0467d",
                 "shasum": ""
             },
             "require": {
@@ -1977,9 +1977,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/domains/issues",
-                "source": "https://github.com/utopia-php/domains/tree/0.9.2"
+                "source": "https://github.com/utopia-php/domains/tree/0.11.0"
             },
-            "time": "2025-11-26T12:16:36+00:00"
+            "time": "2026-01-13T09:40:08+00:00"
         },
         {
             "name": "utopia-php/pools",
@@ -2039,12 +2039,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/span.git",
-                "reference": "849d22e409fda7013f946f9eee901a112dd5f27b"
+                "reference": "f2f6c499ded3a776e8019902e83d140ff0f89693"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/span/zipball/849d22e409fda7013f946f9eee901a112dd5f27b",
-                "reference": "849d22e409fda7013f946f9eee901a112dd5f27b",
+                "url": "https://api.github.com/repos/utopia-php/span/zipball/f2f6c499ded3a776e8019902e83d140ff0f89693",
+                "reference": "f2f6c499ded3a776e8019902e83d140ff0f89693",
                 "shasum": ""
             },
             "require": {
@@ -2093,7 +2093,7 @@
                 "source": "https://github.com/utopia-php/span/tree/main",
                 "issues": "https://github.com/utopia-php/span/issues"
             },
-            "time": "2026-01-04T17:31:38+00:00"
+            "time": "2026-01-12T20:05:10+00:00"
         },
         {
             "name": "utopia-php/telemetry",
@@ -2152,16 +2152,16 @@
         },
         {
             "name": "utopia-php/validators",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/validators.git",
-                "reference": "5c57d5b6cf964f8981807c1d3ea8df620c869080"
+                "reference": "30b6030a5b100fc1dff34506e5053759594b2a20"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/validators/zipball/5c57d5b6cf964f8981807c1d3ea8df620c869080",
-                "reference": "5c57d5b6cf964f8981807c1d3ea8df620c869080",
+                "url": "https://api.github.com/repos/utopia-php/validators/zipball/30b6030a5b100fc1dff34506e5053759594b2a20",
+                "reference": "30b6030a5b100fc1dff34506e5053759594b2a20",
                 "shasum": ""
             },
             "require": {
@@ -2169,7 +2169,7 @@
             },
             "require-dev": {
                 "laravel/pint": "1.*",
-                "phpstan/phpstan": "1.*",
+                "phpstan/phpstan": "2.*",
                 "phpunit/phpunit": "11.*"
             },
             "type": "library",
@@ -2191,9 +2191,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/validators/issues",
-                "source": "https://github.com/utopia-php/validators/tree/0.1.0"
+                "source": "https://github.com/utopia-php/validators/tree/0.2.0"
             },
-            "time": "2025-11-18T11:05:46+00:00"
+            "time": "2026-01-13T09:16:51+00:00"
         }
     ],
     "packages-dev": [
@@ -4039,5 +4039,5 @@
         "php": ">=8.3"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.6.0"
 }
