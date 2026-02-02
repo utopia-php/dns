@@ -164,12 +164,12 @@ final readonly class Resolver
             );
 
             if (!empty($exactTypeRecords)) {
-                // E1: Return exact type match
+                // E1: Return exact type match (randomized for load balancing)
                 return Message::response(
                     header: $query->header,
                     responseCode: Message::RCODE_NOERROR,
                     questions: $query->questions,
-                    answers: array_values($exactTypeRecords),
+                    answers: self::randomizeRRSet(array_values($exactTypeRecords)),
                     authoritative: true,
                     recursionAvailable: false
                 );
@@ -216,6 +216,28 @@ final readonly class Resolver
     }
 
     /**
+     * Randomize RRSet order for load balancing.
+     *
+     * Per RFC 2181 Section 5, the order of resource records within an RRSet
+     * is not significant. By randomizing the order, we help distribute load
+     * across multiple servers (e.g., multiple A records for the same name).
+     *
+     * @param list<Record> $records
+     * @return list<Record>
+     */
+    private static function randomizeRRSet(array $records): array
+    {
+        if (count($records) <= 1) {
+            return $records;
+        }
+
+        // RFC 2181 Section 5: Order within RRSet is not significant
+        // Randomization helps load balance across multiple A/AAAA records
+        shuffle($records);
+        return $records;
+    }
+
+    /**
      * Check if a query name matches a wildcard record name
      *
      * @param string $queryName The query name (e.g., "sub.example.com")
@@ -255,7 +277,7 @@ final readonly class Resolver
         );
 
         if (!empty($exactTypeRecords)) {
-            // Synthesize records with the query name
+            // Synthesize records with the query name (randomized for load balancing)
             $synthesizedRecords = array_map(
                 fn ($r) => $r->withName($question->name),
                 $exactTypeRecords
@@ -265,7 +287,7 @@ final readonly class Resolver
                 header: $query->header,
                 responseCode: Message::RCODE_NOERROR,
                 questions: $query->questions,
-                answers: array_values($synthesizedRecords),
+                answers: self::randomizeRRSet(array_values($synthesizedRecords)),
                 authoritative: true,
                 recursionAvailable: false
             );

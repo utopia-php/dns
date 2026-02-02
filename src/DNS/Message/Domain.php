@@ -74,11 +74,15 @@ final readonly class Domain
     /**
      * Decode a domain name from DNS wire format, handling compression pointers.
      *
+     * Per RFC 1035 Section 4.1.4, compression pointers allow domain names to
+     * reference earlier occurrences in the packet. This implementation tracks
+     * visited pointer positions to prevent infinite loops from malicious packets.
+     *
      * @param string $data   Full DNS packet
      * @param int    $offset Current read offset (updated to first byte after the name)
      * @return string Decoded domain name in dotted form
      *
-     * @throws DecodingException when the packet is malformed.
+     * @throws DecodingException when the packet is malformed or contains pointer loops.
      */
     public static function decode(string $data, int &$offset): string
     {
@@ -86,12 +90,18 @@ final readonly class Domain
         $jumped = false;
         $pos = $offset;
         $dataLength = strlen($data);
-        $loopGuard = 0;
+
+        // Track visited pointer positions to detect loops (RFC 1035 compliance)
+        // This is more reliable than iteration counting as it catches actual cycles
+        $visitedPointers = [];
+
+        // Maximum labels per RFC 1035 (127 labels * 63 chars + separators = 255 max)
+        $labelCount = 0;
 
         while (true) {
-            if ($loopGuard++ > $dataLength) {
+            if ($labelCount > self::MAX_LABELS) {
                 throw new DecodingException(
-                    'Possible compression pointer loop while decoding domain name'
+                    'Domain name exceeds maximum label count'
                 );
             }
 
@@ -117,17 +127,42 @@ final readonly class Domain
                 }
 
                 $pointer = (($len & 0x3F) << 8) | ord($data[$pos + 1]);
+
+                // RFC 1035: Pointer must reference earlier in packet (forward refs invalid)
+                if ($pointer >= $pos) {
+                    throw new DecodingException(
+                        'Compression pointer must reference earlier position in packet'
+                    );
+                }
+
                 if ($pointer >= $dataLength) {
                     throw new DecodingException(
                         'Compression pointer out of bounds in domain name'
                     );
                 }
+
+                // Detect pointer loops by tracking visited positions
+                if (isset($visitedPointers[$pointer])) {
+                    throw new DecodingException(
+                        'Compression pointer loop detected in domain name'
+                    );
+                }
+                $visitedPointers[$pointer] = true;
+
                 if (!$jumped) {
                     $offset = $pos + 2;
                 }
                 $pos = $pointer;
                 $jumped = true;
                 continue;
+            }
+
+            // Check for reserved label type (RFC 1035: bits 6-7 indicate label type)
+            // 00 = standard label, 11 = compression pointer, 01/10 = reserved
+            if (($len & 0xC0) !== 0) {
+                throw new DecodingException(
+                    'Reserved label type encountered in domain name'
+                );
             }
 
             if ($pos + 1 + $len > $dataLength) {
@@ -137,6 +172,7 @@ final readonly class Domain
             }
 
             $labels[] = substr($data, $pos + 1, $len);
+            $labelCount++;
             $pos += $len + 1;
 
             if (!$jumped) {
