@@ -27,8 +27,10 @@ final class ClientTest extends TestCase
         $this->assertSame(Record::TYPE_A, $records[0]->type);
         $this->assertSame(Record::CLASS_IN, $records[0]->class);
         $this->assertSame(1800, $records[0]->ttl);
-        $this->assertSame('142.6.0.1', $records[0]->rdata);
-        $this->assertSame('142.6.0.2', $records[1]->rdata);
+        // RRSet order is randomized for load balancing per RFC 2181
+        $rdataValues = array_map(fn ($r) => $r->rdata, $records);
+        $this->assertContains('142.6.0.1', $rdataValues);
+        $this->assertContains('142.6.0.2', $rdataValues);
     }
 
     public function testARecords(): void
@@ -57,8 +59,10 @@ final class ClientTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $records[0]->class);
         $this->assertSame(1800, $records[0]->ttl);
         $this->assertSame(Record::TYPE_A, $records[0]->type);
-        $this->assertSame('142.6.0.1', $records[0]->rdata);
-        $this->assertSame('142.6.0.2', $records[1]->rdata);
+        // RRSet order is randomized for load balancing per RFC 2181
+        $rdataValues = array_map(fn ($r) => $r->rdata, $records);
+        $this->assertContains('142.6.0.1', $rdataValues);
+        $this->assertContains('142.6.0.2', $rdataValues);
 
         $response = $client->query(Message::query(
             new Question('dev3.appwrite.io', Record::TYPE_A)
@@ -87,8 +91,10 @@ final class ClientTest extends TestCase
         $records = $response->answers;
 
         $this->assertCount(2, $records);
-        $this->assertSame('2001:db8::ff00:0:1', $records[0]->rdata);
-        $this->assertSame('2001:db8::ff00:0:2', $records[1]->rdata);
+        // RRSet order is randomized for load balancing per RFC 2181
+        $rdataValues = array_map(fn ($r) => $r->rdata, $records);
+        $this->assertContains('2001:db8::ff00:0:1', $rdataValues);
+        $this->assertContains('2001:db8::ff00:0:2', $rdataValues);
 
         $response = $client->query(Message::query(
             new Question('dev3.appwrite.io', Record::TYPE_AAAA)
