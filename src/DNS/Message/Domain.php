@@ -99,12 +99,6 @@ final readonly class Domain
         $labelCount = 0;
 
         while (true) {
-            if ($labelCount > self::MAX_LABELS) {
-                throw new DecodingException(
-                    'Domain name exceeds maximum label count'
-                );
-            }
-
             if ($pos >= $dataLength) {
                 throw new DecodingException(
                     'Unexpected end of data while decoding domain name'
@@ -174,6 +168,12 @@ final readonly class Domain
             $labels[] = substr($data, $pos + 1, $len);
             $labelCount++;
             $pos += $len + 1;
+
+            if ($labelCount > self::MAX_LABELS) {
+                throw new DecodingException(
+                    'Domain name exceeds maximum label count'
+                );
+            }
 
             if (!$jumped) {
                 $offset = $pos;
