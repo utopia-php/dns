@@ -207,6 +207,14 @@ class Native extends Adapter
             $unpacked = unpack('n', substr($this->tcpBuffers[$clientId], 0, 2));
             $payloadLength = (is_array($unpacked) && array_key_exists(1, $unpacked) && is_int($unpacked[1])) ? $unpacked[1] : 0;
 
+            // Close connection for invalid zero-length payloads
+            if ($payloadLength === 0) {
+                $this->closeTcpClient($client);
+                return;
+            }
+
+            // DNS TCP messages have a 2-byte length prefix (max 65535), but we enforce
+            // a stricter limit to prevent memory exhaustion from malicious clients
             if ($payloadLength > $this->maxTcpFrameSize) {
                 printf("Invalid TCP frame size %d for client %d\n", $payloadLength, $clientId);
                 $this->closeTcpClient($client);
