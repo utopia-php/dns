@@ -8,6 +8,12 @@ use Utopia\DNS\Adapter;
 
 class Native extends Adapter
 {
+    /**
+     * Maximum DNS TCP message size per RFC 1035 Section 4.2.2
+     * TCP uses 2-byte length prefix, so max payload is 65535 bytes
+     */
+    public const int MAX_TCP_MESSAGE_SIZE = 65535;
+
     protected Socket $udpServer;
 
     protected ?Socket $tcpServer = null;
@@ -18,19 +24,32 @@ class Native extends Adapter
     /** @var array<int, string> */
     protected array $tcpBuffers = [];
 
+    /** @var array<int, int> Track last activity time per TCP client for idle timeout */
+    protected array $tcpLastActivity = [];
+
     /** @var callable(string $buffer, string $ip, int $port, ?int $maxResponseSize): string */
     protected mixed $onPacket;
 
     /** @var list<callable(int $workerId): void> */
     protected array $onWorkerStart = [];
 
+    /**
+     * @param string $host Host to bind to
+     * @param int $port Port to listen on
+     * @param bool $enableTcp Enable TCP support (RFC 5966)
+     * @param int $maxTcpClients Maximum concurrent TCP clients
+     * @param int $maxTcpBufferSize Maximum buffer size per TCP client
+     * @param int $maxTcpFrameSize Maximum DNS message size over TCP
+     * @param int $tcpIdleTimeout Seconds before idle TCP connections are closed (RFC 7766)
+     */
     public function __construct(
         protected string $host = '0.0.0.0',
         protected int $port = 8053,
         protected bool $enableTcp = true,
         protected int $maxTcpClients = 100,
         protected int $maxTcpBufferSize = 16384,
-        protected int $maxTcpFrameSize = 8192
+        protected int $maxTcpFrameSize = 65535,
+        protected int $tcpIdleTimeout = 30
     ) {
 
         $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
@@ -97,6 +116,9 @@ class Native extends Adapter
 
         /** @phpstan-ignore-next-line */
         while (1) {
+            // RFC 7766 Section 6.2.3: Close idle TCP connections
+            $this->closeIdleTcpClients();
+
             $readSockets = [$this->udpServer];
 
             if ($this->tcpServer) {
@@ -110,9 +132,10 @@ class Native extends Adapter
             $write = [];
             $except = [];
 
-            $changed = socket_select($readSockets, $write, $except, null);
+            // Use 1 second timeout for socket_select to periodically check idle connections
+            $changed = socket_select($readSockets, $write, $except, 1);
 
-            if ($changed === false) {
+            if ($changed === false || $changed === 0) {
                 continue;
             }
 
@@ -155,6 +178,7 @@ class Native extends Adapter
                         $id = spl_object_id($client);
                         $this->tcpClients[$id] = $client;
                         $this->tcpBuffers[$id] = '';
+                        $this->tcpLastActivity[$id] = time();
                     }
 
                     continue;
@@ -191,6 +215,9 @@ class Native extends Adapter
 
             return;
         }
+
+        // Update activity timestamp for idle timeout tracking
+        $this->tcpLastActivity[$clientId] = time();
 
         $currentBufferSize = strlen($this->tcpBuffers[$clientId] ?? '');
         $chunkSize = strlen($chunk);
@@ -242,9 +269,31 @@ class Native extends Adapter
         }
     }
 
+    /**
+     * Send a TCP DNS response with length prefix.
+     *
+     * Per RFC 1035 Section 4.2.2, TCP messages use a 2-byte length prefix.
+     * This limits maximum message size to 65535 bytes. Oversized responses
+     * are rejected to prevent silent data corruption from integer overflow.
+     */
     protected function sendTcpResponse(Socket $client, string $payload): void
     {
-        $frame = pack('n', strlen($payload)) . $payload;
+        $payloadLength = strlen($payload);
+
+        // RFC 1035: TCP uses 2-byte length prefix, max 65535 bytes
+        if ($payloadLength > self::MAX_TCP_MESSAGE_SIZE) {
+            // This should not happen if truncation is working correctly
+            // Log and close connection rather than send corrupted data
+            printf(
+                "TCP response too large (%d bytes > %d max), dropping\n",
+                $payloadLength,
+                self::MAX_TCP_MESSAGE_SIZE
+            );
+            $this->closeTcpClient($client);
+            return;
+        }
+
+        $frame = pack('n', $payloadLength) . $payload;
         $total = strlen($frame);
         $sent = 0;
 
@@ -268,11 +317,30 @@ class Native extends Adapter
         }
     }
 
+    /**
+     * Close idle TCP connections per RFC 7766 Section 6.2.3
+     *
+     * Servers should close idle connections to free resources.
+     * This prevents resource exhaustion from slow or abandoned clients.
+     */
+    protected function closeIdleTcpClients(): void
+    {
+        $now = time();
+
+        foreach ($this->tcpClients as $id => $client) {
+            $lastActivity = $this->tcpLastActivity[$id] ?? 0;
+
+            if (($now - $lastActivity) > $this->tcpIdleTimeout) {
+                $this->closeTcpClient($client);
+            }
+        }
+    }
+
     protected function closeTcpClient(Socket $client): void
     {
         $id = spl_object_id($client);
 
-        unset($this->tcpClients[$id], $this->tcpBuffers[$id]);
+        unset($this->tcpClients[$id], $this->tcpBuffers[$id], $this->tcpLastActivity[$id]);
 
         @socket_close($client);
     }
