@@ -260,7 +260,7 @@ class Native extends Adapter
             socket_getpeername($client, $ip, $port);
 
             if (is_string($ip) && is_int($port)) {
-                $answer = call_user_func($this->onPacket, $message, $ip, $port, null);
+                $answer = call_user_func($this->onPacket, $message, $ip, $port, self::MAX_TCP_MESSAGE_SIZE);
 
                 if ($answer !== '') {
                     $this->sendTcpResponse($client, $answer);
