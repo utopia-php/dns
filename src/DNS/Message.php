@@ -183,8 +183,21 @@ final class Message
         return new self($header, $questions, $answers, $authority, $additional);
     }
 
+    /**
+     * Encode the message to a binary DNS packet.
+     *
+     * When maxSize is specified, truncation follows RFC 1035 Section 6.2 and RFC 2181 Section 9:
+     * - Truncation starts at the end and works forward (additional → authority → answers)
+     * - TC flag is only set when required RRSets (answers) couldn't be fully included
+     * - Complete RRSets are preserved; partial RRSets are omitted entirely
+     * - Questions are always preserved
+     *
+     * @param int|null $maxSize Maximum packet size (e.g., 512 for UDP per RFC 1035)
+     * @return string The encoded DNS packet
+     */
     public function encode(?int $maxSize = null): string
     {
+        // Build full packet first
         $packet = $this->header->encode();
 
         foreach ($this->questions as $question) {
@@ -203,23 +216,101 @@ final class Message
             $packet .= $additional->encode($packet);
         }
 
-        // Apply truncation if size limit is set and exceeded
-        if ($maxSize !== null && strlen($packet) > $maxSize) {
-            $truncated = self::response(
-                $this->header,
-                $this->header->responseCode,
-                questions: $this->questions,
-                answers: [],
-                authority: [],
-                additional: [],
-                authoritative: $this->header->authoritative,
-                truncated: true,
-                recursionAvailable: $this->header->recursionAvailable
-            );
-
-            return $truncated->encode();
+        // No truncation needed
+        if ($maxSize === null || strlen($packet) <= $maxSize) {
+            return $packet;
         }
 
-        return $packet;
+        // RFC-compliant truncation: work backward from end
+        // Per RFC 1035 Section 6.2 and RFC 2181 Section 9
+        return $this->encodeWithTruncation($maxSize);
+    }
+
+    /**
+     * Encode with RFC-compliant truncation strategy.
+     *
+     * Truncation order per RFC 1035 Section 6.2:
+     * 1. Drop additional section first
+     * 2. If still too big, drop authority section
+     * 3. If still too big, include as many complete answer RRSets as fit, set TC
+     *
+     * TC flag is only set when answer section data is truncated (RFC 2181 Section 9).
+     */
+    private function encodeWithTruncation(int $maxSize): string
+    {
+        // Step 1: Try without additional section
+        $withoutAdditional = self::response(
+            $this->header,
+            $this->header->responseCode,
+            questions: $this->questions,
+            answers: $this->answers,
+            authority: $this->authority,
+            additional: [],
+            authoritative: $this->header->authoritative,
+            truncated: false,
+            recursionAvailable: $this->header->recursionAvailable
+        );
+
+        $packet = $withoutAdditional->encode();
+        if (strlen($packet) <= $maxSize) {
+            return $packet;
+        }
+
+        // Step 2: Try without authority section
+        $withoutAuthority = self::response(
+            $this->header,
+            $this->header->responseCode,
+            questions: $this->questions,
+            answers: $this->answers,
+            authority: [],
+            additional: [],
+            authoritative: $this->header->authoritative,
+            truncated: false,
+            recursionAvailable: $this->header->recursionAvailable
+        );
+
+        $packet = $withoutAuthority->encode();
+        if (strlen($packet) <= $maxSize) {
+            return $packet;
+        }
+
+        // Step 3: Truncate answers - find how many complete records fit
+        // Build base packet with header + questions
+        $basePacket = $this->header->encode();
+        foreach ($this->questions as $question) {
+            $basePacket .= $question->encode();
+        }
+
+        $fittingAnswers = [];
+        $tempPacket = $basePacket;
+
+        foreach ($this->answers as $answer) {
+            $encodedAnswer = $answer->encode($tempPacket);
+            if (strlen($tempPacket) + strlen($encodedAnswer) <= $maxSize) {
+                $tempPacket .= $encodedAnswer;
+                $fittingAnswers[] = $answer;
+            } else {
+                // This answer doesn't fit, stop here
+                break;
+            }
+        }
+
+        // Determine if we need to set TC flag
+        // Per RFC 2181 Section 9: TC is set only when required RRSet data couldn't fit
+        $needsTruncation = count($fittingAnswers) < count($this->answers);
+
+        $truncatedResponse = self::response(
+            $this->header,
+            $this->header->responseCode,
+            questions: $this->questions,
+            answers: $fittingAnswers,
+            authority: [],
+            additional: [],
+            authoritative: $this->header->authoritative,
+            truncated: $needsTruncation,
+            recursionAvailable: $this->header->recursionAvailable
+        );
+
+        return $truncatedResponse->encode();
     }
 }

@@ -25,6 +25,10 @@ final class ClientTest extends TestCase
         $this->assertCount(2, $records);
         $this->assertSame('dev2.appwrite.io', $records[0]->name);
         $this->assertSame(Record::TYPE_A, $records[0]->type);
+        $this->assertSame(Record::CLASS_IN, $records[0]->class);
+        $this->assertSame(1800, $records[0]->ttl);
+        $this->assertSame('142.6.0.1', $records[0]->rdata);
+        $this->assertSame('142.6.0.2', $records[1]->rdata);
     }
 
     public function testARecords(): void

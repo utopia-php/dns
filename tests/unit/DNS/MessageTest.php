@@ -291,6 +291,14 @@ final class MessageTest extends TestCase
         $this->assertSame('ns1.example.com hostmaster.example.com 1 3600 900 604800 300', $soa->rdata);
     }
 
+    /**
+     * Tests RFC-compliant truncation behavior per RFC 1035 Section 6.2 and RFC 2181 Section 9.
+     *
+     * Truncation should:
+     * 1. Work backward from the end (additional → authority → answers)
+     * 2. Preserve as many complete answer RRSets as fit
+     * 3. Only set TC flag when required data (answers) couldn't fully fit
+     */
     public function testEncodeTruncatesWhenExceedingMaxSize(): void
     {
         $question = new Question('example.com', Record::TYPE_A);
@@ -315,20 +323,107 @@ final class MessageTest extends TestCase
         $truncated = $response->encode(512);
         $decoded = Message::decode($truncated);
 
-        // Verify TC flag is set
-        $this->assertTrue($decoded->header->truncated, 'TC flag should be set on truncated response');
+        // Verify TC flag is set (RFC 2181 Section 9: TC set when answers couldn't fit)
+        $this->assertTrue($decoded->header->truncated, 'TC flag should be set when answers are truncated');
 
-        // Verify sections are cleared when truncated
-        $this->assertCount(0, $decoded->answers, 'Answers should be cleared when truncated');
+        // RFC 1035 Section 6.2: Preserve as many complete answer records as fit
+        $this->assertGreaterThan(0, count($decoded->answers), 'Should include answers that fit within size limit');
+        $this->assertLessThan(100, count($decoded->answers), 'Not all answers should fit');
+
+        // Verify other sections are cleared per RFC truncation order
         $this->assertCount(0, $decoded->authority, 'Authority should be cleared when truncated');
         $this->assertCount(0, $decoded->additional, 'Additional should be cleared when truncated');
 
-        // Verify question is preserved
+        // Verify question is always preserved
         $this->assertCount(1, $decoded->questions);
         $this->assertSame($query->questions[0]->name, $decoded->questions[0]->name);
 
         // Verify truncated packet is within size limit
         $this->assertLessThanOrEqual(512, strlen($truncated));
+    }
+
+    /**
+     * Tests that additional section is dropped first without setting TC flag.
+     * Per RFC 2181 Section 9: TC should NOT be set merely because extra info couldn't fit.
+     */
+    public function testTruncationDropsAdditionalSectionFirst(): void
+    {
+        $question = new Question('example.com', Record::TYPE_MX);
+        $query = Message::query($question, id: 0x5678);
+
+        // Small answers that fit, but additional section pushes over limit
+        $answers = [
+            new Record('example.com', Record::TYPE_MX, Record::CLASS_IN, 300, 'mail.example.com', priority: 10),
+        ];
+
+        // Large additional section (glue records)
+        $additional = [];
+        for ($i = 0; $i < 50; $i++) {
+            $additional[] = new Record('mail' . $i . '.example.com', Record::TYPE_A, Record::CLASS_IN, 300, '192.168.1.' . $i);
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: $additional
+        );
+
+        $truncated = $response->encode(512);
+        $decoded = Message::decode($truncated);
+
+        // TC should NOT be set - answers fit, only additional was dropped
+        $this->assertFalse($decoded->header->truncated, 'TC should NOT be set when only additional section is dropped');
+
+        // Answers should be preserved
+        $this->assertCount(1, $decoded->answers);
+        $this->assertSame('example.com', $decoded->answers[0]->name);
+
+        // Additional section should be dropped
+        $this->assertCount(0, $decoded->additional);
+    }
+
+    /**
+     * Tests that authority section is dropped after additional, before answers.
+     */
+    public function testTruncationDropsAuthoritySectionSecond(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x9ABC);
+
+        // Small answer that fits
+        $answers = [
+            new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.1'),
+        ];
+
+        // Authority section with NS records
+        $authority = [];
+        for ($i = 0; $i < 30; $i++) {
+            $authority[] = new Record('example.com', Record::TYPE_NS, Record::CLASS_IN, 3600, 'ns' . $i . '.example.com');
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: $authority,
+            additional: []
+        );
+
+        $truncated = $response->encode(512);
+        $decoded = Message::decode($truncated);
+
+        // TC should NOT be set - answers fit, only authority was dropped
+        $this->assertFalse($decoded->header->truncated, 'TC should NOT be set when only authority section is dropped');
+
+        // Answers should be preserved
+        $this->assertCount(1, $decoded->answers);
+
+        // Authority section should be dropped
+        $this->assertCount(0, $decoded->authority);
     }
 
     public function testEncodeWithoutMaxSizeDoesNotTruncate(): void
