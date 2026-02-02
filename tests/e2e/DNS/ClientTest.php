@@ -283,32 +283,31 @@ final class ClientTest extends TestCase
 
     public function testTcpFallbackAfterUdpTruncation(): void
     {
-        $client = new Client('127.0.0.1', self::PORT);
-
-        // Query for a TXT record that has large response (would trigger truncation over UDP)
+        // Query for large.localhost TXT records - the response is large enough
+        // to always trigger truncation over UDP (8 TXT records > 512 bytes)
         $question = new Question('large.localhost', Record::TYPE_TXT);
         $query = Message::query($question);
 
-        // First try UDP - should get TC flag if response is large
-        $udpResponse = $client->query($query);
+        // UDP query should be truncated (TC flag set) due to 512-byte limit
+        $udpClient = new Client('127.0.0.1', self::PORT);
+        $udpResponse = $udpClient->query($query);
+        $this->assertTrue($udpResponse->header->truncated, 'UDP response should be truncated for large response');
 
-        // If truncated, retry with TCP
-        if ($udpResponse->header->truncated) {
-            $tcpClient = new Client('127.0.0.1', self::PORT, useTcp: true);
-            $tcpResponse = $tcpClient->query($query);
+        // TCP query should return full response without truncation
+        $tcpClient = new Client('127.0.0.1', self::PORT, useTcp: true);
+        $tcpResponse = $tcpClient->query($query);
 
-            // TCP response should not be truncated
-            $this->assertFalse($tcpResponse->header->truncated, 'TCP response should not be truncated');
+        // TCP response should not be truncated
+        $this->assertFalse($tcpResponse->header->truncated, 'TCP response should not be truncated');
 
-            // TCP response should have more data than UDP
-            $this->assertGreaterThan(
-                count($udpResponse->answers),
-                count($tcpResponse->answers),
-                'TCP should return more answers than truncated UDP'
-            );
-        } else {
-            // If not truncated, that's fine - the response fit in UDP
-            $this->addToAssertionCount(1);
-        }
+        // TCP response should have all 8 TXT records from the zone file
+        $this->assertCount(8, $tcpResponse->answers, 'TCP should return all 8 TXT records');
+
+        // TCP response should have more answers than truncated UDP
+        $this->assertGreaterThan(
+            count($udpResponse->answers),
+            count($tcpResponse->answers),
+            'TCP should return more answers than truncated UDP'
+        );
     }
 }
