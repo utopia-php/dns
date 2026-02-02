@@ -4,9 +4,12 @@ require __DIR__ . '/../../vendor/autoload.php';
 
 use Utopia\DNS\Server;
 use Utopia\DNS\Adapter\Swoole;
+use Utopia\DNS\Message;
 use Utopia\DNS\Message\Record;
-use Utopia\DNS\Resolver\Memory;
+use Utopia\DNS\Resolver;
 use Utopia\DNS\Zone;
+use Utopia\DNS\Zone\File;
+use Utopia\DNS\Zone\Resolver as ZoneResolver;
 use Utopia\Span\Span;
 use Utopia\Span\Storage;
 use Utopia\Span\Exporter;
@@ -45,7 +48,7 @@ $records = [
     new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, rdata: 'ns2.test.io', ttl: 30),
 ];
 
-$zone = new Zone(
+$appwriteZone = new Zone(
     name: 'appwrite.io',
     records: $records,
     soa: new Record(
@@ -56,7 +59,56 @@ $zone = new Zone(
     )
 );
 
-$dns = new Server($server, new Memory($zone));
+// Load the localhost zone from zone file (contains large.localhost TXT records for TCP truncation tests)
+$localhostZoneContent = (string) file_get_contents(__DIR__ . '/zone-valid-localhost.txt');
+$localhostZone = File::import($localhostZoneContent);
+
+/**
+ * Simple multi-zone resolver for testing purposes
+ */
+$multiZoneResolver = new class([$appwriteZone, $localhostZone]) implements Resolver {
+    /** @param list<Zone> $zones */
+    public function __construct(private readonly array $zones)
+    {
+    }
+
+    public function resolve(Message $query): Message
+    {
+        $question = $query->questions[0] ?? null;
+        if ($question === null) {
+            return Message::response(
+                header: $query->header,
+                responseCode: Message::RCODE_FORMERR,
+                authoritative: true,
+            );
+        }
+
+        // Find the matching zone for this query
+        $queryName = strtolower($question->name);
+        foreach ($this->zones as $zone) {
+            $zoneName = $zone->name;
+            if ($queryName === $zoneName || str_ends_with($queryName, '.' . $zoneName)) {
+                return ZoneResolver::lookup($query, $zone);
+            }
+        }
+
+        // No matching zone found - return NXDOMAIN with first zone's SOA
+        return Message::response(
+            header: $query->header,
+            responseCode: Message::RCODE_NXDOMAIN,
+            questions: $query->questions,
+            authority: [$this->zones[0]->soa],
+            authoritative: true,
+        );
+    }
+
+    public function getName(): string
+    {
+        return 'multi-zone-memory';
+    }
+};
+
+$dns = new Server($server, $multiZoneResolver);
 $dns->setDebug(false);
 
 $dns->onWorkerStart(function (Server $server, int $workerId) {
