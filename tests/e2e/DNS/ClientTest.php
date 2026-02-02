@@ -29,8 +29,7 @@ final class ClientTest extends TestCase
         $this->assertSame(1800, $records[0]->ttl);
         // RRSet order is randomized for load balancing per RFC 2181
         $rdataValues = array_map(fn ($r) => $r->rdata, $records);
-        $this->assertContains('142.6.0.1', $rdataValues);
-        $this->assertContains('142.6.0.2', $rdataValues);
+        $this->assertEqualsCanonicalizing(['142.6.0.1', '142.6.0.2'], $rdataValues);
     }
 
     public function testARecords(): void
@@ -61,8 +60,7 @@ final class ClientTest extends TestCase
         $this->assertSame(Record::TYPE_A, $records[0]->type);
         // RRSet order is randomized for load balancing per RFC 2181
         $rdataValues = array_map(fn ($r) => $r->rdata, $records);
-        $this->assertContains('142.6.0.1', $rdataValues);
-        $this->assertContains('142.6.0.2', $rdataValues);
+        $this->assertEqualsCanonicalizing(['142.6.0.1', '142.6.0.2'], $rdataValues);
 
         $response = $client->query(Message::query(
             new Question('dev3.appwrite.io', Record::TYPE_A)
@@ -93,8 +91,7 @@ final class ClientTest extends TestCase
         $this->assertCount(2, $records);
         // RRSet order is randomized for load balancing per RFC 2181
         $rdataValues = array_map(fn ($r) => $r->rdata, $records);
-        $this->assertContains('2001:db8::ff00:0:1', $rdataValues);
-        $this->assertContains('2001:db8::ff00:0:2', $rdataValues);
+        $this->assertEqualsCanonicalizing(['2001:db8::ff00:0:1', '2001:db8::ff00:0:2'], $rdataValues);
 
         $response = $client->query(Message::query(
             new Question('dev3.appwrite.io', Record::TYPE_AAAA)
