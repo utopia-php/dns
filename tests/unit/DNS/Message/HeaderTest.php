@@ -135,4 +135,63 @@ final class HeaderTest extends TestCase
             additionalCount: 0
         );
     }
+
+    /**
+     * Test that packets with non-zero Z bits are accepted for interoperability.
+     *
+     * RFC 1035 says Z bits MUST be zero, but many DNS clients/proxies
+     * (including Google's infrastructure) set these bits. We intentionally
+     * ignore them to maximize compatibility.
+     */
+    public function testDecodeAcceptsNonZeroZBits(): void
+    {
+        // Flags with Z bits set (bits 4-6):
+        // QR=1, opcode=0, AA=0, TC=0, RD=1, RA=1, Z=0b111, RCODE=0
+        // = 1000 0001 1111 0000 = 0x81F0
+        $flagsWithAllZBits = 0x81F0;
+        $binaryHeader = pack('nnnnnn', 0x1234, $flagsWithAllZBits, 1, 0, 0, 0);
+
+        $decoded = Header::decode($binaryHeader);
+
+        // Verify the header is decoded correctly despite Z bits
+        $this->assertSame(0x1234, $decoded->id);
+        $this->assertTrue($decoded->isResponse);
+        $this->assertSame(0, $decoded->opcode);
+        $this->assertFalse($decoded->authoritative);
+        $this->assertFalse($decoded->truncated);
+        $this->assertTrue($decoded->recursionDesired);
+        $this->assertTrue($decoded->recursionAvailable);
+        $this->assertSame(0, $decoded->responseCode);
+        $this->assertSame(1, $decoded->questionCount);
+    }
+
+    /**
+     * Test various Z bit patterns are all accepted.
+     */
+    public function testDecodeAcceptsVariousZBitPatterns(): void
+    {
+        $zBitPatterns = [
+            0x0010, // Z bit 4 only
+            0x0020, // Z bit 5 only
+            0x0040, // Z bit 6 only
+            0x0030, // Z bits 4 and 5
+            0x0050, // Z bits 4 and 6
+            0x0060, // Z bits 5 and 6
+            0x0070, // All Z bits (4, 5, 6)
+        ];
+
+        foreach ($zBitPatterns as $zBits) {
+            // Base flags: QR=0, opcode=0, AA=0, TC=0, RD=1, RA=0, RCODE=0
+            // = 0000 0001 0000 0000 = 0x0100
+            $flags = 0x0100 | $zBits;
+            $binaryHeader = pack('nnnnnn', 0xABCD, $flags, 1, 0, 0, 0);
+
+            $decoded = Header::decode($binaryHeader);
+
+            $this->assertSame(0xABCD, $decoded->id, "Failed for Z bits pattern: " . sprintf('0x%04X', $zBits));
+            $this->assertFalse($decoded->isResponse);
+            $this->assertTrue($decoded->recursionDesired);
+            $this->assertSame(0, $decoded->responseCode);
+        }
+    }
 }
