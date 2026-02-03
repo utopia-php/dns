@@ -33,11 +33,7 @@ final readonly class Header
     /**
      * Decode DNS header from wire format.
      *
-     * Per RFC 1035 Section 4.1.1, the Z bits (bits 4-6 of the flags field)
-     * MUST be zero. While the RFC says these bits should be ignored on
-     * receipt, we validate them to detect malformed or malicious packets.
-     *
-     * @throws DecodingException if header is malformed or Z bits are non-zero
+     * @throws DecodingException if header is malformed
      */
     public static function decode(string $data, int $offset = 0): self
     {
@@ -68,13 +64,10 @@ final readonly class Header
         $nscount = $values['nscount'];
         $arcount = $values['arcount'];
 
-        // RFC 1035 Section 4.1.1: Z bits (bits 4-6) MUST be zero
-        // Z bits are at positions 4, 5, 6 counting from bit 0 (rightmost)
-        $zBits = ($flags >> 4) & 0x7;
-        if ($zBits !== 0) {
-            throw new DecodingException('Reserved Z bits must be zero per RFC 1035');
-        }
-
+        /**
+         * Note: Z bits (bits 4-6) are reserved per RFC 1035 and should be zero.
+         * However, we intentionally ignore them here for interoperability - many DNS clients and proxies (including Google's infrastructure) set these bits, and strict validation would cause unnecessary failures.
+        */
         return new self(
             id: $id,
             isResponse: (bool) (($flags >> 15) & 0x1),
