@@ -2036,16 +2036,16 @@
         },
         {
             "name": "utopia-php/span",
-            "version": "1.1.4",
+            "version": "1.1.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/span.git",
-                "reference": "49d04aa588a2cdbbc9381ee7a1c129469e0f905c"
+                "reference": "028406940ca92bdc88099f0b1a123a3b2cbdd4e5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/span/zipball/49d04aa588a2cdbbc9381ee7a1c129469e0f905c",
-                "reference": "49d04aa588a2cdbbc9381ee7a1c129469e0f905c",
+                "url": "https://api.github.com/repos/utopia-php/span/zipball/028406940ca92bdc88099f0b1a123a3b2cbdd4e5",
+                "reference": "028406940ca92bdc88099f0b1a123a3b2cbdd4e5",
                 "shasum": ""
             },
             "require": {
@@ -2074,9 +2074,9 @@
             "description": "Simple span tracing library for PHP with coroutine support",
             "support": {
                 "issues": "https://github.com/utopia-php/span/issues",
-                "source": "https://github.com/utopia-php/span/tree/1.1.4"
+                "source": "https://github.com/utopia-php/span/tree/1.1.5"
             },
-            "time": "2026-02-13T10:58:12+00:00"
+            "time": "2026-02-13T18:00:11+00:00"
         },
         {
             "name": "utopia-php/telemetry",
