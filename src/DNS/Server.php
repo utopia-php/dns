@@ -179,6 +179,7 @@ class Server
             } catch (PartialDecodingException $e) {
                 $this->handleError($e);
 
+                $span->set('level', 'warn');
                 $response = Message::response(
                     $e->getHeader(),
                     Message::RCODE_FORMERR,
@@ -207,6 +208,7 @@ class Server
 
             $question = $query->questions[0] ?? null;
             if ($question === null) {
+                $span->set('level', 'warn');
                 $response = Message::response(
                     $query->header,
                     Message::RCODE_FORMERR,
