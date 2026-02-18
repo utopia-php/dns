@@ -360,25 +360,36 @@ final class RecordTest extends TestCase
 
     public function testEncodeTxtRecordWithMultipleChunks(): void
     {
-        // Create a TXT record with rdata that will be split into multiple chunks
-        // "hello" (5 bytes) + "world" (5 bytes) = 10 bytes total
+        // Test that a TXT record with rdata exactly 256 bytes gets split into 2 chunks
+        // (255 bytes + 1 byte)
+        $exactly256Bytes = str_repeat('a', 256);
         $record = new Record(
             name: 'example.com',
             type: Record::TYPE_TXT,
             class: Record::CLASS_IN,
             ttl: 600,
-            rdata: 'helloworld'
+            rdata: $exactly256Bytes
         );
 
-        $expected = "\x07example\x03com\x00"
-            . "\x00\x10"  // TYPE_TXT
-            . "\x00\x01"  // CLASS_IN
-            . "\x00\x00\x02\x58"  // TTL: 600
-            . "\x00\x0A"  // RDLENGTH: 10 bytes (1+5+1+5)
-            . "\x05hello"
-            . "\x05world";
+        $encoded = $record->encode();
+        
+        // Extract RDATA portion to verify chunking
+        $nameLen = strlen("\x07example\x03com\x00");
+        $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
+        $rdataEncoded = substr($encoded, $headerLen);
 
-        $this->assertSame($expected, $record->encode());
+        // Should have 2 chunks: 255 bytes + 1 byte = 256 bytes total
+        // First chunk: chr(255) + 255 bytes = 256 bytes
+        // Second chunk: chr(1) + 1 byte = 2 bytes
+        // Total RDATA: 256 + 2 = 258 bytes
+        $this->assertSame(258, strlen($rdataEncoded)); // Total RDATA length
+        $this->assertSame(255, ord($rdataEncoded[0])); // First chunk is 255 bytes
+        $this->assertSame(1, ord($rdataEncoded[256])); // Second chunk is 1 byte
+        
+        // Verify round-trip
+        $offset = 0;
+        $decoded = Record::decode($encoded, $offset);
+        $this->assertSame($exactly256Bytes, $decoded->rdata);
     }
 
     public function testEncodeTxtRecordWithLongString(): void
