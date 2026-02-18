@@ -357,4 +357,88 @@ final class RecordTest extends TestCase
 
         $this->assertSame($original, $encoded);
     }
+
+    public function testEncodeTxtRecordWithMultipleChunks(): void
+    {
+        // Create a TXT record with rdata that will be split into multiple chunks
+        // "hello" (5 bytes) + "world" (5 bytes) = 10 bytes total
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_TXT,
+            class: Record::CLASS_IN,
+            ttl: 600,
+            rdata: 'helloworld'
+        );
+
+        $expected = "\x07example\x03com\x00"
+            . "\x00\x10"  // TYPE_TXT
+            . "\x00\x01"  // CLASS_IN
+            . "\x00\x00\x02\x58"  // TTL: 600
+            . "\x00\x0A"  // RDLENGTH: 10 bytes (1+5+1+5)
+            . "\x05hello"
+            . "\x05world";
+
+        $this->assertSame($expected, $record->encode());
+    }
+
+    public function testEncodeTxtRecordWithLongString(): void
+    {
+        // Create a TXT record with rdata > 255 bytes to test chunking
+        $longString = str_repeat('a', 300); // 300 bytes
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_TXT,
+            class: Record::CLASS_IN,
+            ttl: 600,
+            rdata: $longString
+        );
+
+        $encoded = $record->encode();
+        $offset = 0;
+        $decoded = Record::decode($encoded, $offset);
+
+        // Verify round-trip: decoded rdata should match original
+        $this->assertSame($longString, $decoded->rdata);
+        $this->assertSame(Record::TYPE_TXT, $decoded->type);
+        $this->assertSame(600, $decoded->ttl);
+
+        // Verify the encoded data has multiple chunks
+        // Extract RDATA portion (skip header: name + type + class + ttl + rdlength)
+        $nameLen = strlen("\x07example\x03com\x00");
+        $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
+        $rdataEncoded = substr($encoded, $headerLen);
+
+        // Should have 2 chunks: 255 bytes + 45 bytes = 300 bytes total
+        // First chunk: chr(255) + 255 bytes = 256 bytes
+        // Second chunk: chr(45) + 45 bytes = 46 bytes
+        // Total RDATA: 256 + 46 = 302 bytes
+        $this->assertSame(302, strlen($rdataEncoded)); // Total RDATA length
+        $this->assertSame(255, ord($rdataEncoded[0])); // First chunk is 255 bytes
+        $this->assertSame(45, ord($rdataEncoded[256])); // Second chunk is 45 bytes
+    }
+
+    public function testEncodeTxtRecordRoundTripWithMultipleChunks(): void
+    {
+        // Test round-trip encoding/decoding of multi-chunk TXT record
+        $original = "\x07example\x03com\x00"
+            . "\x00\x10"  // TYPE_TXT
+            . "\x00\x01"  // CLASS_IN
+            . "\x00\x00\x02\x58"  // TTL: 600
+            . "\x00\x0C"  // RDLENGTH: 12 bytes (1+3+1+3+1+3)
+            . "\x03foo"
+            . "\x03bar"
+            . "\x03baz";
+
+        $offset = 0;
+        $record = Record::decode($original, $offset);
+        $encoded = $record->encode();
+
+        // Decode again to verify
+        $offset2 = 0;
+        $record2 = Record::decode($encoded, $offset2);
+
+        $this->assertSame('foobarbaz', $record2->rdata);
+        $this->assertSame(Record::TYPE_TXT, $record2->type);
+        $this->assertSame(600, $record2->ttl);
+    }
 }

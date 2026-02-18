@@ -448,14 +448,20 @@ final readonly class Record
                     Domain::encode($this->rdata);
 
             case self::TYPE_TXT:
-                $len = strlen($this->rdata);
-                if ($len > self::MAX_TXT_CHUNK) {
-                    throw new \InvalidArgumentException(
-                        'TXT record chunk exceeds ' . self::MAX_TXT_CHUNK . ' bytes'
-                    );
+                // Split rdata into chunks of up to 255 bytes each per RFC 1035
+                $rdata = $this->rdata;
+                $encoded = '';
+                $pos = 0;
+                $totalLen = strlen($rdata);
+
+                while ($pos < $totalLen) {
+                    $chunkLen = min(self::MAX_TXT_CHUNK, $totalLen - $pos);
+                    $chunk = substr($rdata, $pos, $chunkLen);
+                    $encoded .= chr($chunkLen) . $chunk;
+                    $pos += $chunkLen;
                 }
 
-                return chr($len) . $this->rdata;
+                return $encoded;
 
             case self::TYPE_CAA:
                 return $this->encodeCaaRdata();
