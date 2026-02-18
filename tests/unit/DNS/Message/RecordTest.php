@@ -372,7 +372,7 @@ final class RecordTest extends TestCase
         );
 
         $encoded = $record->encode();
-        
+
         // Extract RDATA portion to verify chunking
         $nameLen = strlen("\x07example\x03com\x00");
         $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
@@ -385,7 +385,7 @@ final class RecordTest extends TestCase
         $this->assertSame(258, strlen($rdataEncoded)); // Total RDATA length
         $this->assertSame(255, ord($rdataEncoded[0])); // First chunk is 255 bytes
         $this->assertSame(1, ord($rdataEncoded[256])); // Second chunk is 1 byte
-        
+
         // Verify round-trip
         $offset = 0;
         $decoded = Record::decode($encoded, $offset);
@@ -451,5 +451,35 @@ final class RecordTest extends TestCase
         $this->assertSame('foobarbaz', $record2->rdata);
         $this->assertSame(Record::TYPE_TXT, $record2->type);
         $this->assertSame(600, $record2->ttl);
+    }
+
+    public function testEncodeTxtRecordWithEmptyRdata(): void
+    {
+        // Test that empty TXT rdata is encoded as a single zero-length character-string
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_TXT,
+            class: Record::CLASS_IN,
+            ttl: 600,
+            rdata: ''
+        );
+
+        $encoded = $record->encode();
+
+        // Extract RDATA portion
+        $nameLen = strlen("\x07example\x03com\x00");
+        $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
+        $rdataEncoded = substr($encoded, $headerLen);
+
+        // Should be a single zero-length character-string: chr(0)
+        $this->assertSame(1, strlen($rdataEncoded)); // RDLENGTH should be 1
+        $this->assertSame(0, ord($rdataEncoded[0])); // First (and only) chunk is 0 bytes
+
+        // Verify round-trip: decode should work and return empty string
+        $offset = 0;
+        $decoded = Record::decode($encoded, $offset);
+        $this->assertSame('', $decoded->rdata);
+        $this->assertSame(Record::TYPE_TXT, $decoded->type);
+        $this->assertSame(600, $decoded->ttl);
     }
 }

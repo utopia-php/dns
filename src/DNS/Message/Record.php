@@ -450,9 +450,15 @@ final readonly class Record
             case self::TYPE_TXT:
                 // Split rdata into chunks of up to 255 bytes each per RFC 1035
                 $rdata = $this->rdata;
+                $totalLen = strlen($rdata);
+
+                // Handle empty rdata: emit a single zero-length character-string
+                if ($totalLen === 0) {
+                    return chr(0);
+                }
+
                 $encoded = '';
                 $pos = 0;
-                $totalLen = strlen($rdata);
 
                 while ($pos < $totalLen) {
                     $chunkLen = min(self::MAX_TXT_CHUNK, $totalLen - $pos);
