@@ -10,7 +10,8 @@ services:
       - ./tests:/usr/src/code/tests
       - ./phpunit.xml:/usr/src/code/phpunit.xml
     dns:
-      - 127.0.0.1
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - dns
     ports:
