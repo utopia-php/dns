@@ -256,7 +256,11 @@ final class Message
             return $packet;
         }
 
-        // Step 2: Try without authority section
+        // Step 2: Try without authority section.
+        // NODATA (NOERROR + no answers) and NXDOMAIN require SOA in authority per RFC;
+        // when we drop authority for size, mark as non-authoritative so validation allows it.
+        $isNodataOrNxdomain = ($this->header->responseCode === self::RCODE_NOERROR && $this->answers === [])
+            || $this->header->responseCode === self::RCODE_NXDOMAIN;
         $withoutAuthority = self::response(
             $this->header,
             $this->header->responseCode,
@@ -264,7 +268,7 @@ final class Message
             answers: $this->answers,
             authority: [],
             additional: [],
-            authoritative: $this->header->authoritative,
+            authoritative: $isNodataOrNxdomain ? false : $this->header->authoritative,
             truncated: false,
             recursionAvailable: $this->header->recursionAvailable
         );
@@ -299,6 +303,10 @@ final class Message
         // Per RFC 2181 Section 9: TC is set only when required RRSet data couldn't fit
         $needsTruncation = count($fittingAnswers) < count($this->answers);
 
+        // When authority is empty (dropped for truncation), NODATA/NXDOMAIN must be non-authoritative
+        $isNodataOrNxdomainTruncated = ($this->header->responseCode === self::RCODE_NOERROR && $fittingAnswers === [])
+            || $this->header->responseCode === self::RCODE_NXDOMAIN;
+
         $truncatedResponse = self::response(
             $this->header,
             $this->header->responseCode,
@@ -306,7 +314,7 @@ final class Message
             answers: $fittingAnswers,
             authority: [],
             additional: [],
-            authoritative: $this->header->authoritative,
+            authoritative: $isNodataOrNxdomainTruncated ? false : $this->header->authoritative,
             truncated: $needsTruncation,
             recursionAvailable: $this->header->recursionAvailable
         );

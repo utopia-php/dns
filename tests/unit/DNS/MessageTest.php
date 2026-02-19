@@ -455,4 +455,40 @@ final class MessageTest extends TestCase
         // Verify all answers are preserved
         $this->assertCount(5, $decoded->answers);
     }
+
+    /**
+     * NODATA (NOERROR + no answers) with SOA in authority must be encodable when truncation
+     * drops the authority section; we mark as non-authoritative to satisfy validation.
+     */
+    public function testEncodeNodataWithTruncationDroppingAuthority(): void
+    {
+        $question = new Question('empty.example.com', Record::TYPE_TXT);
+        $query = Message::query($question, id: 0x1234);
+
+        $soa = new Record(
+            'example.com',
+            Record::TYPE_SOA,
+            Record::CLASS_IN,
+            300,
+            'ns.example.com. hostmaster.example.com. 2024010101 3600 600 86400 300'
+        );
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: [],
+            authority: [$soa],
+            additional: [],
+            authoritative: true
+        );
+
+        // Force truncation to drop authority (packet with question + SOA exceeds small limit)
+        $truncated = $response->encode(80);
+        $decoded = Message::decode($truncated);
+
+        $this->assertCount(0, $decoded->answers);
+        $this->assertCount(0, $decoded->authority);
+        $this->assertFalse($decoded->header->authoritative, 'Dropped authority => non-authoritative');
+    }
 }
