@@ -61,4 +61,18 @@ final class QuestionTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $parsedSecond->class);
         $this->assertSame(strlen($message), $offset);
     }
+
+    public function testConstructorTrimsWhitespaceFromName(): void
+    {
+        $question = new Question('  www.example.com  ', Record::TYPE_A, Record::CLASS_IN);
+
+        $this->assertSame('www.example.com', $question->name);
+    }
+
+    public function testConstructorTrimsTabsAndNewlinesFromName(): void
+    {
+        $question = new Question("\t\nwww.example.com\r\n", Record::TYPE_A, Record::CLASS_IN);
+
+        $this->assertSame('www.example.com', $question->name);
+    }
 }

@@ -120,7 +120,7 @@ final readonly class Record
         public ?int $weight = null,
         public ?int $port = null
     ) {
-        $this->name = strtolower($name);
+        $this->name = trim(strtolower($name));
     }
 
     /**
