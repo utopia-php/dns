@@ -13,7 +13,7 @@ final readonly class Question
         public int $type,
         public int $class = Record::CLASS_IN
     ) {
-        $this->name = strtolower($name);
+        $this->name = trim(strtolower($name));
     }
 
     /**
