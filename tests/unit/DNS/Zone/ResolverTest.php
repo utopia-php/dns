@@ -465,6 +465,49 @@ final class ResolverTest extends TestCase
         $this->assertSame($aaaaRecord, $response->answers[0]);
     }
 
+    public function testLookupReturnsSoaAnswerForApexSoaQueryWithRecords(): void
+    {
+        $soa = new Record(
+            'example.com',
+            Record::TYPE_SOA,
+            ttl: 300,
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+        );
+        $aRecord = new Record('example.com', Record::TYPE_A, ttl: 3600, rdata: '1.1.1.1');
+        $zone = new Zone('example.com', [$aRecord], $soa);
+
+        $question = new Question('example.com', Record::TYPE_SOA);
+        $query = Message::query($question);
+        $response = Resolver::lookup($query, $zone);
+
+        $this->assertSame(Message::RCODE_NOERROR, $response->header->responseCode);
+        $this->assertCount(1, $response->answers);
+        $this->assertSame($soa, $response->answers[0]);
+        $this->assertTrue($response->header->authoritative);
+        $this->assertFalse($response->header->recursionAvailable);
+    }
+
+    public function testLookupReturnsSoaAnswerForApexSoaQueryWithNoRecords(): void
+    {
+        $soa = new Record(
+            'example.com',
+            Record::TYPE_SOA,
+            ttl: 300,
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+        );
+        $zone = new Zone('example.com', [], $soa);
+
+        $question = new Question('example.com', Record::TYPE_SOA);
+        $query = Message::query($question);
+        $response = Resolver::lookup($query, $zone);
+
+        $this->assertSame(Message::RCODE_NOERROR, $response->header->responseCode);
+        $this->assertCount(1, $response->answers);
+        $this->assertSame($soa, $response->answers[0]);
+        $this->assertTrue($response->header->authoritative);
+        $this->assertFalse($response->header->recursionAvailable);
+    }
+
     public function testLookupReturnsSoaInAuthorityForApexNonNSQuery(): void
     {
         $soa = new Record(
