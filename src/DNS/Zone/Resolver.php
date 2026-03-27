@@ -42,6 +42,11 @@ final readonly class Resolver
         $records = self::selectBestRecords($query, $zone);
 
         if (empty($records)) {
+            // SOA is stored separately; if querying SOA at the zone apex, return it
+            if ($question->type === Record::TYPE_SOA && $question->name === $zone->name) {
+                return self::soaApexResponse($query, $zone);
+            }
+
             return Message::response(
                 header: $query->header,
                 responseCode: Message::RCODE_NXDOMAIN,
@@ -157,6 +162,11 @@ final readonly class Resolver
         $isAuthoritative = $zone->isAuthoritative($question->name);
 
         if ($isAuthoritative) {
+            // SOA is stored separately in Zone; handle SOA queries at the zone apex
+            if ($question->type === Record::TYPE_SOA && $question->name === $zone->name) {
+                return self::soaApexResponse($query, $zone);
+            }
+
             // Path E1: Exact match of type
             $exactTypeRecords = array_filter(
                 $records,
@@ -213,6 +223,21 @@ final readonly class Resolver
                 recursionAvailable: false
             );
         }
+    }
+
+    /**
+     * Build an authoritative SOA answer for the zone apex.
+     */
+    private static function soaApexResponse(Message $query, Zone $zone): Message
+    {
+        return Message::response(
+            header: $query->header,
+            responseCode: Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: [$zone->soa],
+            authoritative: true,
+            recursionAvailable: false
+        );
     }
 
     /**

@@ -213,16 +213,16 @@ final class ClientTest extends TestCase
         $response = $client->query(Message::query(
             new Question('appwrite.io', Record::TYPE_SOA)
         ));
-        $this->assertCount(0, $response->answers);
+        $this->assertCount(0, $response->authority);
 
-        $authority = $response->authority;
-        $this->assertCount(1, $authority);
-        $this->assertSame('appwrite.io', $authority[0]->name);
-        $this->assertSame(Record::CLASS_IN, $authority[0]->class);
-        $this->assertSame(30, $authority[0]->ttl);
-        $this->assertSame(Record::TYPE_SOA, $authority[0]->type);
+        $answers = $response->answers;
+        $this->assertCount(1, $answers);
+        $this->assertSame('appwrite.io', $answers[0]->name);
+        $this->assertSame(Record::CLASS_IN, $answers[0]->class);
+        $this->assertSame(30, $answers[0]->ttl);
+        $this->assertSame(Record::TYPE_SOA, $answers[0]->type);
 
-        $rdata = $authority[0]->rdata;
+        $rdata = $answers[0]->rdata;
         $this->assertStringContainsString('ns1.appwrite.zone', $rdata);
         $this->assertStringContainsString('team.appwrite.io', $rdata);
         $this->assertStringContainsString('1 7200 1800 1209600 3600', $rdata);
