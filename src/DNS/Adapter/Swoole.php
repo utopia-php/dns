@@ -7,7 +7,7 @@ use Utopia\DNS\Adapter;
 use Swoole\Server;
 use Swoole\Server\Port;
 use Utopia\DNS\Exception\ProxyProtocol\DecodingException as ProxyDecodingException;
-use Utopia\DNS\ProxyProtocol;
+use Utopia\DNS\ProxyProtocolStream;
 
 class Swoole extends Adapter
 {
@@ -30,20 +30,16 @@ class Swoole extends Adapter
     /**
      * Per-fd TCP state for PROXY-aware streams.
      *
-     * @var array<int, array{buffer: string, proxied: bool, ip: string, port: int}>
+     * @var array<int, array{buffer: string, stream: ProxyProtocolStream, ip: string, port: int}>
      */
     protected array $tcpState = [];
 
-    /**
-     * @param bool $enableProxyProtocol Auto-detect a PROXY protocol (v1 or v2) preamble on each connection/datagram. Connections without a preamble are treated as direct. Only enable when the listener is reachable solely from trusted proxies — untrusted clients could forge the source address.
-     */
     public function __construct(
         protected string $host = '0.0.0.0',
         protected int $port = 53,
         protected int $numWorkers = 1,
         protected int $maxCoroutines = 3000,
         protected bool $enableTcp = true,
-        protected bool $enableProxyProtocol = false,
     ) {
         $this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
         $this->server->set([
@@ -56,22 +52,6 @@ class Swoole extends Adapter
 
             if ($port instanceof Port) {
                 $this->tcpPort = $port;
-
-                if ($this->enableProxyProtocol) {
-                    // Disable length-prefix framing: PROXY header sits before the DNS length prefix,
-                    // so we must buffer and parse manually.
-                    $this->tcpPort->set([
-                        'open_length_check' => false,
-                    ]);
-                } else {
-                    $this->tcpPort->set([
-                        'open_length_check' => true,
-                        'package_length_type' => 'n',
-                        'package_length_offset' => 0,
-                        'package_body_offset' => 2,
-                        'package_max_length' => 65537,
-                    ]);
-                }
             }
         }
     }
@@ -98,6 +78,8 @@ class Swoole extends Adapter
     {
         $this->onPacket = $callback;
 
+        $this->configureTcpListener();
+
         // UDP handler - enforces 512-byte limit per RFC 1035
         $this->server->on('Packet', function ($server, $data, $clientInfo) {
             if (!is_string($data) || !is_array($clientInfo)) {
@@ -110,23 +92,17 @@ class Swoole extends Adapter
             $port = $peerPort;
             $payload = $data;
 
-            if ($this->enableProxyProtocol && ProxyProtocol::detect($payload)) {
+            if ($this->enableProxyProtocol) {
                 try {
-                    $header = ProxyProtocol::decode($payload);
+                    $header = ProxyProtocolStream::unwrapDatagram($payload);
                 } catch (ProxyDecodingException) {
                     return;
                 }
 
-                if ($header === null) {
-                    return;
-                }
-
-                if ($header->sourceAddress !== null && $header->sourcePort !== null) {
+                if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
                     $ip = $header->sourceAddress;
                     $port = $header->sourcePort;
                 }
-
-                $payload = substr($payload, $header->bytesConsumed);
             }
 
             $response = \call_user_func($this->onPacket, $payload, $ip, $port, 512);
@@ -144,6 +120,33 @@ class Swoole extends Adapter
                 $this->registerDirectTcpHandlers();
             }
         }
+    }
+
+    /**
+     * When PROXY is enabled we must disable Swoole's length-check framing:
+     * the preamble sits before the DNS length prefix and would be misread.
+     * When PROXY is disabled the kernel-level length-check is a big win.
+     */
+    protected function configureTcpListener(): void
+    {
+        if (!$this->tcpPort instanceof Port) {
+            return;
+        }
+
+        if ($this->enableProxyProtocol) {
+            $this->tcpPort->set([
+                'open_length_check' => false,
+            ]);
+            return;
+        }
+
+        $this->tcpPort->set([
+            'open_length_check' => true,
+            'package_length_type' => 'n',
+            'package_length_offset' => 0,
+            'package_body_offset' => 2,
+            'package_max_length' => 65537,
+        ]);
     }
 
     protected function registerDirectTcpHandlers(): void
@@ -180,7 +183,7 @@ class Swoole extends Adapter
 
             $this->tcpState[$fd] = [
                 'buffer' => '',
-                'proxied' => false,
+                'stream' => new ProxyProtocolStream(),
                 'ip' => $ip,
                 'port' => $portNum,
             ];
@@ -198,7 +201,7 @@ class Swoole extends Adapter
 
                 $this->tcpState[$fd] = [
                     'buffer' => '',
-                    'proxied' => false,
+                    'stream' => new ProxyProtocolStream(),
                     'ip' => $ip,
                     'port' => $portNum,
                 ];
@@ -212,36 +215,24 @@ class Swoole extends Adapter
                 return;
             }
 
-            if (!$state['proxied']) {
-                $detected = ProxyProtocol::detect($state['buffer']);
+            $stream = $state['stream'];
 
-                // Not enough bytes to decide; wait for more.
-                if ($detected === null) {
+            if ($stream->state() === ProxyProtocolStream::STATE_UNRESOLVED) {
+                try {
+                    $resolvedState = $stream->resolve($state['buffer']);
+                } catch (ProxyDecodingException) {
+                    $server->close($fd);
                     return;
                 }
 
-                if ($detected === 0) {
-                    // Definitely not PROXY — treat as direct DNS on this connection.
-                    $state['proxied'] = true;
-                } else {
-                    try {
-                        $header = ProxyProtocol::decode($state['buffer']);
-                    } catch (ProxyDecodingException) {
-                        $server->close($fd);
-                        return;
-                    }
+                if ($resolvedState === ProxyProtocolStream::STATE_UNRESOLVED) {
+                    return;
+                }
 
-                    if ($header === null) {
-                        return;
-                    }
-
-                    $state['buffer'] = substr($state['buffer'], $header->bytesConsumed);
-                    $state['proxied'] = true;
-
-                    if ($header->sourceAddress !== null && $header->sourcePort !== null) {
-                        $state['ip'] = $header->sourceAddress;
-                        $state['port'] = $header->sourcePort;
-                    }
+                $header = $stream->header();
+                if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
+                    $state['ip'] = $header->sourceAddress;
+                    $state['port'] = $header->sourcePort;
                 }
             }
 

@@ -6,7 +6,7 @@ use Exception;
 use Socket;
 use Utopia\DNS\Adapter;
 use Utopia\DNS\Exception\ProxyProtocol\DecodingException as ProxyDecodingException;
-use Utopia\DNS\ProxyProtocol;
+use Utopia\DNS\ProxyProtocolStream;
 
 class Native extends Adapter
 {
@@ -29,8 +29,8 @@ class Native extends Adapter
     /** @var array<int, int> Track last activity time per TCP client for idle timeout */
     protected array $tcpLastActivity = [];
 
-    /** @var array<int, bool> Whether the PROXY header has been consumed for this TCP client */
-    protected array $tcpProxyParsed = [];
+    /** @var array<int, ProxyProtocolStream> PROXY preamble resolver per TCP client */
+    protected array $tcpProxyStreams = [];
 
     /** @var array<int, array{ip: string, port: int}> Real client address (PROXY-aware) per TCP client */
     protected array $tcpClientAddress = [];
@@ -49,7 +49,6 @@ class Native extends Adapter
      * @param int $maxTcpBufferSize Maximum buffer size per TCP client
      * @param int $maxTcpFrameSize Maximum DNS message size over TCP
      * @param int $tcpIdleTimeout Seconds before idle TCP connections are closed (RFC 7766)
-     * @param bool $enableProxyProtocol Auto-detect a PROXY protocol (v1 or v2) preamble on each connection/datagram. Connections without a preamble are treated as direct. Only enable when the listener is reachable solely from trusted proxies — untrusted clients could forge the source address.
      */
     public function __construct(
         protected string $host = '0.0.0.0',
@@ -59,7 +58,6 @@ class Native extends Adapter
         protected int $maxTcpBufferSize = 16384,
         protected int $maxTcpFrameSize = 65535,
         protected int $tcpIdleTimeout = 30,
-        protected bool $enableProxyProtocol = false,
     ) {
 
         $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
@@ -161,23 +159,17 @@ class Native extends Adapter
                         $replyIp = $ip;
                         $replyPort = $port;
 
-                        if ($this->enableProxyProtocol && ProxyProtocol::detect($buf)) {
+                        if ($this->enableProxyProtocol) {
                             try {
-                                $header = ProxyProtocol::decode($buf);
+                                $header = ProxyProtocolStream::unwrapDatagram($buf);
                             } catch (ProxyDecodingException) {
                                 continue;
                             }
 
-                            if ($header === null) {
-                                continue;
-                            }
-
-                            if ($header->sourceAddress !== null && $header->sourcePort !== null) {
+                            if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
                                 $ip = $header->sourceAddress;
                                 $port = $header->sourcePort;
                             }
-
-                            $buf = substr($buf, $header->bytesConsumed);
                         }
 
                         $answer = call_user_func($this->onPacket, $buf, $ip, $port, 512);
@@ -212,7 +204,10 @@ class Native extends Adapter
                         $this->tcpClients[$id] = $client;
                         $this->tcpBuffers[$id] = '';
                         $this->tcpLastActivity[$id] = time();
-                        $this->tcpProxyParsed[$id] = false;
+
+                        if ($this->enableProxyProtocol) {
+                            $this->tcpProxyStreams[$id] = new ProxyProtocolStream();
+                        }
 
                         $peerIp = '';
                         $peerPort = 0;
@@ -272,39 +267,26 @@ class Native extends Adapter
 
         $this->tcpBuffers[$clientId] = ($this->tcpBuffers[$clientId] ?? '') . $chunk;
 
-        if ($this->enableProxyProtocol && !($this->tcpProxyParsed[$clientId] ?? false)) {
-            $detected = ProxyProtocol::detect($this->tcpBuffers[$clientId]);
+        $stream = $this->tcpProxyStreams[$clientId] ?? null;
 
-            // Not enough bytes to decide yet; wait for more.
-            if ($detected === null) {
+        if ($stream !== null && $stream->state() === ProxyProtocolStream::STATE_UNRESOLVED) {
+            try {
+                $state = $stream->resolve($this->tcpBuffers[$clientId]);
+            } catch (ProxyDecodingException) {
+                $this->closeTcpClient($client);
                 return;
             }
 
-            if ($detected === 0) {
-                // Definitely not a PROXY preamble — treat this connection as direct.
-                $this->tcpProxyParsed[$clientId] = true;
-            } else {
-                try {
-                    $header = ProxyProtocol::decode($this->tcpBuffers[$clientId]);
-                } catch (ProxyDecodingException) {
-                    $this->closeTcpClient($client);
-                    return;
-                }
+            if ($state === ProxyProtocolStream::STATE_UNRESOLVED) {
+                return;
+            }
 
-                if ($header === null) {
-                    // PROXY signature matched but payload is still incomplete.
-                    return;
-                }
-
-                $this->tcpBuffers[$clientId] = substr($this->tcpBuffers[$clientId], $header->bytesConsumed);
-                $this->tcpProxyParsed[$clientId] = true;
-
-                if ($header->sourceAddress !== null && $header->sourcePort !== null) {
-                    $this->tcpClientAddress[$clientId] = [
-                        'ip' => $header->sourceAddress,
-                        'port' => $header->sourcePort,
-                    ];
-                }
+            $header = $stream->header();
+            if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
+                $this->tcpClientAddress[$clientId] = [
+                    'ip' => $header->sourceAddress,
+                    'port' => $header->sourcePort,
+                ];
             }
         }
 
@@ -428,7 +410,7 @@ class Native extends Adapter
             $this->tcpClients[$id],
             $this->tcpBuffers[$id],
             $this->tcpLastActivity[$id],
-            $this->tcpProxyParsed[$id],
+            $this->tcpProxyStreams[$id],
             $this->tcpClientAddress[$id],
         );
 

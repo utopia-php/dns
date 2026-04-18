@@ -67,6 +67,8 @@ class Server
 
     protected bool $debug = false;
 
+    protected bool $enableProxyProtocol = false;
+
     /**
      * Telemetry metrics
      */
@@ -137,6 +139,22 @@ class Server
     public function setDebug(bool $status): self
     {
         $this->debug = $status;
+        return $this;
+    }
+
+    /**
+     * Expect a PROXY protocol (v1 or v2) preamble on each UDP datagram and
+     * TCP connection. Traffic without a preamble is still handled as direct
+     * DNS, so health checks and direct clients keep working.
+     *
+     * Only enable when the listener is reachable solely from trusted
+     * proxies — untrusted clients can forge a PROXY preamble to spoof their
+     * source address.
+     */
+    public function setProxyProtocol(bool $enabled): self
+    {
+        $this->enableProxyProtocol = $enabled;
+        $this->adapter->setProxyProtocol($enabled);
         return $this;
     }
 

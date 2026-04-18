@@ -5,6 +5,32 @@ namespace Utopia\DNS;
 abstract class Adapter
 {
     /**
+     * Whether the adapter should treat incoming traffic as potentially
+     * prefixed with a PROXY protocol (v1/v2) preamble. Configured via
+     * {@see Server::setProxyProtocol()} (or directly via
+     * {@see setProxyProtocol()}).
+     */
+    protected bool $enableProxyProtocol = false;
+
+    /**
+     * Toggle PROXY protocol awareness.
+     *
+     * Enabling this makes the adapter look for a PROXY preamble at the
+     * start of every UDP datagram and TCP connection; traffic without a
+     * preamble is still handled as direct DNS so health checks and direct
+     * clients keep working.
+     */
+    public function setProxyProtocol(bool $enabled): void
+    {
+        $this->enableProxyProtocol = $enabled;
+    }
+
+    public function hasProxyProtocol(): bool
+    {
+        return $this->enableProxyProtocol;
+    }
+
+    /**
      * Worker start
      *
      * @param callable(int $workerId): void $callback

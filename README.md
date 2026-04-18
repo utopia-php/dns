@@ -72,21 +72,12 @@ Adapters are responsible only for receiving and returning raw packets. They call
 
 ## PROXY protocol
 
-When the DNS server sits behind a proxy or load balancer that speaks the [HAProxy PROXY protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt) (AWS NLB, HAProxy, nginx, Envoy, etc.), enable it on the adapter so resolver callbacks see the real client address instead of the proxy's. Both v1 (text) and v2 (binary) headers are parsed, and the feature applies to both UDP datagrams and TCP connections.
+When the DNS server sits behind a proxy or load balancer that speaks the [HAProxy PROXY protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt) (AWS NLB, HAProxy, nginx, Envoy, etc.), enable it on the `Server` so resolver callbacks see the real client address instead of the proxy's. Both v1 (text) and v2 (binary) headers are parsed, and the feature applies to both UDP datagrams and TCP connections.
 
 ```php
-$adapter = new Native(
-    host: '0.0.0.0',
-    port: 5300,
-    enableProxyProtocol: true,
-);
-
-// Swoole equivalent
-$adapter = new Swoole(
-    host: '0.0.0.0',
-    port: 5300,
-    enableProxyProtocol: true,
-);
+$server = new Server($adapter, $resolver);
+$server->setProxyProtocol(enabled: true);
+$server->start();
 ```
 
 Detection is per-connection (TCP) or per-datagram (UDP): traffic that begins with a PROXY v1/v2 signature is parsed and the real client address is passed to the resolver; traffic without a signature is handled as a direct DNS request. This keeps health checks and direct clients working during rollouts.
