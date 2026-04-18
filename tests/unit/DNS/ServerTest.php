@@ -22,11 +22,11 @@ class RecordingServer extends Server
 
     public ?int $lastPort = null;
 
-    protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
+    protected function onMessage(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
         $this->lastIp = $ip;
         $this->lastPort = $port;
-        return parent::onPacket($buffer, $ip, $port, $maxResponseSize);
+        return parent::onMessage($buffer, $ip, $port, $maxResponseSize);
     }
 }
 

@@ -176,8 +176,14 @@ class Server
 
     /**
      * Handle a complete DNS message.
+     *
+     * Called once per decoded query, regardless of transport (UDP or TCP).
+     * Subclasses override this hook to customize message handling; by
+     * default it runs the decode/resolve/encode pipeline against the
+     * configured resolver. $ip and $port are the real client address
+     * (already resolved from PROXY protocol when enabled).
      */
-    protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
+    protected function onMessage(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
         $span = Span::init('dns.packet');
         $span->set('client.ip', $ip);
@@ -297,9 +303,9 @@ class Server
 
     /**
      * UDP adapter callback. Strips a PROXY preamble (if enabled) and
-     * delegates to {@see onPacket()}.
+     * delegates to {@see onMessage()}.
      */
-    protected function onUdpPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize): string
+    private function dispatchUdp(string $buffer, string $ip, int $port, ?int $maxResponseSize): string
     {
         if ($this->enableProxyProtocol) {
             try {
@@ -315,7 +321,7 @@ class Server
             }
         }
 
-        return $this->onPacket($buffer, $ip, $port, $maxResponseSize);
+        return $this->onMessage($buffer, $ip, $port, $maxResponseSize);
     }
 
     /**
@@ -323,7 +329,7 @@ class Server
      * present, extracts length-prefixed DNS frames, and sends responses
      * back via the adapter.
      */
-    protected function onTcpReceive(int $fd, string $bytes, string $ip, int $port): void
+    private function dispatchTcpReceive(int $fd, string $bytes, string $ip, int $port): void
     {
         if (!isset($this->tcpBuffers[$fd])) {
             $this->tcpBuffers[$fd] = '';
@@ -383,7 +389,7 @@ class Server
             $buffer = substr($buffer, $frameLength + 2);
 
             $address = $this->tcpAddresses[$fd];
-            $response = $this->onPacket($message, $address['ip'], $address['port'], self::TCP_MAX_MESSAGE_SIZE);
+            $response = $this->onMessage($message, $address['ip'], $address['port'], self::TCP_MAX_MESSAGE_SIZE);
 
             if ($response !== '') {
                 if (strlen($response) > self::TCP_MAX_MESSAGE_SIZE) {
@@ -398,7 +404,7 @@ class Server
         $this->tcpBuffers[$fd] = $buffer;
     }
 
-    protected function onTcpClose(int $fd): void
+    private function dispatchTcpClose(int $fd): void
     {
         unset(
             $this->tcpBuffers[$fd],
@@ -410,9 +416,9 @@ class Server
     public function start(): void
     {
         try {
-            $this->adapter->onUdpPacket($this->onUdpPacket(...));
-            $this->adapter->onTcpReceive($this->onTcpReceive(...));
-            $this->adapter->onTcpClose($this->onTcpClose(...));
+            $this->adapter->onUdpPacket($this->dispatchUdp(...));
+            $this->adapter->onTcpReceive($this->dispatchTcpReceive(...));
+            $this->adapter->onTcpClose($this->dispatchTcpClose(...));
             $this->adapter->start();
         } catch (Throwable $error) {
             $this->handleError($error);
