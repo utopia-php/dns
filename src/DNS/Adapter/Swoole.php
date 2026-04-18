@@ -112,7 +112,7 @@ class Swoole extends Adapter
 
             if ($this->enableProxyProtocol && ProxyProtocol::detect($payload)) {
                 try {
-                    $header = ProxyProtocol::parse($payload);
+                    $header = ProxyProtocol::decode($payload);
                 } catch (ProxyDecodingException) {
                     return;
                 }
@@ -225,7 +225,7 @@ class Swoole extends Adapter
                     $state['proxied'] = true;
                 } else {
                     try {
-                        $header = ProxyProtocol::parse($state['buffer']);
+                        $header = ProxyProtocol::decode($state['buffer']);
                     } catch (ProxyDecodingException) {
                         $server->close($fd);
                         return;

@@ -163,7 +163,7 @@ class Native extends Adapter
 
                         if ($this->enableProxyProtocol && ProxyProtocol::detect($buf)) {
                             try {
-                                $header = ProxyProtocol::parse($buf);
+                                $header = ProxyProtocol::decode($buf);
                             } catch (ProxyDecodingException) {
                                 continue;
                             }
@@ -285,7 +285,7 @@ class Native extends Adapter
                 $this->tcpProxyParsed[$clientId] = true;
             } else {
                 try {
-                    $header = ProxyProtocol::parse($this->tcpBuffers[$clientId]);
+                    $header = ProxyProtocol::decode($this->tcpBuffers[$clientId]);
                 } catch (ProxyDecodingException) {
                     $this->closeTcpClient($client);
                     return;
