@@ -70,6 +70,30 @@ Resolvers can be combined with any adapter. Implementing the `Resolver` interfac
 
 Adapters are responsible only for receiving and returning raw packets. They call back into the server with the payload, source IP, and port so your resolver logic stays isolated.
 
+## PROXY protocol
+
+When the DNS server sits behind a proxy or load balancer that speaks the [HAProxy PROXY protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt) (AWS NLB, HAProxy, nginx, Envoy, etc.), enable it on the adapter so resolver callbacks see the real client address instead of the proxy's. Both v1 (text) and v2 (binary) headers are parsed, and the feature applies to both UDP datagrams and TCP connections.
+
+```php
+$adapter = new Native(
+    host: '0.0.0.0',
+    port: 5300,
+    enableProxyProtocol: true,
+);
+
+// Swoole equivalent
+$adapter = new Swoole(
+    host: '0.0.0.0',
+    port: 5300,
+    enableProxyProtocol: true,
+);
+```
+
+Detection is per-connection (TCP) or per-datagram (UDP): traffic that begins with a PROXY v1/v2 signature is parsed and the real client address is passed to the resolver; traffic without a signature is handled as a direct DNS request. This keeps health checks and direct clients working during rollouts.
+
+> [!WARNING]
+> Only enable PROXY protocol on listeners that are exclusively reachable by trusted proxies. An untrusted client can forge a PROXY header to spoof its source address. Bind to an internal network interface or enforce network-level ACLs.
+
 ## DNS client
 
 The bundled client can query any DNS server and returns fully decoded messages.

@@ -5,6 +5,8 @@ namespace Utopia\DNS\Adapter;
 use Exception;
 use Socket;
 use Utopia\DNS\Adapter;
+use Utopia\DNS\Exception\ProxyProtocol\DecodingException as ProxyDecodingException;
+use Utopia\DNS\ProxyProtocol;
 
 class Native extends Adapter
 {
@@ -27,6 +29,12 @@ class Native extends Adapter
     /** @var array<int, int> Track last activity time per TCP client for idle timeout */
     protected array $tcpLastActivity = [];
 
+    /** @var array<int, bool> Whether the PROXY header has been consumed for this TCP client */
+    protected array $tcpProxyParsed = [];
+
+    /** @var array<int, array{ip: string, port: int}> Real client address (PROXY-aware) per TCP client */
+    protected array $tcpClientAddress = [];
+
     /** @var callable(string $buffer, string $ip, int $port, ?int $maxResponseSize): string */
     protected mixed $onPacket;
 
@@ -41,6 +49,7 @@ class Native extends Adapter
      * @param int $maxTcpBufferSize Maximum buffer size per TCP client
      * @param int $maxTcpFrameSize Maximum DNS message size over TCP
      * @param int $tcpIdleTimeout Seconds before idle TCP connections are closed (RFC 7766)
+     * @param bool $enableProxyProtocol Auto-detect a PROXY protocol (v1 or v2) preamble on each connection/datagram. Connections without a preamble are treated as direct. Only enable when the listener is reachable solely from trusted proxies — untrusted clients could forge the source address.
      */
     public function __construct(
         protected string $host = '0.0.0.0',
@@ -49,7 +58,8 @@ class Native extends Adapter
         protected int $maxTcpClients = 100,
         protected int $maxTcpBufferSize = 16384,
         protected int $maxTcpFrameSize = 65535,
-        protected int $tcpIdleTimeout = 30
+        protected int $tcpIdleTimeout = 30,
+        protected bool $enableProxyProtocol = false,
     ) {
 
         $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
@@ -147,10 +157,33 @@ class Native extends Adapter
                     $len = socket_recvfrom($this->udpServer, $buf, 1024 * 4, 0, $ip, $port);
 
                     if ($len > 0 && is_string($buf) && is_string($ip) && is_int($port)) {
+                        // Reply goes back to the actual UDP peer (the proxy), not the parsed client.
+                        $replyIp = $ip;
+                        $replyPort = $port;
+
+                        if ($this->enableProxyProtocol && ProxyProtocol::detect($buf)) {
+                            try {
+                                $header = ProxyProtocol::parse($buf);
+                            } catch (ProxyDecodingException) {
+                                continue;
+                            }
+
+                            if ($header === null) {
+                                continue;
+                            }
+
+                            if ($header->sourceAddress !== null && $header->sourcePort !== null) {
+                                $ip = $header->sourceAddress;
+                                $port = $header->sourcePort;
+                            }
+
+                            $buf = substr($buf, $header->bytesConsumed);
+                        }
+
                         $answer = call_user_func($this->onPacket, $buf, $ip, $port, 512);
 
                         if ($answer !== '') {
-                            socket_sendto($this->udpServer, $answer, strlen($answer), 0, $ip, $port);
+                            socket_sendto($this->udpServer, $answer, strlen($answer), 0, $replyIp, $replyPort);
                         }
                     }
 
@@ -179,6 +212,15 @@ class Native extends Adapter
                         $this->tcpClients[$id] = $client;
                         $this->tcpBuffers[$id] = '';
                         $this->tcpLastActivity[$id] = time();
+                        $this->tcpProxyParsed[$id] = false;
+
+                        $peerIp = '';
+                        $peerPort = 0;
+                        socket_getpeername($client, $peerIp, $peerPort);
+                        $this->tcpClientAddress[$id] = [
+                            'ip' => is_string($peerIp) ? $peerIp : '',
+                            'port' => is_int($peerPort) ? $peerPort : 0,
+                        ];
                     }
 
                     continue;
@@ -230,6 +272,42 @@ class Native extends Adapter
 
         $this->tcpBuffers[$clientId] = ($this->tcpBuffers[$clientId] ?? '') . $chunk;
 
+        if ($this->enableProxyProtocol && !($this->tcpProxyParsed[$clientId] ?? false)) {
+            $detected = ProxyProtocol::detect($this->tcpBuffers[$clientId]);
+
+            // Not enough bytes to decide yet; wait for more.
+            if ($detected === null) {
+                return;
+            }
+
+            if ($detected === 0) {
+                // Definitely not a PROXY preamble — treat this connection as direct.
+                $this->tcpProxyParsed[$clientId] = true;
+            } else {
+                try {
+                    $header = ProxyProtocol::parse($this->tcpBuffers[$clientId]);
+                } catch (ProxyDecodingException) {
+                    $this->closeTcpClient($client);
+                    return;
+                }
+
+                if ($header === null) {
+                    // PROXY signature matched but payload is still incomplete.
+                    return;
+                }
+
+                $this->tcpBuffers[$clientId] = substr($this->tcpBuffers[$clientId], $header->bytesConsumed);
+                $this->tcpProxyParsed[$clientId] = true;
+
+                if ($header->sourceAddress !== null && $header->sourcePort !== null) {
+                    $this->tcpClientAddress[$clientId] = [
+                        'ip' => $header->sourceAddress,
+                        'port' => $header->sourcePort,
+                    ];
+                }
+            }
+        }
+
         while (strlen($this->tcpBuffers[$clientId]) >= 2) {
             $unpacked = unpack('n', substr($this->tcpBuffers[$clientId], 0, 2));
             $payloadLength = (is_array($unpacked) && array_key_exists(1, $unpacked) && is_int($unpacked[1])) ? $unpacked[1] : 0;
@@ -255,16 +333,22 @@ class Native extends Adapter
             $message = substr($this->tcpBuffers[$clientId], 2, $payloadLength);
             $this->tcpBuffers[$clientId] = substr($this->tcpBuffers[$clientId], $payloadLength + 2);
 
-            $ip = '';
-            $port = 0;
-            socket_getpeername($client, $ip, $port);
+            $address = $this->tcpClientAddress[$clientId] ?? null;
 
-            if (is_string($ip) && is_int($port)) {
-                $answer = call_user_func($this->onPacket, $message, $ip, $port, self::MAX_TCP_MESSAGE_SIZE);
+            if ($address === null) {
+                $ip = '';
+                $port = 0;
+                socket_getpeername($client, $ip, $port);
+                $address = [
+                    'ip' => is_string($ip) ? $ip : '',
+                    'port' => is_int($port) ? $port : 0,
+                ];
+            }
 
-                if ($answer !== '') {
-                    $this->sendTcpResponse($client, $answer);
-                }
+            $answer = call_user_func($this->onPacket, $message, $address['ip'], $address['port'], self::MAX_TCP_MESSAGE_SIZE);
+
+            if ($answer !== '') {
+                $this->sendTcpResponse($client, $answer);
             }
         }
     }
@@ -340,7 +424,13 @@ class Native extends Adapter
     {
         $id = spl_object_id($client);
 
-        unset($this->tcpClients[$id], $this->tcpBuffers[$id], $this->tcpLastActivity[$id]);
+        unset(
+            $this->tcpClients[$id],
+            $this->tcpBuffers[$id],
+            $this->tcpLastActivity[$id],
+            $this->tcpProxyParsed[$id],
+            $this->tcpClientAddress[$id],
+        );
 
         @socket_close($client);
     }
