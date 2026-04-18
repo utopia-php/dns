@@ -457,8 +457,9 @@ final class MessageTest extends TestCase
     }
 
     /**
-     * NODATA (NOERROR + no answers) with SOA in authority must be encodable when truncation
-     * drops the authority section; we mark as non-authoritative to satisfy validation.
+     * NODATA (NOERROR + no answers) with SOA in authority must be encodable when
+     * truncation drops the authority section; the AA flag is cleared so the
+     * resulting packet stays RFC-valid.
      */
     public function testEncodeNodataWithTruncationDroppingAuthority(): void
     {
@@ -490,5 +491,271 @@ final class MessageTest extends TestCase
         $this->assertCount(0, $decoded->answers);
         $this->assertCount(0, $decoded->authority);
         $this->assertFalse($decoded->header->authoritative, 'Dropped authority => non-authoritative');
+    }
+
+    /**
+     * When authority doesn't fit, additional is dropped too — even if it
+     * would have fit alongside answers on its own. Locks in the section
+     * priority (additional depends on authority being included first).
+     */
+    public function testTruncationDropsAdditionalWhenAuthorityOverflows(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0xAB01);
+
+        $answers = [
+            new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.1'),
+        ];
+
+        // Oversized authority — will not fit
+        $authority = [];
+        for ($i = 0; $i < 30; $i++) {
+            $authority[] = new Record('example.com', Record::TYPE_NS, Record::CLASS_IN, 3600, 'ns' . $i . '.example.com');
+        }
+
+        // Tiny additional — would fit on its own with just the answers
+        $additional = [
+            new Record('glue.example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.2'),
+        ];
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: $authority,
+            additional: $additional
+        );
+
+        $truncated = $response->encode(512);
+        $decoded = Message::decode($truncated);
+
+        $this->assertFalse($decoded->header->truncated, 'TC should not be set when only authority/additional dropped');
+        $this->assertCount(1, $decoded->answers);
+        $this->assertCount(0, $decoded->authority);
+        $this->assertCount(0, $decoded->additional, 'Additional must be dropped whenever authority is dropped');
+        $this->assertLessThanOrEqual(512, strlen($truncated));
+    }
+
+    /**
+     * When answers are partially truncated, authority and additional are
+     * always cleared regardless of how much room remains. Prior tests used
+     * empty authority/additional for this path — this one populates both.
+     */
+    public function testAnswerTruncationDropsPopulatedAuthorityAndAdditional(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0xCD02);
+
+        $answers = [];
+        for ($i = 0; $i < 100; $i++) {
+            $answers[] = new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '10.0.' . ($i % 256) . '.' . ($i % 256));
+        }
+
+        $authority = [];
+        for ($i = 0; $i < 5; $i++) {
+            $authority[] = new Record('example.com', Record::TYPE_NS, Record::CLASS_IN, 3600, 'ns' . $i . '.example.com');
+        }
+
+        $additional = [];
+        for ($i = 0; $i < 5; $i++) {
+            $additional[] = new Record('ns' . $i . '.example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.2.' . $i);
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: $authority,
+            additional: $additional
+        );
+
+        $truncated = $response->encode(512);
+        $decoded = Message::decode($truncated);
+
+        $this->assertTrue($decoded->header->truncated, 'TC must be set when answers are partial');
+        $this->assertGreaterThan(0, count($decoded->answers));
+        $this->assertLessThan(100, count($decoded->answers));
+        $this->assertCount(0, $decoded->authority, 'Authority cleared under answer truncation');
+        $this->assertCount(0, $decoded->additional, 'Additional cleared under answer truncation');
+        $this->assertLessThanOrEqual(512, strlen($truncated));
+    }
+
+    /**
+     * Re-encoding a message whose header already has TC=1 must preserve
+     * the flag when nothing new is dropped. The encode() short-circuit
+     * relies on the original header bytes being returned verbatim.
+     */
+    public function testReEncodePreservesOriginalTruncatedFlag(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0xEF03);
+
+        $answers = [
+            new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.1'),
+        ];
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: [],
+            truncated: true
+        );
+
+        $encoded = $response->encode();
+        $decoded = Message::decode($encoded);
+
+        $this->assertTrue($decoded->header->truncated, 'TC flag must survive re-encoding when nothing is dropped');
+        $this->assertSame($encoded, $decoded->encode(), 'Second round-trip must be byte-identical');
+    }
+
+    /**
+     * maxSize equal to the natural encoded length must not trigger truncation.
+     * Guards against an off-by-one where `>` would incorrectly become `>=`.
+     */
+    public function testEncodeFitsExactlyAtMaxSizeBoundary(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x1104);
+
+        $answers = [
+            new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.1'),
+            new Record('example.com', Record::TYPE_A, Record::CLASS_IN, 60, '192.168.1.2'),
+        ];
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: []
+        );
+
+        $natural = $response->encode();
+        $exactSize = strlen($natural);
+
+        $atBoundary = $response->encode($exactSize);
+        $this->assertSame($natural, $atBoundary, 'Encoding at exact size must match unconstrained output');
+
+        $belowBoundary = $response->encode($exactSize - 1);
+        $this->assertLessThan(count($answers), count(Message::decode($belowBoundary)->answers));
+    }
+
+    /**
+     * A forwarded/relayed message with TC=1 in its source header must
+     * retain that flag after re-encoding even when maxSize causes the
+     * additional or authority section to be dropped. Otherwise the
+     * downstream client loses the signal to retry over TCP.
+     */
+    public function testReEncodeWithMaxSizePreservesOriginalTruncatedFlag(): void
+    {
+        $question = new Question('example.com', Record::TYPE_MX);
+        $query = Message::query($question, id: 0x4407);
+
+        $answers = [
+            new Record('example.com', Record::TYPE_MX, Record::CLASS_IN, 300, 'mail.example.com', priority: 10),
+        ];
+
+        // Oversized additional — will be dropped under maxSize=512.
+        $additional = [];
+        for ($i = 0; $i < 50; $i++) {
+            $additional[] = new Record('mail' . $i . '.example.com', Record::TYPE_A, Record::CLASS_IN, 300, '192.168.1.' . ($i % 256));
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: $additional,
+            truncated: true
+        );
+
+        $reEncoded = $response->encode(512);
+        $decoded = Message::decode($reEncoded);
+
+        $this->assertTrue(
+            $decoded->header->truncated,
+            'Original TC=1 must survive re-encoding even when sections are dropped'
+        );
+        $this->assertCount(0, $decoded->additional);
+    }
+
+    /**
+     * Extreme answer truncation (TC=1, zero answers encoded) must not be
+     * confused with a NODATA response. The AA flag is the server's claim
+     * of authority over the zone; TC=1 already tells the client to retry
+     * over TCP to get the full answer, so AA must survive.
+     */
+    public function testExtremeAnswerTruncationPreservesAuthoritativeFlag(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x3306);
+
+        // Many large answers; every one will overflow the 60-byte limit,
+        // so encoding ends up with zero answers and TC=1.
+        $answers = [];
+        for ($i = 0; $i < 5; $i++) {
+            $answers[] = new Record('verylongname' . $i . '.example.com', Record::TYPE_A, Record::CLASS_IN, 60, '10.0.0.' . $i);
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: [],
+            authoritative: true
+        );
+
+        $truncated = $response->encode(40);
+        $decoded = Message::decode($truncated);
+
+        $this->assertTrue($decoded->header->truncated, 'TC must be set when answers are truncated');
+        $this->assertCount(0, $decoded->answers);
+        $this->assertTrue(
+            $decoded->header->authoritative,
+            'AA must survive truncation — the original message had answers, TC already signals retry'
+        );
+    }
+
+    /**
+     * NODATA-style response: zero answers but populated authority. When the
+     * authority section can't fit, it's dropped without setting TC — there
+     * are no answer records that failed to transmit.
+     */
+    public function testNoAnswersWithOversizedAuthorityDropsWithoutTruncation(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x2205);
+
+        $authority = [];
+        for ($i = 0; $i < 30; $i++) {
+            $authority[] = new Record('example.com', Record::TYPE_NS, Record::CLASS_IN, 3600, 'ns' . $i . '.example.com');
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: [],
+            authority: $authority,
+            additional: []
+        );
+
+        $truncated = $response->encode(512);
+        $decoded = Message::decode($truncated);
+
+        $this->assertFalse($decoded->header->truncated, 'TC must remain unset when there were no answers to truncate');
+        $this->assertCount(0, $decoded->answers);
+        $this->assertCount(0, $decoded->authority, 'Oversized authority is dropped');
+        $this->assertLessThanOrEqual(512, strlen($truncated));
     }
 }

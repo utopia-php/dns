@@ -57,7 +57,10 @@ final class Message
             fn ($record) => $record->type === Record::TYPE_SOA
         ));
 
-        if ($header->isResponse && $header->authoritative && $soaAuthorityCount < 1) {
+        // TC=1 signals an incomplete response, so NODATA/NXDOMAIN invariants
+        // that require SOA in authority don't apply — the client will retry
+        // over TCP for the full answer.
+        if ($header->isResponse && $header->authoritative && !$header->truncated && $soaAuthorityCount < 1) {
             if ($header->responseCode === self::RCODE_NXDOMAIN) {
                 throw new \InvalidArgumentException('NXDOMAIN requires SOA in authority');
             }
@@ -186,10 +189,11 @@ final class Message
     /**
      * Encode the message to a binary DNS packet.
      *
-     * When maxSize is specified, truncation follows RFC 1035 Section 6.2 and RFC 2181 Section 9:
-     * - Truncation starts at the end and works forward (additional → authority → answers)
-     * - TC flag is only set when required RRSets (answers) couldn't be fully included
-     * - Complete RRSets are preserved; partial RRSets are omitted entirely
+     * When maxSize is specified, truncation follows RFC 1035 Section 6.2 and
+     * RFC 2181 Section 9:
+     * - Sections are dropped from the end first (additional → authority → answers)
+     * - Authority and additional are all-or-nothing; answers allow partial inclusion
+     * - TC flag is only set when answer records couldn't all fit
      * - Questions are always preserved
      *
      * @param int|null $maxSize Maximum packet size (e.g., 512 for UDP per RFC 1035)
@@ -197,128 +201,91 @@ final class Message
      */
     public function encode(?int $maxSize = null): string
     {
-        // Build full packet first
         $packet = $this->header->encode();
-
         foreach ($this->questions as $question) {
             $packet .= $question->encode();
         }
 
+        // Answers: include as many complete records as fit (partial allowed).
+        $answerCount = 0;
         foreach ($this->answers as $answer) {
-            $packet .= $answer->encode($packet);
-        }
-
-        foreach ($this->authority as $authority) {
-            $packet .= $authority->encode($packet);
-        }
-
-        foreach ($this->additional as $additional) {
-            $packet .= $additional->encode($packet);
-        }
-
-        // No truncation needed
-        if ($maxSize === null || strlen($packet) <= $maxSize) {
-            return $packet;
-        }
-
-        // RFC-compliant truncation: work backward from end
-        // Per RFC 1035 Section 6.2 and RFC 2181 Section 9
-        return $this->encodeWithTruncation($maxSize);
-    }
-
-    /**
-     * Encode with RFC-compliant truncation strategy.
-     *
-     * Truncation order per RFC 1035 Section 6.2:
-     * 1. Drop additional section first
-     * 2. If still too big, drop authority section
-     * 3. If still too big, include as many complete answer RRSets as fit, set TC
-     *
-     * TC flag is only set when answer section data is truncated (RFC 2181 Section 9).
-     */
-    private function encodeWithTruncation(int $maxSize): string
-    {
-        // Step 1: Try without additional section
-        $withoutAdditional = self::response(
-            $this->header,
-            $this->header->responseCode,
-            questions: $this->questions,
-            answers: $this->answers,
-            authority: $this->authority,
-            additional: [],
-            authoritative: $this->header->authoritative,
-            truncated: false,
-            recursionAvailable: $this->header->recursionAvailable
-        );
-
-        $packet = $withoutAdditional->encode();
-        if (strlen($packet) <= $maxSize) {
-            return $packet;
-        }
-
-        // Step 2: Try without authority section.
-        // NODATA (NOERROR + no answers) and NXDOMAIN require SOA in authority per RFC;
-        // when we drop authority for size, mark as non-authoritative so validation allows it.
-        $isNodataOrNxdomain = ($this->header->responseCode === self::RCODE_NOERROR && $this->answers === [])
-            || $this->header->responseCode === self::RCODE_NXDOMAIN;
-        $withoutAuthority = self::response(
-            $this->header,
-            $this->header->responseCode,
-            questions: $this->questions,
-            answers: $this->answers,
-            authority: [],
-            additional: [],
-            authoritative: $isNodataOrNxdomain ? false : $this->header->authoritative,
-            truncated: false,
-            recursionAvailable: $this->header->recursionAvailable
-        );
-
-        $packet = $withoutAuthority->encode();
-        if (strlen($packet) <= $maxSize) {
-            return $packet;
-        }
-
-        // Step 3: Truncate answers - find how many complete records fit
-        // Build base packet with header + questions
-        $basePacket = $this->header->encode();
-        foreach ($this->questions as $question) {
-            $basePacket .= $question->encode();
-        }
-
-        $fittingAnswers = [];
-        $tempPacket = $basePacket;
-
-        foreach ($this->answers as $answer) {
-            $encodedAnswer = $answer->encode($tempPacket);
-            if (strlen($tempPacket) + strlen($encodedAnswer) <= $maxSize) {
-                $tempPacket .= $encodedAnswer;
-                $fittingAnswers[] = $answer;
-            } else {
-                // This answer doesn't fit, stop here
+            $encoded = $answer->encode($packet);
+            if ($maxSize !== null && strlen($packet) + strlen($encoded) > $maxSize) {
                 break;
+            }
+            $packet .= $encoded;
+            $answerCount++;
+        }
+        $answersTruncated = $answerCount < count($this->answers);
+
+        // Authority then additional: all-or-nothing, and only once answers all fit.
+        // Order matches RFC 1035 Section 6.2 (drop additional before authority).
+        $authorityCount = 0;
+        $additionalCount = 0;
+        if (!$answersTruncated) {
+            $withAuthority = $this->appendRecords($packet, $this->authority);
+            if ($maxSize === null || strlen($withAuthority) <= $maxSize) {
+                $packet = $withAuthority;
+                $authorityCount = count($this->authority);
+
+                $withAdditional = $this->appendRecords($packet, $this->additional);
+                if ($maxSize === null || strlen($withAdditional) <= $maxSize) {
+                    $packet = $withAdditional;
+                    $additionalCount = count($this->additional);
+                }
             }
         }
 
-        // Determine if we need to set TC flag
-        // Per RFC 2181 Section 9: TC is set only when required RRSet data couldn't fit
-        $needsTruncation = count($fittingAnswers) < count($this->answers);
+        $sectionsUnchanged =
+            $answerCount === count($this->answers)
+            && $authorityCount === count($this->authority)
+            && $additionalCount === count($this->additional);
 
-        // When authority is empty (dropped for truncation), NODATA/NXDOMAIN must be non-authoritative
-        $isNodataOrNxdomainTruncated = ($this->header->responseCode === self::RCODE_NOERROR && $fittingAnswers === [])
+        if ($sectionsUnchanged) {
+            return $packet;
+        }
+
+        // When authority is dropped, an authoritative NODATA/NXDOMAIN response
+        // loses the SOA it needs to remain RFC-valid, so clear the AA flag.
+        // Use the original message's intent (not post-truncation counts): a
+        // TC=1 response that merely encoded zero answers isn't NODATA — the
+        // client will retry over TCP and the AA claim remains accurate.
+        $authorityDropped = $authorityCount < count($this->authority);
+        $isNodataOrNxdomain = ($this->header->responseCode === self::RCODE_NOERROR && $this->answers === [])
             || $this->header->responseCode === self::RCODE_NXDOMAIN;
+        $authoritative = ($authorityDropped && $isNodataOrNxdomain)
+            ? false
+            : $this->header->authoritative;
 
-        $truncatedResponse = self::response(
-            $this->header,
-            $this->header->responseCode,
-            questions: $this->questions,
-            answers: $fittingAnswers,
-            authority: [],
-            additional: [],
-            authoritative: $isNodataOrNxdomainTruncated ? false : $this->header->authoritative,
-            truncated: $needsTruncation,
-            recursionAvailable: $this->header->recursionAvailable
+        // Per RFC 2181 Section 9, TC signals truncated required data (answers).
+        // Preserve an inbound TC=1 (e.g. from a forwarded packet) — dropping
+        // additional/authority on re-encode must not silently clear it.
+        $header = new Header(
+            id: $this->header->id,
+            isResponse: $this->header->isResponse,
+            opcode: $this->header->opcode,
+            authoritative: $authoritative,
+            truncated: $answersTruncated || $this->header->truncated,
+            recursionDesired: $this->header->recursionDesired,
+            recursionAvailable: $this->header->recursionAvailable,
+            responseCode: $this->header->responseCode,
+            questionCount: count($this->questions),
+            answerCount: $answerCount,
+            authorityCount: $authorityCount,
+            additionalCount: $additionalCount,
         );
 
-        return $truncatedResponse->encode();
+        return $header->encode() . substr($packet, Header::LENGTH);
+    }
+
+    /**
+     * @param list<Record> $records
+     */
+    private function appendRecords(string $packet, array $records): string
+    {
+        foreach ($records as $record) {
+            $packet .= $record->encode($packet);
+        }
+        return $packet;
     }
 }
