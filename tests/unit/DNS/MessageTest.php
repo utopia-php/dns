@@ -647,6 +647,47 @@ final class MessageTest extends TestCase
     }
 
     /**
+     * A forwarded/relayed message with TC=1 in its source header must
+     * retain that flag after re-encoding even when maxSize causes the
+     * additional or authority section to be dropped. Otherwise the
+     * downstream client loses the signal to retry over TCP.
+     */
+    public function testReEncodeWithMaxSizePreservesOriginalTruncatedFlag(): void
+    {
+        $question = new Question('example.com', Record::TYPE_MX);
+        $query = Message::query($question, id: 0x4407);
+
+        $answers = [
+            new Record('example.com', Record::TYPE_MX, Record::CLASS_IN, 300, 'mail.example.com', priority: 10),
+        ];
+
+        // Oversized additional — will be dropped under maxSize=512.
+        $additional = [];
+        for ($i = 0; $i < 50; $i++) {
+            $additional[] = new Record('mail' . $i . '.example.com', Record::TYPE_A, Record::CLASS_IN, 300, '192.168.1.' . ($i % 256));
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: $additional,
+            truncated: true
+        );
+
+        $reEncoded = $response->encode(512);
+        $decoded = Message::decode($reEncoded);
+
+        $this->assertTrue(
+            $decoded->header->truncated,
+            'Original TC=1 must survive re-encoding even when sections are dropped'
+        );
+        $this->assertCount(0, $decoded->additional);
+    }
+
+    /**
      * Extreme answer truncation (TC=1, zero answers encoded) must not be
      * confused with a NODATA response. The AA flag is the server's claim
      * of authority over the zone; TC=1 already tells the client to retry

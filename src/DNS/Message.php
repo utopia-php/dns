@@ -258,12 +258,14 @@ final class Message
             : $this->header->authoritative;
 
         // Per RFC 2181 Section 9, TC signals truncated required data (answers).
+        // Preserve an inbound TC=1 (e.g. from a forwarded packet) — dropping
+        // additional/authority on re-encode must not silently clear it.
         $header = new Header(
             id: $this->header->id,
             isResponse: $this->header->isResponse,
             opcode: $this->header->opcode,
             authoritative: $authoritative,
-            truncated: $answersTruncated,
+            truncated: $answersTruncated || $this->header->truncated,
             recursionDesired: $this->header->recursionDesired,
             recursionAvailable: $this->header->recursionAvailable,
             responseCode: $this->header->responseCode,
