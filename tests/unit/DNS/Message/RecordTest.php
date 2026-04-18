@@ -482,4 +482,44 @@ final class RecordTest extends TestCase
         $this->assertSame(Record::TYPE_TXT, $decoded->type);
         $this->assertSame(600, $decoded->ttl);
     }
+
+    public function testConstructorTrimsWhitespaceFromName(): void
+    {
+        $record = new Record(
+            name: '  example.com  ',
+            type: Record::TYPE_A,
+            class: Record::CLASS_IN,
+            ttl: 300,
+            rdata: '93.184.216.34'
+        );
+
+        $this->assertSame('example.com', $record->name);
+    }
+
+    public function testConstructorTrimsTabsAndNewlinesFromName(): void
+    {
+        $record = new Record(
+            name: "\t\nexample.com\r\n",
+            type: Record::TYPE_A,
+            class: Record::CLASS_IN,
+            ttl: 300,
+            rdata: '93.184.216.34'
+        );
+
+        $this->assertSame('example.com', $record->name);
+    }
+
+    public function testWithNameTrimsWhitespace(): void
+    {
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_A,
+            class: Record::CLASS_IN,
+            ttl: 300,
+            rdata: '93.184.216.34'
+        );
+
+        $renamed = $record->withName('  other.com  ');
+        $this->assertSame('other.com', $renamed->name);
+    }
 }
