@@ -3,7 +3,8 @@
 require __DIR__ . '/../../vendor/autoload.php';
 
 use Utopia\DNS\Server;
-use Utopia\DNS\Adapter\Swoole;
+use Utopia\DNS\Adapter\SwooleUdp;
+use Utopia\DNS\Adapter\SwooleTcp;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver;
@@ -22,7 +23,12 @@ Span::setStorage(new Storage\Coroutine());
 Span::addExporter(new Exporter\Stdout());
 
 $port = (int) (getenv('PORT') ?: 5300);
-$server = new Swoole('0.0.0.0', $port);
+
+// Share one Swoole\Server between the UDP adapter and the TCP adapter so
+// both listeners run under a single event loop on the same port.
+$udpAdapter = new SwooleUdp('0.0.0.0', $port);
+$tcpAdapter = new SwooleTcp('0.0.0.0', $port, server: $udpAdapter->getServer());
+$adapter = new \Utopia\DNS\Adapter\Composite($udpAdapter, $tcpAdapter);
 
 $records = [
     // Single A
@@ -108,7 +114,7 @@ $multiZoneResolver = new class([$appwriteZone, $localhostZone]) implements Resol
     }
 };
 
-$dns = new Server($server, $multiZoneResolver);
+$dns = new Server($adapter, $multiZoneResolver);
 $dns->setDebug(false);
 
 $dns->onWorkerStart(function (Server $server, int $workerId) {
