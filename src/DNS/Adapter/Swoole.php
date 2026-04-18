@@ -6,33 +6,21 @@ use Swoole\Runtime;
 use Utopia\DNS\Adapter;
 use Swoole\Server;
 use Swoole\Server\Port;
-use Utopia\DNS\Exception\ProxyProtocol\DecodingException as ProxyDecodingException;
-use Utopia\DNS\ProxyProtocolStream;
 
 class Swoole extends Adapter
 {
-    /**
-     * Maximum DNS TCP message size per RFC 1035 Section 4.2.2
-     * TCP uses 2-byte length prefix, so max payload is 65535 bytes
-     */
-    public const int MAX_TCP_MESSAGE_SIZE = 65535;
-
-    /** Hard cap when PROXY protocol is enabled, before the DNS length prefix can be validated. */
-    public const int MAX_TCP_BUFFER_SIZE = 131072;
-
     protected Server $server;
 
     protected ?Port $tcpPort = null;
 
     /** @var callable(string $buffer, string $ip, int $port, ?int $maxResponseSize): string */
-    protected mixed $onPacket;
+    protected mixed $onUdpPacket;
 
-    /**
-     * Per-fd TCP state for PROXY-aware streams.
-     *
-     * @var array<int, array{buffer: string, stream: ProxyProtocolStream, ip: string, port: int}>
-     */
-    protected array $tcpState = [];
+    /** @var callable(int $fd, string $bytes, string $ip, int $port): void */
+    protected mixed $onTcpReceive;
+
+    /** @var callable(int $fd): void */
+    protected mixed $onTcpClose;
 
     public function __construct(
         protected string $host = '0.0.0.0',
@@ -52,15 +40,16 @@ class Swoole extends Adapter
 
             if ($port instanceof Port) {
                 $this->tcpPort = $port;
+                // TCP framing and PROXY parsing live in Server, so Swoole's
+                // kernel-level length-check is not applicable here. The
+                // cost (userland buffering) is negligible for DNS loads.
+                $this->tcpPort->set([
+                    'open_length_check' => false,
+                ]);
             }
         }
     }
 
-    /**
-     * Worker start callback
-     *
-     * @param callable(int $workerId): void $callback
-     */
     public function onWorkerStart(callable $callback): void
     {
         $this->server->on('WorkerStart', function ($server, $workerId) use ($callback) {
@@ -70,211 +59,72 @@ class Swoole extends Adapter
         });
     }
 
-    /**
-     * @param callable $callback
-     * @phpstan-param callable(string $buffer, string $ip, int $port, ?int $maxResponseSize):string $callback
-     */
-    public function onPacket(callable $callback): void
+    public function onUdpPacket(callable $callback): void
     {
-        $this->onPacket = $callback;
+        $this->onUdpPacket = $callback;
 
-        $this->configureTcpListener();
-
-        // UDP handler - enforces 512-byte limit per RFC 1035
         $this->server->on('Packet', function ($server, $data, $clientInfo) {
             if (!is_string($data) || !is_array($clientInfo)) {
                 return;
             }
 
-            $peerIp = is_string($clientInfo['address'] ?? null) ? $clientInfo['address'] : '';
-            $peerPort = is_int($clientInfo['port'] ?? null) ? $clientInfo['port'] : 0;
-            $ip = $peerIp;
-            $port = $peerPort;
-            $payload = $data;
+            $ip = is_string($clientInfo['address'] ?? null) ? $clientInfo['address'] : '';
+            $port = is_int($clientInfo['port'] ?? null) ? $clientInfo['port'] : 0;
 
-            if ($this->enableProxyProtocol) {
-                try {
-                    $header = ProxyProtocolStream::unwrapDatagram($payload);
-                } catch (ProxyDecodingException) {
-                    return;
-                }
-
-                if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
-                    $ip = $header->sourceAddress;
-                    $port = $header->sourcePort;
-                }
-            }
-
-            $response = \call_user_func($this->onPacket, $payload, $ip, $port, 512);
+            $response = \call_user_func($this->onUdpPacket, $data, $ip, $port, 512);
 
             if ($response !== '' && $server instanceof Server) {
-                // Reply goes back to the actual UDP peer (the proxy), not the parsed client.
-                $server->sendto($peerIp, $peerPort, $response);
+                $server->sendto($ip, $port, $response);
             }
         });
-
-        if ($this->tcpPort instanceof Port) {
-            if ($this->enableProxyProtocol) {
-                $this->registerProxiedTcpHandlers();
-            } else {
-                $this->registerDirectTcpHandlers();
-            }
-        }
     }
 
-    /**
-     * When PROXY is enabled we must disable Swoole's length-check framing:
-     * the preamble sits before the DNS length prefix and would be misread.
-     * When PROXY is disabled the kernel-level length-check is a big win.
-     */
-    protected function configureTcpListener(): void
+    public function onTcpReceive(callable $callback): void
     {
+        $this->onTcpReceive = $callback;
+
         if (!$this->tcpPort instanceof Port) {
             return;
         }
 
-        if ($this->enableProxyProtocol) {
-            $this->tcpPort->set([
-                'open_length_check' => false,
-            ]);
-            return;
-        }
-
-        $this->tcpPort->set([
-            'open_length_check' => true,
-            'package_length_type' => 'n',
-            'package_length_offset' => 0,
-            'package_body_offset' => 2,
-            'package_max_length' => 65537,
-        ]);
-    }
-
-    protected function registerDirectTcpHandlers(): void
-    {
-        $this->tcpPort?->on('Receive', function (Server $server, int $fd, int $reactorId, string $data) {
+        $this->tcpPort->on('Receive', function (Server $server, int $fd, int $reactorId, string $data) {
             $info = $server->getClientInfo($fd, $reactorId);
-            if (!is_array($info)) {
-                return;
-            }
+            $ip = is_array($info) && is_string($info['remote_ip'] ?? null) ? $info['remote_ip'] : '';
+            $port = is_array($info) && is_int($info['remote_port'] ?? null) ? $info['remote_port'] : 0;
 
-            $payload = substr($data, 2); // strip 2-byte length prefix
-            $ip = is_string($info['remote_ip'] ?? null) ? $info['remote_ip'] : '';
-            $port = is_int($info['remote_port'] ?? null) ? $info['remote_port'] : 0;
-
-            $response = \call_user_func($this->onPacket, $payload, $ip, $port, self::MAX_TCP_MESSAGE_SIZE);
-
-            if ($response !== '') {
-                $server->send($fd, pack('n', strlen($response)) . $response);
-            }
+            \call_user_func($this->onTcpReceive, $fd, $data, $ip, $port);
         });
     }
 
-    protected function registerProxiedTcpHandlers(): void
+    public function onTcpClose(callable $callback): void
     {
-        $port = $this->tcpPort;
-        if (!$port instanceof Port) {
+        $this->onTcpClose = $callback;
+
+        if (!$this->tcpPort instanceof Port) {
             return;
         }
 
-        $port->on('Connect', function (Server $server, int $fd) {
-            $info = $server->getClientInfo($fd);
-            $ip = is_array($info) && is_string($info['remote_ip'] ?? null) ? $info['remote_ip'] : '';
-            $portNum = is_array($info) && is_int($info['remote_port'] ?? null) ? $info['remote_port'] : 0;
-
-            $this->tcpState[$fd] = [
-                'buffer' => '',
-                'stream' => new ProxyProtocolStream(),
-                'ip' => $ip,
-                'port' => $portNum,
-            ];
-        });
-
-        $port->on('Close', function (Server $server, int $fd) {
-            unset($this->tcpState[$fd]);
-        });
-
-        $port->on('Receive', function (Server $server, int $fd, int $reactorId, string $data) {
-            if (!isset($this->tcpState[$fd])) {
-                $info = $server->getClientInfo($fd, $reactorId);
-                $ip = is_array($info) && is_string($info['remote_ip'] ?? null) ? $info['remote_ip'] : '';
-                $portNum = is_array($info) && is_int($info['remote_port'] ?? null) ? $info['remote_port'] : 0;
-
-                $this->tcpState[$fd] = [
-                    'buffer' => '',
-                    'stream' => new ProxyProtocolStream(),
-                    'ip' => $ip,
-                    'port' => $portNum,
-                ];
-            }
-
-            $state = &$this->tcpState[$fd];
-            $state['buffer'] .= $data;
-
-            if (strlen($state['buffer']) > self::MAX_TCP_BUFFER_SIZE) {
-                $server->close($fd);
-                return;
-            }
-
-            $stream = $state['stream'];
-
-            if ($stream->state() === ProxyProtocolStream::STATE_UNRESOLVED) {
-                try {
-                    $resolvedState = $stream->resolve($state['buffer']);
-                } catch (ProxyDecodingException) {
-                    $server->close($fd);
-                    return;
-                }
-
-                if ($resolvedState === ProxyProtocolStream::STATE_UNRESOLVED) {
-                    return;
-                }
-
-                $header = $stream->header();
-                if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
-                    $state['ip'] = $header->sourceAddress;
-                    $state['port'] = $header->sourcePort;
-                }
-            }
-
-            while (strlen($state['buffer']) >= 2) {
-                $unpacked = unpack('n', substr($state['buffer'], 0, 2));
-                $payloadLength = (is_array($unpacked) && array_key_exists(1, $unpacked) && is_int($unpacked[1])) ? $unpacked[1] : 0;
-
-                if ($payloadLength === 0 || $payloadLength > self::MAX_TCP_MESSAGE_SIZE) {
-                    $server->close($fd);
-                    return;
-                }
-
-                if (strlen($state['buffer']) < $payloadLength + 2) {
-                    return;
-                }
-
-                $message = substr($state['buffer'], 2, $payloadLength);
-                $state['buffer'] = substr($state['buffer'], $payloadLength + 2);
-
-                $response = \call_user_func($this->onPacket, $message, $state['ip'], $state['port'], self::MAX_TCP_MESSAGE_SIZE);
-
-                if ($response !== '') {
-                    $server->send($fd, pack('n', strlen($response)) . $response);
-                }
-            }
+        $this->tcpPort->on('Close', function (Server $server, int $fd) {
+            \call_user_func($this->onTcpClose, $fd);
         });
     }
 
-    /**
-     * Start the DNS server
-     */
+    public function sendTcp(int $fd, string $data): void
+    {
+        $this->server->send($fd, $data);
+    }
+
+    public function closeTcp(int $fd): void
+    {
+        $this->server->close($fd);
+    }
+
     public function start(): void
     {
         Runtime::enableCoroutine();
         $this->server->start();
     }
 
-    /**
-     * Get the name of the adapter
-     *
-     * @return string
-     */
     public function getName(): string
     {
         return 'swoole';

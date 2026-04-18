@@ -4,6 +4,7 @@ namespace Utopia\DNS;
 
 use Throwable;
 use Utopia\DNS\Exception\Message\PartialDecodingException;
+use Utopia\DNS\Exception\ProxyProtocol\DecodingException as ProxyDecodingException;
 use Utopia\Span\Span;
 use Utopia\Telemetry\Adapter as Telemetry;
 use Utopia\Telemetry\Adapter\None as NoTelemetry;
@@ -59,6 +60,20 @@ use Utopia\Telemetry\Histogram;
 
 class Server
 {
+    /** RFC 1035: UDP replies are capped at 512 bytes (EDNS0 aside). */
+    public const int UDP_MAX_RESPONSE_SIZE = 512;
+
+    /** RFC 1035: TCP frames use a 2-byte length prefix, so max 65535 bytes. */
+    public const int TCP_MAX_MESSAGE_SIZE = 65535;
+
+    /**
+     * Hard cap on per-connection TCP buffer size. Prevents slow-loris style
+     * attacks from consuming unbounded memory while a preamble or frame is
+     * being accumulated. Must fit at least one max-sized DNS frame plus a
+     * PROXY v1 preamble (107 bytes).
+     */
+    public const int TCP_MAX_BUFFER_SIZE = 131072;
+
     protected Adapter $adapter;
     protected Resolver $resolver;
 
@@ -69,9 +84,15 @@ class Server
 
     protected bool $enableProxyProtocol = false;
 
-    /**
-     * Telemetry metrics
-     */
+    /** @var array<int, string> Per-fd TCP receive buffer. */
+    protected array $tcpBuffers = [];
+
+    /** @var array<int, ProxyProtocolStream> Per-fd PROXY preamble resolver (only if enabled). */
+    protected array $tcpProxyStreams = [];
+
+    /** @var array<int, array{ip: string, port: int}> Per-fd effective client address (peer or PROXY-resolved). */
+    protected array $tcpAddresses = [];
+
     protected ?Histogram $duration = null;
     protected ?Counter $queriesTotal = null;
     protected ?Counter $responsesTotal = null;
@@ -83,11 +104,6 @@ class Server
         $this->setTelemetry(new NoTelemetry());
     }
 
-    /**
-     * Set telemetry adapter
-     *
-     * @param Telemetry $telemetry
-     */
     public function setTelemetry(Telemetry $telemetry): void
     {
         $this->duration = $telemetry->createHistogram(
@@ -97,7 +113,6 @@ class Server
             ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]]
         );
 
-        // Initialize additional telemetry metrics
         $this->queriesTotal = $telemetry->createCounter('dns.queries.total');
         $this->responsesTotal = $telemetry->createCounter('dns.responses.total');
     }
@@ -130,12 +145,6 @@ class Server
         return $this;
     }
 
-    /**
-     * Set Debug Mode
-     *
-     * @param bool $status
-     * @return self
-     */
     public function setDebug(bool $status): self
     {
         $this->debug = $status;
@@ -158,12 +167,6 @@ class Server
         return $this;
     }
 
-    /**
-     * Handle Error
-     *
-     * @param Throwable $error
-     * @return void
-     */
     protected function handleError(Throwable $error): void
     {
         foreach ($this->errors as $handler) {
@@ -172,14 +175,7 @@ class Server
     }
 
     /**
-     * Handle packet
-     *
-     * @param string $buffer
-     * @param string $ip
-     * @param int $port
-     * @param int|null $maxResponseSize
-     *
-     * @return string
+     * Handle a complete DNS message.
      */
     protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
@@ -190,7 +186,6 @@ class Server
         $response = null;
 
         try {
-            // 1. Parse Message.
             $decodeStart = microtime(true);
             try {
                 $query = Message::decode($buffer);
@@ -214,7 +209,6 @@ class Server
             $span->set('dns.duration.decode', $decodeDuration);
 
             // RFC 1035: Only OPCODE 0 (QUERY) is supported
-            // Return NOTIMP for other opcodes (IQUERY=1 is obsolete, STATUS=2, others reserved)
             if ($query->header->opcode !== 0) {
                 $response = Message::response(
                     $query->header,
@@ -242,7 +236,6 @@ class Server
                 'type' => $question->type ?? null,
             ]);
 
-            // 2. Resolve query
             $resolveStart = microtime(true);
             try {
                 $response = $this->resolver->resolve($query);
@@ -264,7 +257,6 @@ class Server
             ]);
             $span->set('dns.duration.resolve', $resolveDuration);
 
-            // 3. Encode response
             $encodeStart = microtime(true);
             try {
                 return $response->encode($maxResponseSize);
@@ -303,11 +295,124 @@ class Server
         }
     }
 
+    /**
+     * UDP adapter callback. Strips a PROXY preamble (if enabled) and
+     * delegates to {@see onPacket()}.
+     */
+    protected function onUdpPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize): string
+    {
+        if ($this->enableProxyProtocol) {
+            try {
+                $header = ProxyProtocolStream::unwrapDatagram($buffer);
+            } catch (ProxyDecodingException $e) {
+                $this->handleError($e);
+                return '';
+            }
+
+            if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
+                $ip = $header->sourceAddress;
+                $port = $header->sourcePort;
+            }
+        }
+
+        return $this->onPacket($buffer, $ip, $port, $maxResponseSize);
+    }
+
+    /**
+     * TCP adapter callback. Buffers bytes, consumes a PROXY preamble when
+     * present, extracts length-prefixed DNS frames, and sends responses
+     * back via the adapter.
+     */
+    protected function onTcpReceive(int $fd, string $bytes, string $ip, int $port): void
+    {
+        if (!isset($this->tcpBuffers[$fd])) {
+            $this->tcpBuffers[$fd] = '';
+            $this->tcpAddresses[$fd] = ['ip' => $ip, 'port' => $port];
+            if ($this->enableProxyProtocol) {
+                $this->tcpProxyStreams[$fd] = new ProxyProtocolStream();
+            }
+        }
+
+        $buffer = $this->tcpBuffers[$fd] . $bytes;
+
+        if (strlen($buffer) > self::TCP_MAX_BUFFER_SIZE) {
+            $this->adapter->closeTcp($fd);
+            return;
+        }
+
+        $stream = $this->tcpProxyStreams[$fd] ?? null;
+
+        if ($stream !== null && $stream->state() === ProxyProtocolStream::STATE_UNRESOLVED) {
+            try {
+                $state = $stream->resolve($buffer);
+            } catch (ProxyDecodingException $e) {
+                $this->handleError($e);
+                $this->adapter->closeTcp($fd);
+                return;
+            }
+
+            if ($state === ProxyProtocolStream::STATE_UNRESOLVED) {
+                $this->tcpBuffers[$fd] = $buffer;
+                return;
+            }
+
+            $header = $stream->header();
+            if ($header !== null && $header->sourceAddress !== null && $header->sourcePort !== null) {
+                $this->tcpAddresses[$fd] = [
+                    'ip' => $header->sourceAddress,
+                    'port' => $header->sourcePort,
+                ];
+            }
+        }
+
+        while (strlen($buffer) >= 2) {
+            $unpacked = unpack('n', substr($buffer, 0, 2));
+            $frameLength = (is_array($unpacked) && is_int($unpacked[1] ?? null)) ? $unpacked[1] : 0;
+
+            // RFC 1035 / 7766: 0-length frames are invalid; oversize frames are either misframed or hostile.
+            if ($frameLength === 0 || $frameLength > self::TCP_MAX_MESSAGE_SIZE) {
+                $this->adapter->closeTcp($fd);
+                return;
+            }
+
+            if (strlen($buffer) < $frameLength + 2) {
+                break;
+            }
+
+            $message = substr($buffer, 2, $frameLength);
+            $buffer = substr($buffer, $frameLength + 2);
+
+            $address = $this->tcpAddresses[$fd];
+            $response = $this->onPacket($message, $address['ip'], $address['port'], self::TCP_MAX_MESSAGE_SIZE);
+
+            if ($response !== '') {
+                if (strlen($response) > self::TCP_MAX_MESSAGE_SIZE) {
+                    // Truncation should have been applied already; if not, bail rather than corrupt framing.
+                    $this->adapter->closeTcp($fd);
+                    return;
+                }
+                $this->adapter->sendTcp($fd, pack('n', strlen($response)) . $response);
+            }
+        }
+
+        $this->tcpBuffers[$fd] = $buffer;
+    }
+
+    protected function onTcpClose(int $fd): void
+    {
+        unset(
+            $this->tcpBuffers[$fd],
+            $this->tcpProxyStreams[$fd],
+            $this->tcpAddresses[$fd],
+        );
+    }
+
     public function start(): void
     {
         try {
-            $onPacket = $this->onPacket(...);
-            $this->adapter->onPacket($onPacket);
+            $this->adapter->onUdpPacket($this->onUdpPacket(...));
+            $this->adapter->onTcpReceive($this->onTcpReceive(...));
+            $this->adapter->onTcpClose($this->onTcpClose(...));
             $this->adapter->start();
         } catch (Throwable $error) {
             $this->handleError($error);
