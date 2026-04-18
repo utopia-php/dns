@@ -57,7 +57,10 @@ final class Message
             fn ($record) => $record->type === Record::TYPE_SOA
         ));
 
-        if ($header->isResponse && $header->authoritative && $soaAuthorityCount < 1) {
+        // TC=1 signals an incomplete response, so NODATA/NXDOMAIN invariants
+        // that require SOA in authority don't apply — the client will retry
+        // over TCP for the full answer.
+        if ($header->isResponse && $header->authoritative && !$header->truncated && $soaAuthorityCount < 1) {
             if ($header->responseCode === self::RCODE_NXDOMAIN) {
                 throw new \InvalidArgumentException('NXDOMAIN requires SOA in authority');
             }
@@ -244,8 +247,11 @@ final class Message
 
         // When authority is dropped, an authoritative NODATA/NXDOMAIN response
         // loses the SOA it needs to remain RFC-valid, so clear the AA flag.
+        // Use the original message's intent (not post-truncation counts): a
+        // TC=1 response that merely encoded zero answers isn't NODATA — the
+        // client will retry over TCP and the AA claim remains accurate.
         $authorityDropped = $authorityCount < count($this->authority);
-        $isNodataOrNxdomain = ($this->header->responseCode === self::RCODE_NOERROR && $answerCount === 0)
+        $isNodataOrNxdomain = ($this->header->responseCode === self::RCODE_NOERROR && $this->answers === [])
             || $this->header->responseCode === self::RCODE_NXDOMAIN;
         $authoritative = ($authorityDropped && $isNodataOrNxdomain)
             ? false

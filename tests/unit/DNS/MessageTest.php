@@ -647,6 +647,45 @@ final class MessageTest extends TestCase
     }
 
     /**
+     * Extreme answer truncation (TC=1, zero answers encoded) must not be
+     * confused with a NODATA response. The AA flag is the server's claim
+     * of authority over the zone; TC=1 already tells the client to retry
+     * over TCP to get the full answer, so AA must survive.
+     */
+    public function testExtremeAnswerTruncationPreservesAuthoritativeFlag(): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x3306);
+
+        // Many large answers; every one will overflow the 60-byte limit,
+        // so encoding ends up with zero answers and TC=1.
+        $answers = [];
+        for ($i = 0; $i < 5; $i++) {
+            $answers[] = new Record('verylongname' . $i . '.example.com', Record::TYPE_A, Record::CLASS_IN, 60, '10.0.0.' . $i);
+        }
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $answers,
+            authority: [],
+            additional: [],
+            authoritative: true
+        );
+
+        $truncated = $response->encode(40);
+        $decoded = Message::decode($truncated);
+
+        $this->assertTrue($decoded->header->truncated, 'TC must be set when answers are truncated');
+        $this->assertCount(0, $decoded->answers);
+        $this->assertTrue(
+            $decoded->header->authoritative,
+            'AA must survive truncation — the original message had answers, TC already signals retry'
+        );
+    }
+
+    /**
      * NODATA-style response: zero answers but populated authority. When the
      * authority section can't fit, it's dropped without setting TC — there
      * are no answer records that failed to transmit.
