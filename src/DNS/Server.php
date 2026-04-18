@@ -67,9 +67,6 @@ class Server
 
     protected bool $debug = false;
 
-    /**
-     * Telemetry metrics
-     */
     protected ?Histogram $duration = null;
     protected ?Counter $queriesTotal = null;
     protected ?Counter $responsesTotal = null;
@@ -81,11 +78,6 @@ class Server
         $this->setTelemetry(new NoTelemetry());
     }
 
-    /**
-     * Set telemetry adapter
-     *
-     * @param Telemetry $telemetry
-     */
     public function setTelemetry(Telemetry $telemetry): void
     {
         $this->duration = $telemetry->createHistogram(
@@ -95,7 +87,6 @@ class Server
             ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]]
         );
 
-        // Initialize additional telemetry metrics
         $this->queriesTotal = $telemetry->createCounter('dns.queries.total');
         $this->responsesTotal = $telemetry->createCounter('dns.responses.total');
     }
@@ -128,12 +119,6 @@ class Server
         return $this;
     }
 
-    /**
-     * Set Debug Mode
-     *
-     * @param bool $status
-     * @return self
-     */
     public function setDebug(bool $status): self
     {
         $this->debug = $status;
@@ -141,11 +126,20 @@ class Server
     }
 
     /**
-     * Handle Error
+     * Expect a PROXY protocol (v1 or v2) preamble on each UDP datagram and
+     * TCP connection. Traffic without a preamble is still handled as direct
+     * DNS, so health checks and direct clients keep working.
      *
-     * @param Throwable $error
-     * @return void
+     * Only enable when the listener is reachable solely from trusted
+     * proxies — untrusted clients can forge a PROXY preamble to spoof their
+     * source address.
      */
+    public function setProxyProtocol(bool $enabled): self
+    {
+        $this->adapter->setProxyProtocol($enabled);
+        return $this;
+    }
+
     protected function handleError(Throwable $error): void
     {
         foreach ($this->errors as $handler) {
@@ -154,16 +148,14 @@ class Server
     }
 
     /**
-     * Handle packet
+     * Handle a complete DNS message.
      *
-     * @param string $buffer
-     * @param string $ip
-     * @param int $port
-     * @param int|null $maxResponseSize
-     *
-     * @return string
+     * Called once per decoded query, regardless of transport. $ip and
+     * $port are the real client address (already resolved from PROXY
+     * protocol when enabled). Subclasses override this hook to customize
+     * message handling; the default runs decode → resolve → encode.
      */
-    protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
+    protected function onMessage(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
         $span = Span::init('dns.packet');
         $span->set('client.ip', $ip);
@@ -172,7 +164,6 @@ class Server
         $response = null;
 
         try {
-            // 1. Parse Message.
             $decodeStart = microtime(true);
             try {
                 $query = Message::decode($buffer);
@@ -196,7 +187,6 @@ class Server
             $span->set('dns.duration.decode', $decodeDuration);
 
             // RFC 1035: Only OPCODE 0 (QUERY) is supported
-            // Return NOTIMP for other opcodes (IQUERY=1 is obsolete, STATUS=2, others reserved)
             if ($query->header->opcode !== 0) {
                 $response = Message::response(
                     $query->header,
@@ -224,7 +214,6 @@ class Server
                 'type' => $question->type ?? null,
             ]);
 
-            // 2. Resolve query
             $resolveStart = microtime(true);
             try {
                 $response = $this->resolver->resolve($query);
@@ -246,7 +235,6 @@ class Server
             ]);
             $span->set('dns.duration.resolve', $resolveDuration);
 
-            // 3. Encode response
             $encodeStart = microtime(true);
             try {
                 return $response->encode($maxResponseSize);
@@ -288,8 +276,7 @@ class Server
     public function start(): void
     {
         try {
-            $onPacket = $this->onPacket(...);
-            $this->adapter->onPacket($onPacket);
+            $this->adapter->onMessage($this->onMessage(...));
             $this->adapter->start();
         } catch (Throwable $error) {
             $this->handleError($error);
