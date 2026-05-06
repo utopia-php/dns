@@ -86,6 +86,7 @@ class Client
             ],
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
         ]);
 
         $response = curl_exec($ch);
@@ -142,6 +143,7 @@ class Client
             ],
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
         ]);
 
         $response = curl_exec($ch);
