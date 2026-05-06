@@ -69,6 +69,10 @@ class Client
 
         $ch = curl_init();
 
+        if ($ch === false) {
+            throw new Exception('Failed to initialize cURL handle.');
+        }
+
         curl_setopt_array($ch, [
             CURLOPT_URL => $this->endpoint,
             CURLOPT_POST => true,
@@ -123,6 +127,10 @@ class Client
         $url = $this->endpoint . $separator . 'dns=' . $encoded;
 
         $ch = curl_init();
+
+        if ($ch === false) {
+            throw new Exception('Failed to initialize cURL handle.');
+        }
 
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,

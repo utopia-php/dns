@@ -10,17 +10,14 @@ use Utopia\DNS\Resolver\Http;
  *
  * Uses Google's public DoH endpoints:
  * - Primary: https://dns.google/dns-query
- * - Backup: https://dns.google/dns-query (same endpoint, Google handles load balancing)
- *
- * Note: Google's DNS infrastructure provides built-in redundancy,
- * so both endpoints resolve to the same highly-available service.
+ * - Backup: https://8.8.8.8/dns-query (IP-addressed; survives DNS resolution failure for dns.google)
  *
  * @see https://developers.google.com/speed/public-dns/docs/doh
  */
 class Google extends Http
 {
     public const ENDPOINT_PRIMARY = 'https://dns.google/dns-query';
-    public const ENDPOINT_BACKUP = 'https://dns.google/dns-query';
+    public const ENDPOINT_BACKUP = 'https://8.8.8.8/dns-query';
 
     /**
      * Create a new Google HTTP (DoH) resolver

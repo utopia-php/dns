@@ -124,6 +124,6 @@ final class GoogleTest extends TestCase
     public function testEndpointConstants(): void
     {
         $this->assertSame('https://dns.google/dns-query', Google::ENDPOINT_PRIMARY);
-        $this->assertSame('https://dns.google/dns-query', Google::ENDPOINT_BACKUP);
+        $this->assertSame('https://8.8.8.8/dns-query', Google::ENDPOINT_BACKUP);
     }
 }
