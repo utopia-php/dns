@@ -1,30 +1,33 @@
 <?php
 
-namespace Utopia\DNS;
+namespace Utopia\DNS\Http;
 
 use Exception;
+use Utopia\DNS\Message;
 
 /**
- * DNS over HTTPS (DoH) Client
+ * DNS over HTTPS Client
  *
  * Implements DNS queries over HTTPS as specified in RFC 8484.
  * Supports both GET and POST methods for sending DNS queries.
  */
-class DoHClient
+class Client
 {
     public const METHOD_GET = 'GET';
     public const METHOD_POST = 'POST';
 
     /**
-     * Create a new DoH client
+     * Create a new DNS over HTTPS client
      *
      * @param string $endpoint DoH endpoint URL (e.g., https://cloudflare-dns.com/dns-query)
-     * @param int $timeout Request timeout in seconds
+     * @param int $timeout Total request timeout in seconds
+     * @param int $connectTimeout Connection timeout in seconds
      * @param string $method HTTP method to use (GET or POST)
      */
     public function __construct(
         protected string $endpoint,
         protected int $timeout = 5,
+        protected int $connectTimeout = 2,
         protected string $method = self::METHOD_POST
     ) {
         if (!filter_var($endpoint, FILTER_VALIDATE_URL)) {
@@ -72,7 +75,7 @@ class DoHClient
             CURLOPT_POSTFIELDS => $packet,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_CONNECTTIMEOUT => $this->timeout,
+            CURLOPT_CONNECTTIMEOUT => $this->connectTimeout,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/dns-message',
                 'Accept: application/dns-message',
@@ -125,7 +128,7 @@ class DoHClient
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $this->timeout,
-            CURLOPT_CONNECTTIMEOUT => $this->timeout,
+            CURLOPT_CONNECTTIMEOUT => $this->connectTimeout,
             CURLOPT_HTTPHEADER => [
                 'Accept: application/dns-message',
             ],
@@ -178,7 +181,7 @@ class DoHClient
     /**
      * Encode data using base64url encoding (RFC 4648 Section 5)
      *
-     * This is required for the GET method as per RFC 8484 Section 4.1
+     * Required for the GET method as per RFC 8484 Section 4.1
      *
      * @param string $data Binary data to encode
      * @return string Base64url-encoded string (no padding)

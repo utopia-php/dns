@@ -2,35 +2,37 @@
 
 namespace Utopia\DNS\Resolver;
 
-use Utopia\DNS\DoHClient;
+use Utopia\DNS\Http\Client;
 use Utopia\DNS\Message;
 use Utopia\DNS\Resolver;
 
 /**
- * DNS over HTTPS (DoH) Resolver
+ * DNS over HTTPS Resolver
  *
  * A resolver that forwards DNS queries to a DoH server over HTTPS.
  * Implements RFC 8484 for DNS queries over HTTP/HTTPS.
  */
-class DoH implements Resolver
+class Http implements Resolver
 {
-    protected DoHClient $client;
+    protected Client $client;
     protected string $endpoint;
 
     /**
-     * Create a new DoH resolver
+     * Create a new HTTP (DoH) resolver
      *
      * @param string $endpoint DoH endpoint URL (e.g., https://cloudflare-dns.com/dns-query)
-     * @param int $timeout Request timeout in seconds
+     * @param int $timeout Total request timeout in seconds
+     * @param int $connectTimeout Connection timeout in seconds
      * @param string $method HTTP method to use (GET or POST)
      */
     public function __construct(
         string $endpoint,
         int $timeout = 5,
-        string $method = DoHClient::METHOD_POST
+        int $connectTimeout = 2,
+        string $method = Client::METHOD_POST
     ) {
         $this->endpoint = $endpoint;
-        $this->client = new DoHClient($endpoint, $timeout, $method);
+        $this->client = new Client($endpoint, $timeout, $connectTimeout, $method);
     }
 
     /**
@@ -51,15 +53,15 @@ class DoH implements Resolver
      */
     public function getName(): string
     {
-        return "DoH ($this->endpoint)";
+        return "HTTP ($this->endpoint)";
     }
 
     /**
-     * Get the DoH client instance
+     * Get the underlying HTTP client
      *
-     * @return DoHClient The client instance
+     * @return Client The client instance
      */
-    public function getClient(): DoHClient
+    public function getClient(): Client
     {
         return $this->client;
     }

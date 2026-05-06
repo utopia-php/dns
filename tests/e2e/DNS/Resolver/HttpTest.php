@@ -3,18 +3,17 @@
 namespace Tests\E2E\Utopia\DNS\Resolver;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\DNS\DoHClient;
+use Utopia\DNS\Http\Client;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
-use Utopia\DNS\Resolver\DoH;
+use Utopia\DNS\Resolver\Http;
 
-final class DoHTest extends TestCase
+final class HttpTest extends TestCase
 {
     public function testResolveWithCustomEndpoint(): void
     {
-        // Using Cloudflare's endpoint as a custom endpoint
-        $resolver = new DoH('https://cloudflare-dns.com/dns-query');
+        $resolver = new Http('https://cloudflare-dns.com/dns-query');
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -35,7 +34,7 @@ final class DoHTest extends TestCase
 
     public function testResolveWithGetMethod(): void
     {
-        $resolver = new DoH('https://cloudflare-dns.com/dns-query', 5, DoHClient::METHOD_GET);
+        $resolver = new Http('https://cloudflare-dns.com/dns-query', 5, 2, Client::METHOD_GET);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -50,7 +49,7 @@ final class DoHTest extends TestCase
 
     public function testResolveWithPostMethod(): void
     {
-        $resolver = new DoH('https://cloudflare-dns.com/dns-query', 5, DoHClient::METHOD_POST);
+        $resolver = new Http('https://cloudflare-dns.com/dns-query', 5, 2, Client::METHOD_POST);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -65,23 +64,23 @@ final class DoHTest extends TestCase
 
     public function testGetName(): void
     {
-        $resolver = new DoH('https://custom-dns.example.com/dns-query');
-        $this->assertSame('DoH (https://custom-dns.example.com/dns-query)', $resolver->getName());
+        $resolver = new Http('https://custom-dns.example.com/dns-query');
+        $this->assertSame('HTTP (https://custom-dns.example.com/dns-query)', $resolver->getName());
     }
 
     public function testGetClient(): void
     {
-        $resolver = new DoH('https://cloudflare-dns.com/dns-query', 10, DoHClient::METHOD_GET);
+        $resolver = new Http('https://cloudflare-dns.com/dns-query', 10, 2, Client::METHOD_GET);
         $client = $resolver->getClient();
 
-        $this->assertInstanceOf(DoHClient::class, $client);
+        $this->assertInstanceOf(Client::class, $client);
         $this->assertSame('https://cloudflare-dns.com/dns-query', $client->getEndpoint());
-        $this->assertSame(DoHClient::METHOD_GET, $client->getMethod());
+        $this->assertSame(Client::METHOD_GET, $client->getMethod());
     }
 
     public function testResolveTXTRecord(): void
     {
-        $resolver = new DoH('https://cloudflare-dns.com/dns-query');
+        $resolver = new Http('https://cloudflare-dns.com/dns-query');
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -104,7 +103,7 @@ final class DoHTest extends TestCase
 
     public function testResolveNSRecord(): void
     {
-        $resolver = new DoH('https://cloudflare-dns.com/dns-query');
+        $resolver = new Http('https://cloudflare-dns.com/dns-query');
 
         $response = $resolver->resolve(Message::query(
             new Question(

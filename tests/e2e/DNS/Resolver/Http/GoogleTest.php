@@ -1,19 +1,19 @@
 <?php
 
-namespace Tests\E2E\Utopia\DNS\Resolver;
+namespace Tests\E2E\Utopia\DNS\Resolver\Http;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\DNS\DoHClient;
+use Utopia\DNS\Http\Client;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
-use Utopia\DNS\Resolver\CloudflareDoH;
+use Utopia\DNS\Resolver\Http\Google;
 
-final class CloudflareDoHTest extends TestCase
+final class GoogleTest extends TestCase
 {
     public function testResolveGoogleAWithPost(): void
     {
-        $resolver = new CloudflareDoH();
+        $resolver = new Google();
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -34,7 +34,7 @@ final class CloudflareDoHTest extends TestCase
 
     public function testResolveGoogleAWithGet(): void
     {
-        $resolver = new CloudflareDoH(useBackup: false, method: DoHClient::METHOD_GET);
+        $resolver = new Google(useBackup: false, method: Client::METHOD_GET);
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -55,7 +55,7 @@ final class CloudflareDoHTest extends TestCase
 
     public function testResolveGoogleAAAA(): void
     {
-        $resolver = new CloudflareDoH();
+        $resolver = new Google();
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -76,7 +76,7 @@ final class CloudflareDoHTest extends TestCase
 
     public function testResolveMXRecord(): void
     {
-        $resolver = new CloudflareDoH();
+        $resolver = new Google();
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -97,9 +97,9 @@ final class CloudflareDoHTest extends TestCase
 
     public function testResolveWithBackupEndpoint(): void
     {
-        $resolver = new CloudflareDoH(useBackup: true);
+        $resolver = new Google(useBackup: true);
 
-        $this->assertSame(CloudflareDoH::ENDPOINT_BACKUP, $resolver->getClient()->getEndpoint());
+        $this->assertSame(Google::ENDPOINT_BACKUP, $resolver->getClient()->getEndpoint());
 
         $response = $resolver->resolve(Message::query(
             new Question(
@@ -113,17 +113,17 @@ final class CloudflareDoHTest extends TestCase
 
     public function testGetName(): void
     {
-        $resolver = new CloudflareDoH();
-        $this->assertStringContainsString('Cloudflare DoH', $resolver->getName());
-        $this->assertStringContainsString(CloudflareDoH::ENDPOINT_PRIMARY, $resolver->getName());
+        $resolver = new Google();
+        $this->assertStringContainsString('Google HTTP', $resolver->getName());
+        $this->assertStringContainsString(Google::ENDPOINT_PRIMARY, $resolver->getName());
 
-        $resolverBackup = new CloudflareDoH(useBackup: true);
-        $this->assertStringContainsString(CloudflareDoH::ENDPOINT_BACKUP, $resolverBackup->getName());
+        $resolverBackup = new Google(useBackup: true);
+        $this->assertStringContainsString(Google::ENDPOINT_BACKUP, $resolverBackup->getName());
     }
 
     public function testEndpointConstants(): void
     {
-        $this->assertSame('https://cloudflare-dns.com/dns-query', CloudflareDoH::ENDPOINT_PRIMARY);
-        $this->assertSame('https://one.one.one.one/dns-query', CloudflareDoH::ENDPOINT_BACKUP);
+        $this->assertSame('https://dns.google/dns-query', Google::ENDPOINT_PRIMARY);
+        $this->assertSame('https://dns.google/dns-query', Google::ENDPOINT_BACKUP);
     }
 }
