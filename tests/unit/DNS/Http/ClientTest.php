@@ -10,9 +10,17 @@ final class ClientTest extends TestCase
     public function testConstructorValidatesEndpoint(): void
     {
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Invalid DoH endpoint URL.');
+        $this->expectExceptionMessage('Invalid DoH endpoint URL. Must be a valid HTTPS URL.');
 
         new Client('not-a-valid-url');
+    }
+
+    public function testConstructorRejectsHttpScheme(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid DoH endpoint URL. Must be a valid HTTPS URL.');
+
+        new Client('http://example.com/dns-query');
     }
 
     public function testConstructorValidatesMethod(): void

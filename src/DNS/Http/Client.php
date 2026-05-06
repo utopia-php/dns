@@ -30,8 +30,8 @@ class Client
         protected int $connectTimeout = 2,
         protected string $method = self::METHOD_POST
     ) {
-        if (!filter_var($endpoint, FILTER_VALIDATE_URL)) {
-            throw new Exception('Invalid DoH endpoint URL.');
+        if (!filter_var($endpoint, FILTER_VALIDATE_URL) || parse_url($endpoint, PHP_URL_SCHEME) !== 'https') {
+            throw new Exception('Invalid DoH endpoint URL. Must be a valid HTTPS URL.');
         }
 
         if (!in_array($method, [self::METHOD_GET, self::METHOD_POST])) {
