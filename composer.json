@@ -25,7 +25,7 @@
         "utopia-php/span": "1.1.*",
         "utopia-php/telemetry": "*",
         "utopia-php/validators": "0.*",
-        "utopia-php/domains": "1.0.*"
+        "utopia-php/domains": "^2.0"
     },
     "require-dev": {
         "swoole/ide-helper": "5.1.8",
