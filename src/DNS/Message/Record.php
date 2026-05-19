@@ -542,7 +542,19 @@ final readonly class Record
             return $rname;
         }
 
+        if (substr_count($rname, '@') > 1) {
+            throw new \InvalidArgumentException(
+                'SOA RNAME email must contain exactly one @ separator'
+            );
+        }
+
         [$localPart, $domain] = explode('@', $rname, 2);
+
+        if ($localPart === '' || $domain === '') {
+            throw new \InvalidArgumentException(
+                'SOA RNAME email must have non-empty local part and domain'
+            );
+        }
 
         return self::escapeSoaRnameLocalPart($localPart) . '.' . $domain;
     }
@@ -574,6 +586,12 @@ final readonly class Record
             }
 
             $escaped .= $char;
+        }
+
+        if ($isEscaped) {
+            throw new \InvalidArgumentException(
+                'SOA RNAME local part cannot end with a dangling backslash'
+            );
         }
 
         return $escaped;

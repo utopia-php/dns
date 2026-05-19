@@ -13,6 +13,11 @@ final readonly class Domain
     /**
      * Encode a domain name according to RFC 1035.
      *
+     * Recognises two escape sequences inside labels: `\.` for a literal dot
+     * and `\\` for a literal backslash. Any other `\X` sequence is rejected.
+     * A single unescaped trailing dot is treated as the FQDN terminator and
+     * does not produce an empty trailing label.
+     *
      * @param string $name
      * @return string
      */
@@ -22,16 +27,22 @@ final readonly class Domain
             return "\x00";
         }
 
-        if (str_ends_with($name, '..')) {
-            throw new \InvalidArgumentException('Domain labels must not be empty');
+        $labels = self::splitLabels($name);
+
+        // FQDN terminator: a trailing unescaped dot ("example.com.") leaves an
+        // empty trailing label; drop it. Consecutive trailing dots
+        // ("example..") leave an empty label *before* the terminator, which is
+        // still caught by the empty-label check below.
+        if (count($labels) > 1 && end($labels) === '') {
+            array_pop($labels);
         }
 
-        $trimmed = rtrim($name, '.');
-        if ($trimmed === '') {
+        // Root domain shorthand: "." (and similar all-dot inputs that collapse
+        // to a single empty label after FQDN trim) encode as the zero byte.
+        if (count($labels) === 1 && $labels[0] === '') {
             return "\x00";
         }
 
-        $labels = self::splitLabels($trimmed);
         $labelCount = count($labels);
 
         if ($labelCount > self::MAX_LABELS) {
@@ -74,8 +85,13 @@ final readonly class Domain
     /**
      * Split a presentation-format domain name into labels.
      *
-     * Escaped dots represent literal dots inside a label, as used by SOA RNAME
-     * mailbox local parts such as "first\.last.example.com".
+     * Two escape sequences are recognised inside labels: `\.` for a literal
+     * dot and `\\` for a literal backslash. These match the subset of RFC 1035
+     * escapes needed by SOA RNAME mailbox local parts such as
+     * "first\.last.example.com". The RFC 1035 `\DDD` decimal escape is *not*
+     * supported. Any other `\X` sequence is rejected so the behaviour change
+     * is loud rather than silent for callers that previously passed raw
+     * backslashes through Domain::encode().
      *
      * @return list<string>
      */
@@ -90,6 +106,11 @@ final readonly class Domain
             $char = $name[$i];
 
             if ($escaped) {
+                if ($char !== '.' && $char !== '\\') {
+                    throw new \InvalidArgumentException(
+                        'Invalid escape sequence in domain name: \\' . $char
+                    );
+                }
                 $label .= $char;
                 $escaped = false;
                 continue;
@@ -110,7 +131,9 @@ final readonly class Domain
         }
 
         if ($escaped) {
-            $label .= '\\';
+            throw new \InvalidArgumentException(
+                'Domain name has a dangling trailing backslash'
+            );
         }
 
         $labels[] = $label;
@@ -124,6 +147,13 @@ final readonly class Domain
      * Per RFC 1035 Section 4.1.4, compression pointers allow domain names to
      * reference earlier occurrences in the packet. This implementation tracks
      * visited pointer positions to prevent infinite loops from malicious packets.
+     *
+     * Asymmetry with encode(): label bytes are joined with literal `.`
+     * without re-escaping. A wire-format SOA RNAME with a dotted local part
+     * (e.g. labels ["first.last", "example", "com"]) decodes to
+     * "first.last.example.com", which then re-encodes as four labels rather
+     * than three. Callers that need to round-trip dotted local parts must
+     * track the original label boundaries themselves.
      *
      * @param string $data   Full DNS packet
      * @param int    $offset Current read offset (updated to first byte after the name)
