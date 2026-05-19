@@ -514,6 +514,7 @@ final readonly class Record
         }
 
         [$mname, $rname, $serial, $refresh, $retry, $expire, $minimum] = $parts;
+        $rname = self::normalizeSoaRname($rname);
 
         $numbers = [];
         foreach ([$serial, $refresh, $retry, $expire, $minimum] as $value) {
@@ -533,6 +534,49 @@ final readonly class Record
         return Domain::encode($mname)
             . Domain::encode($rname)
             . pack('NNNNN', $serialNum, $refreshNum, $retryNum, $expireNum, $minimumNum);
+    }
+
+    private static function normalizeSoaRname(string $rname): string
+    {
+        if (!str_contains($rname, '@')) {
+            return $rname;
+        }
+
+        [$localPart, $domain] = explode('@', $rname, 2);
+
+        return self::escapeSoaRnameLocalPart($localPart) . '.' . $domain;
+    }
+
+    private static function escapeSoaRnameLocalPart(string $localPart): string
+    {
+        $escaped = '';
+        $length = strlen($localPart);
+        $isEscaped = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $localPart[$i];
+
+            if ($isEscaped) {
+                $escaped .= $char;
+                $isEscaped = false;
+                continue;
+            }
+
+            if ($char === '\\') {
+                $escaped .= $char;
+                $isEscaped = true;
+                continue;
+            }
+
+            if ($char === '.') {
+                $escaped .= '\\.';
+                continue;
+            }
+
+            $escaped .= $char;
+        }
+
+        return $escaped;
     }
 
     private function encodeCaaRdata(): string

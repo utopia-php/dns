@@ -24,6 +24,13 @@ final class DomainTest extends TestCase
         );
     }
 
+    public function testEncodeTreatsEscapedDotAsLiteralLabelCharacter(): void
+    {
+        $encoded = Domain::encode('first\.last.example.com');
+
+        $this->assertSame("\x0Afirst.last\x07example\x03com\x00", $encoded);
+    }
+
     public function testEncodeAllowsRootViaEmptyString(): void
     {
         $this->assertSame("\x00", Domain::encode(''));

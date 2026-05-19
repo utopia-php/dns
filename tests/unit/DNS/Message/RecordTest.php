@@ -295,6 +295,36 @@ final class RecordTest extends TestCase
         $this->assertSame($expected, $record->encode());
     }
 
+    public function testEncodeSoaRecordAcceptsEmailRname(): void
+    {
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_SOA,
+            class: Record::CLASS_IN,
+            ttl: 3600,
+            rdata: 'ns1.example.com hostmaster@example.com 2024102701 7200 3600 1209600 86400'
+        );
+
+        $encoded = $record->encode();
+
+        $this->assertStringContainsString("\x0Ahostmaster\x07example\x03com\x00", $encoded);
+    }
+
+    public function testEncodeSoaRecordEscapesDotsInEmailRnameLocalPart(): void
+    {
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_SOA,
+            class: Record::CLASS_IN,
+            ttl: 3600,
+            rdata: 'ns1.example.com first.last@example.com 2024102701 7200 3600 1209600 86400'
+        );
+
+        $encoded = $record->encode();
+
+        $this->assertStringContainsString("\x0Afirst.last\x07example\x03com\x00", $encoded);
+    }
+
     public function testDecodeTxtRecordWithMultipleChunks(): void
     {
         // TXT with two chunks: "hello" (5 bytes) + "world" (5 bytes)

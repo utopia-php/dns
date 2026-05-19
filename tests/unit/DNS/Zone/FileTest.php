@@ -202,6 +202,20 @@ ZONE;
         $this->assertSame('www.example.com', $zone->records[0]->name);
     }
 
+    public function testImportAllowsEmailAddressSoaRnameToEncode(): void
+    {
+        $contents = <<<'ZONE'
+@ IN SOA ns1.example.com. first.last@example.com. 2025011801 7200 3600 1209600 1800
+www 600 IN A 192.0.2.10
+ZONE;
+
+        $zone = File::import($contents, 'example.com');
+
+        $encoded = $zone->soa->encode();
+
+        $this->assertStringContainsString("\x0Afirst.last\x07example\x03com\x00", $encoded);
+    }
+
     public function testImportFailsWhenSoaDataMissing(): void
     {
         $this->expectException(ImportException::class);

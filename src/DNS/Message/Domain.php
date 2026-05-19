@@ -31,7 +31,7 @@ final readonly class Domain
             return "\x00";
         }
 
-        $labels = explode('.', $trimmed);
+        $labels = self::splitLabels($trimmed);
         $labelCount = count($labels);
 
         if ($labelCount > self::MAX_LABELS) {
@@ -69,6 +69,53 @@ final readonly class Domain
         }
 
         return $encoded . "\x00";
+    }
+
+    /**
+     * Split a presentation-format domain name into labels.
+     *
+     * Escaped dots represent literal dots inside a label, as used by SOA RNAME
+     * mailbox local parts such as "first\.last.example.com".
+     *
+     * @return list<string>
+     */
+    private static function splitLabels(string $name): array
+    {
+        $labels = [];
+        $label = '';
+        $length = strlen($name);
+        $escaped = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $name[$i];
+
+            if ($escaped) {
+                $label .= $char;
+                $escaped = false;
+                continue;
+            }
+
+            if ($char === '\\') {
+                $escaped = true;
+                continue;
+            }
+
+            if ($char === '.') {
+                $labels[] = $label;
+                $label = '';
+                continue;
+            }
+
+            $label .= $char;
+        }
+
+        if ($escaped) {
+            $label .= '\\';
+        }
+
+        $labels[] = $label;
+
+        return $labels;
     }
 
     /**
