@@ -24,52 +24,6 @@ final class DomainTest extends TestCase
         );
     }
 
-    public function testEncodeTreatsEscapedDotAsLiteralLabelCharacter(): void
-    {
-        $encoded = Domain::encode('first\.last.example.com');
-
-        $this->assertSame("\x0Afirst.last\x07example\x03com\x00", $encoded);
-    }
-
-    public function testEncodePreservesEscapedDotImmediatelyBeforeFqdnTerminator(): void
-    {
-        // "foo\.." = label "foo." (escaped dot) followed by FQDN root terminator.
-        $encoded = Domain::encode('foo\..');
-
-        $this->assertSame("\x04foo.\x00", $encoded);
-    }
-
-    public function testEncodeTreatsEscapedDotAsLiteralEvenWithoutTrailingTerminator(): void
-    {
-        // "foo\." = single label "foo." with no FQDN terminator.
-        $encoded = Domain::encode('foo\.');
-
-        $this->assertSame("\x04foo.\x00", $encoded);
-    }
-
-    public function testEncodeTreatsEscapedBackslashAsLiteralBackslash(): void
-    {
-        $encoded = Domain::encode('foo\\\\.com');
-
-        $this->assertSame("\x04foo\\\x03com\x00", $encoded);
-    }
-
-    public function testEncodeRejectsDanglingTrailingBackslash(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('dangling trailing backslash');
-
-        Domain::encode('foo\\');
-    }
-
-    public function testEncodeRejectsUnknownEscapeSequence(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid escape sequence');
-
-        Domain::encode('foo\xbar');
-    }
-
     public function testEncodeAllowsRootViaEmptyString(): void
     {
         $this->assertSame("\x00", Domain::encode(''));

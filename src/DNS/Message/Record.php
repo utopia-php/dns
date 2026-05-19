@@ -514,7 +514,6 @@ final readonly class Record
         }
 
         [$mname, $rname, $serial, $refresh, $retry, $expire, $minimum] = $parts;
-        $rname = self::normalizeSoaRname($rname);
 
         $numbers = [];
         foreach ([$serial, $refresh, $retry, $expire, $minimum] as $value) {
@@ -532,14 +531,14 @@ final readonly class Record
         [$serialNum, $refreshNum, $retryNum, $expireNum, $minimumNum] = $numbers;
 
         return Domain::encode($mname)
-            . Domain::encode($rname)
+            . self::encodeSoaRname($rname)
             . pack('NNNNN', $serialNum, $refreshNum, $retryNum, $expireNum, $minimumNum);
     }
 
-    private static function normalizeSoaRname(string $rname): string
+    private static function encodeSoaRname(string $rname): string
     {
         if (!str_contains($rname, '@')) {
-            return $rname;
+            return Domain::encode($rname);
         }
 
         if (substr_count($rname, '@') > 1) {
@@ -556,45 +555,19 @@ final readonly class Record
             );
         }
 
-        return self::escapeSoaRnameLocalPart($localPart) . '.' . $domain;
-    }
-
-    private static function escapeSoaRnameLocalPart(string $localPart): string
-    {
-        $escaped = '';
-        $length = strlen($localPart);
-        $isEscaped = false;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $localPart[$i];
-
-            if ($isEscaped) {
-                $escaped .= $char;
-                $isEscaped = false;
-                continue;
-            }
-
-            if ($char === '\\') {
-                $escaped .= $char;
-                $isEscaped = true;
-                continue;
-            }
-
-            if ($char === '.') {
-                $escaped .= '\\.';
-                continue;
-            }
-
-            $escaped .= $char;
+        $localLength = strlen($localPart);
+        if ($localLength > Domain::MAX_LABEL_LEN) {
+            throw new \InvalidArgumentException("Label too long: $localPart");
         }
 
-        if ($isEscaped) {
+        $encoded = chr($localLength) . $localPart . Domain::encode($domain);
+        if (strlen($encoded) > Domain::MAX_DOMAIN_NAME_LEN) {
             throw new \InvalidArgumentException(
-                'SOA RNAME local part cannot end with a dangling backslash'
+                "Encoded domain exceeds maximum length of " . Domain::MAX_DOMAIN_NAME_LEN . ' bytes'
             );
         }
 
-        return $escaped;
+        return $encoded;
     }
 
     private function encodeCaaRdata(): string
