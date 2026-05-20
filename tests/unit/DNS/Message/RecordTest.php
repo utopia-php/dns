@@ -513,6 +513,37 @@ final class RecordTest extends TestCase
         $this->assertSame(600, $decoded->ttl);
     }
 
+    public function testValidateRdataRejectsHostnameForARecord(): void
+    {
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_A,
+            class: Record::CLASS_IN,
+            ttl: 300,
+            rdata: 'ns2.appwrite.zone'
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid IPv4 address: ns2.appwrite.zone');
+
+        $record->validateRdata();
+    }
+
+    public function testValidateRdataAcceptsHostnameForNsRecord(): void
+    {
+        $record = new Record(
+            name: 'example.com',
+            type: Record::TYPE_NS,
+            class: Record::CLASS_IN,
+            ttl: 300,
+            rdata: 'ns2.appwrite.zone'
+        );
+
+        $record->validateRdata();
+
+        $this->addToAssertionCount(1);
+    }
+
     public function testConstructorTrimsWhitespaceFromName(): void
     {
         $record = new Record(

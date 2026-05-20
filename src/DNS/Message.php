@@ -279,6 +279,22 @@ final class Message
     }
 
     /**
+     * Validate all response records without encoding the message.
+     */
+    public function validate(): void
+    {
+        foreach ([
+            $this->answers,
+            $this->authority,
+            $this->additional,
+        ] as $records) {
+            foreach ($records as $record) {
+                $record->validateRdata();
+            }
+        }
+    }
+
+    /**
      * @param list<Record> $records
      */
     private function appendRecords(string $packet, array $records): string

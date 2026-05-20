@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Utopia\DNS;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Utopia\DNS\Exception\Message\DecodingException;
 use Utopia\DNS\Exception\Message\PartialDecodingException;
@@ -724,6 +725,46 @@ final class MessageTest extends TestCase
             $decoded->header->authoritative,
             'AA must survive truncation — the original message had answers, TC already signals retry'
         );
+    }
+
+    #[DataProvider('invalidSectionProvider')]
+    public function testValidateChecksAnswerAuthorityAndAdditionalRecords(string $invalidSection): void
+    {
+        $question = new Question('example.com', Record::TYPE_A);
+        $query = Message::query($question, id: 0x5508);
+
+        $invalid = [
+            new Record('ns2.appwrite.zone', Record::TYPE_A, Record::CLASS_IN, 300, 'ns2.appwrite.zone'),
+        ];
+        $valid = [
+            new Record('example.com', Record::TYPE_NS, Record::CLASS_IN, 300, 'ns2.appwrite.zone'),
+        ];
+
+        $response = Message::response(
+            $query->header,
+            Message::RCODE_NOERROR,
+            questions: $query->questions,
+            answers: $invalidSection === 'answers' ? $invalid : $valid,
+            authority: $invalidSection === 'authority' ? $invalid : $valid,
+            additional: $invalidSection === 'additional' ? $invalid : $valid
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid IPv4 address: ns2.appwrite.zone');
+
+        $response->validate();
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public static function invalidSectionProvider(): array
+    {
+        return [
+            'answers' => ['answers'],
+            'authority' => ['authority'],
+            'additional' => ['additional'],
+        ];
     }
 
     /**

@@ -387,6 +387,14 @@ final readonly class Record
     }
 
     /**
+     * Validate RDATA for this record type without encoding the full record.
+     */
+    public function validateRdata(): void
+    {
+        $this->encodeRdata('');
+    }
+
+    /**
      * Encode RDATA based on record type.
      */
     private function encodeRdata(string $packet): string
