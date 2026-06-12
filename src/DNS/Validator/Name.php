@@ -8,7 +8,14 @@ use Utopia\Validator;
 
 class Name extends Validator
 {
-    private const array RECORD_TYPES_WITH_UNDERSCORE_IN_NAME = [Record::TYPE_SRV, Record::TYPE_TXT];
+    /**
+     * Record types whose owner name must be a valid host name, where the
+     * LDH rule applies (RFC 952, RFC 1123 section 2.1) and underscores are
+     * forbidden. Owner names of all other record types follow the general
+     * domain name rules (RFC 2181 section 11), where underscored labels
+     * (RFC 8552) are legal - e.g. DKIM '_domainkey' CNAME/TXT records.
+     */
+    private const array RECORD_TYPES_WITH_HOSTNAME_OWNER = [Record::TYPE_A, Record::TYPE_AAAA];
 
     public const int LABEL_MAX_LENGTH = 63;
 
@@ -20,13 +27,18 @@ class Name extends Validator
 
     public const string FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE = 'Label must contain only alpha-numeric characters, hyphens and underscores, and cannot start or end with a hyphen';
 
+    public const string FAILURE_REASON_INVALID_WILDCARD = 'Wildcard "*" must be the entire leftmost label';
+
     public const string FAILURE_REASON_GENERAL = 'Name must be between 1 and 255 characters long, and contain only alpha-numeric characters and hyphens, and cannot start or end with a hyphen, and may contain underscore if the record type allows it';
 
     public string $reason = '';
 
-    private int $recordType;
+    private ?int $recordType;
 
-    public function __construct(int $recordType)
+    /**
+     * @param int|null $recordType Record type code, or null to apply the general domain name rules.
+     */
+    public function __construct(?int $recordType = null)
     {
         $this->recordType = $recordType;
     }
@@ -47,7 +59,6 @@ class Name extends Validator
         // DNS names are made up of labels separated by dots.
         // Each label: 1-63 chars, letters, digits, hyphens, can't start/end w/ hyphen.
         // Full name: <=255 chars, labels separated by single dots, no empty labels unless root.
-        // If the record type allows underscores in the name, they are allowed in the name.
 
         if (\strlen($name) < 1 || \strlen($name) > Domain::MAX_DOMAIN_NAME_LEN) {
             $this->reason = self::FAILURE_REASON_INVALID_NAME_LENGTH;
@@ -61,9 +72,22 @@ class Name extends Validator
 
         // If the name ends with '.', strip it (absolute FQDN); allow trailing '.'.
         $trimmed = (\substr($name, -1) === '.') ? \substr($name, 0, -1) : $name;
+
+        // RFC 4592: a wildcard is a single '*' as the entire leftmost label.
+        if ($trimmed === '*') {
+            return true;
+        }
+        if (\str_starts_with($trimmed, '*.')) {
+            $trimmed = \substr($trimmed, 2);
+        }
+        if (\str_contains($trimmed, '*')) {
+            $this->reason = self::FAILURE_REASON_INVALID_WILDCARD;
+            return false;
+        }
+
         $labels = \explode('.', $trimmed);
 
-        $isUnderscoreAllowed = \in_array($this->recordType, self::RECORD_TYPES_WITH_UNDERSCORE_IN_NAME);
+        $isUnderscoreAllowed = !\in_array($this->recordType, self::RECORD_TYPES_WITH_HOSTNAME_OWNER, true);
 
         foreach ($labels as $label) {
             if ($label === '') {
@@ -76,10 +100,7 @@ class Name extends Validator
                 return false;
             }
 
-            // RFC: Only a-z 0-9 -, can't start or end with '-'
-            // May contain '_' if the record type allows it.
             $len = \strlen($label);
-            // Check label contains only allowed chars
             for ($i = 0; $i < $len; ++$i) {
                 if (!$this->isValidCharacter($label[$i], $i === 0 || $i === $len - 1, $isUnderscoreAllowed)) {
                     $this->reason = $isUnderscoreAllowed ? self::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE : self::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITHOUT_UNDERSCORE;
