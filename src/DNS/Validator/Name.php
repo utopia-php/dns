@@ -29,7 +29,7 @@ class Name extends Validator
 
     public const string FAILURE_REASON_INVALID_WILDCARD = 'Wildcard "*" must be the entire leftmost label';
 
-    public const string FAILURE_REASON_GENERAL = 'Name must be between 1 and 255 characters long, and contain only alpha-numeric characters and hyphens, and cannot start or end with a hyphen, and may contain underscore if the record type allows it';
+    public const string FAILURE_REASON_GENERAL = 'Name must be between 1 and 255 characters long, and contain only alpha-numeric characters, hyphens and (for non-address record types) underscores, and cannot start or end with a hyphen';
 
     public string $reason = '';
 
