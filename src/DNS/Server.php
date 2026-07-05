@@ -59,9 +59,6 @@ use Utopia\Telemetry\Histogram;
 
 class Server
 {
-    protected Adapter $adapter;
-    protected Resolver $resolver;
-
     /** @var array<int, callable> */
     protected array $errors = [];
 
@@ -74,17 +71,13 @@ class Server
     protected ?Counter $queriesTotal = null;
     protected ?Counter $responsesTotal = null;
 
-    public function __construct(Adapter $adapter, Resolver $resolver)
+    public function __construct(protected Adapter $adapter, protected Resolver $resolver)
     {
-        $this->adapter = $adapter;
-        $this->resolver = $resolver;
         $this->setTelemetry(new NoTelemetry());
     }
 
     /**
      * Set telemetry adapter
-     *
-     * @param Telemetry $telemetry
      */
     public function setTelemetry(Telemetry $telemetry): void
     {
@@ -92,7 +85,7 @@ class Server
             'dns.query.duration',
             's',
             null,
-            ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]]
+            ['ExplicitBucketBoundaries' => [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1]],
         );
 
         // Initialize additional telemetry metrics
@@ -102,9 +95,6 @@ class Server
 
     /**
      * Add Error Handler
-     *
-     * @param callable $handler
-     * @return self
      */
     public function error(callable $handler): self
     {
@@ -117,11 +107,10 @@ class Server
      *
      * @param callable(Server $server, int $workerId): void $handler
      * @phpstan-param callable(Server $server, int $workerId): void $handler
-     * @return self
      */
     public function onWorkerStart(callable $handler): self
     {
-        $this->adapter->onWorkerStart(function (int $workerId) use ($handler) {
+        $this->adapter->onWorkerStart(function (int $workerId) use ($handler): void {
             \call_user_func($handler, $this, $workerId);
         });
 
@@ -130,9 +119,6 @@ class Server
 
     /**
      * Set Debug Mode
-     *
-     * @param bool $status
-     * @return self
      */
     public function setDebug(bool $status): self
     {
@@ -142,26 +128,18 @@ class Server
 
     /**
      * Handle Error
-     *
-     * @param Throwable $error
-     * @return void
      */
     protected function handleError(Throwable $error): void
     {
         foreach ($this->errors as $handler) {
-            call_user_func($handler, $error);
+            \call_user_func($handler, $error);
         }
     }
 
     /**
      * Handle packet
      *
-     * @param string $buffer
-     * @param string $ip
-     * @param int $port
-     * @param int|null $maxResponseSize
      *
-     * @return string
      */
     protected function onPacket(string $buffer, string $ip, int $port, ?int $maxResponseSize = null): string
     {
@@ -184,7 +162,7 @@ class Server
                 $response = Message::response(
                     $e->getHeader(),
                     Message::RCODE_FORMERR,
-                    authoritative: false
+                    authoritative: false,
                 );
                 return $response->encode($maxResponseSize);
             } catch (Throwable $e) {
@@ -202,7 +180,7 @@ class Server
                 $response = Message::response(
                     $query->header,
                     Message::RCODE_NOTIMP,
-                    authoritative: false
+                    authoritative: false,
                 );
                 return $response->encode($maxResponseSize);
             }
@@ -213,7 +191,7 @@ class Server
                 $response = Message::response(
                     $query->header,
                     Message::RCODE_FORMERR,
-                    authoritative: false
+                    authoritative: false,
                 );
                 return $response->encode($maxResponseSize);
             }
@@ -222,7 +200,7 @@ class Server
             $span->set('dns.question.type', $question->type);
 
             $this->queriesTotal?->add(1, [
-                'type' => $question->type ?? null,
+                'type' => $question->type,
             ]);
 
             // 2. Resolve query
@@ -237,7 +215,7 @@ class Server
                     $query->header,
                     Message::RCODE_SERVFAIL,
                     questions: $query->questions,
-                    authoritative: false
+                    authoritative: false,
                 );
             }
             $resolveDuration = microtime(true) - $resolveStart;
@@ -259,26 +237,26 @@ class Server
                     $query->header,
                     Message::RCODE_SERVFAIL,
                     questions: $query->questions,
-                    authoritative: false
+                    authoritative: false,
                 );
                 return $response->encode($maxResponseSize);
             } finally {
                 $encodeDuration = microtime(true) - $encodeStart;
                 $this->duration?->record($encodeDuration, [
                     'phase' => 'encode',
-                    'responseCode' => $response->header->responseCode
+                    'responseCode' => $response->header->responseCode,
                 ]);
                 $span->set('dns.duration.encode', $encodeDuration);
             }
         } finally {
             if ($question !== null) {
                 $this->responsesTotal?->add(1, [
-                    'type' => $question->type ?? null,
-                    'responseCode' => $response?->header->responseCode
+                    'type' => $question->type,
+                    'responseCode' => $response?->header->responseCode,
                 ]);
             }
 
-            if ($response !== null) {
+            if ($response instanceof \Utopia\DNS\Message) {
                 $span->set('dns.response.code', $response->header->responseCode);
                 $span->set('dns.response.answer_count', $response->header->answerCount);
             }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS\Validator;
 
 use PHPUnit\Framework\TestCase;
@@ -41,18 +43,18 @@ final class NameTest extends TestCase
         }
 
         $validator = new Name(Record::TYPE_SRV);
-        $this->assertTrue($validator->isValid('example._tcp.com'), "Expected valid: example._tcp.com");
+        $this->assertTrue($validator->isValid('example._tcp.com'), 'Expected valid: example._tcp.com');
 
         // No record type applies the general domain name rules
         $validator = new Name();
-        $this->assertTrue($validator->isValid('selector1._domainkey'), "Expected valid: selector1._domainkey");
-        $this->assertTrue($validator->isValid('*.example.com'), "Expected valid: *.example.com");
+        $this->assertTrue($validator->isValid('selector1._domainkey'), 'Expected valid: selector1._domainkey');
+        $this->assertTrue($validator->isValid('*.example.com'), 'Expected valid: *.example.com');
 
         // Address records still allow wildcards, just not underscores
         $validator = new Name(Record::TYPE_A);
-        $this->assertTrue($validator->isValid('*'), "Expected valid: *");
-        $this->assertTrue($validator->isValid('*.example.com'), "Expected valid: *.example.com");
-        $this->assertFalse($validator->isValid('_dmarc'), "Expected invalid: _dmarc");
+        $this->assertTrue($validator->isValid('*'), 'Expected valid: *');
+        $this->assertTrue($validator->isValid('*.example.com'), 'Expected valid: *.example.com');
+        $this->assertFalse($validator->isValid('_dmarc'), 'Expected invalid: _dmarc');
     }
 
     public function testInvalid(): void
@@ -125,7 +127,7 @@ final class NameTest extends TestCase
         }
 
         // '*..com' fails on the empty label left after the wildcard is stripped
-        $this->assertFalse($validator->isValid('*..com'), "Expected invalid: *..com");
+        $this->assertFalse($validator->isValid('*..com'), 'Expected invalid: *..com');
         $this->assertSame(Name::FAILURE_REASON_INVALID_LABEL_CHARACTERS_WITH_UNDERSCORE, $validator->getDescription());
     }
 }

@@ -2,17 +2,17 @@
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-use Utopia\DNS\Server;
 use Utopia\DNS\Adapter\Swoole;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver;
+use Utopia\DNS\Server;
 use Utopia\DNS\Zone;
 use Utopia\DNS\Zone\File;
 use Utopia\DNS\Zone\Resolver as ZoneResolver;
+use Utopia\Span\Exporter;
 use Utopia\Span\Span;
 use Utopia\Span\Storage;
-use Utopia\Span\Exporter;
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) {
     return;
@@ -26,26 +26,26 @@ $server = new Swoole('0.0.0.0', $port);
 
 $records = [
     // Single A
-    new Record(name: 'dev.appwrite.io', type: Record::TYPE_A, rdata: '180.12.3.24', ttl: 10),
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_A, ttl: 10, rdata: '180.12.3.24'),
     // Mulple AAAA
-    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_A, rdata: '142.6.0.1', ttl: 1800),
-    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_A, rdata: '142.6.0.2', ttl: 1800),
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_A, ttl: 1800, rdata: '142.6.0.1'),
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_A, ttl: 1800, rdata: '142.6.0.2'),
     // Single AAAA
-    new Record(name: 'dev.appwrite.io', type: Record::TYPE_AAAA, rdata: '2001:0db8:0000:0000:0000:ff00:0042:8329', ttl: 20),
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_AAAA, ttl: 20, rdata: '2001:0db8:0000:0000:0000:ff00:0042:8329'),
     // Multiple AAAA
-    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_AAAA, rdata: '2001:0db8:0000:0000:0000:ff00:0000:0001', ttl: 20),
-    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_AAAA, rdata: '2001:0db8:0000:0000:0000:ff00:0000:0002', ttl: 20),
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_AAAA, ttl: 20, rdata: '2001:0db8:0000:0000:0000:ff00:0000:0001'),
+    new Record(name: 'dev2.appwrite.io', type: Record::TYPE_AAAA, ttl: 20, rdata: '2001:0db8:0000:0000:0000:ff00:0000:0002'),
     // Single CNAME
-    new Record(name: 'alias.appwrite.io', type: Record::TYPE_CNAME, rdata: 'cloud.appwrite.io', ttl: 30),
+    new Record(name: 'alias.appwrite.io', type: Record::TYPE_CNAME, ttl: 30, rdata: 'cloud.appwrite.io'),
     // Secret TXT
-    new Record(name: 'dev.appwrite.io', type: Record::TYPE_TXT, rdata: 'awesome-secret-key', ttl: 30),
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_TXT, ttl: 30, rdata: 'awesome-secret-key'),
     // Mail MX
-    new Record(name: 'dev.appwrite.io', type: Record::TYPE_MX, rdata: '10 mail.appwrite.io', ttl: 30),
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_MX, ttl: 30, rdata: '10 mail.appwrite.io'),
     // Single CAA
-    new Record(name: 'dev.appwrite.io', type: Record::TYPE_CAA, rdata: '0 issue "letsencrypt.org"', ttl: 30),
+    new Record(name: 'dev.appwrite.io', type: Record::TYPE_CAA, ttl: 30, rdata: '0 issue "letsencrypt.org"'),
     // Subdomain NS delegation
-    new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, rdata: 'ns1.test.io', ttl: 30),
-    new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, rdata: 'ns2.test.io', ttl: 30),
+    new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, ttl: 30, rdata: 'ns1.test.io'),
+    new Record(name: 'delegated.appwrite.io', type: Record::TYPE_NS, ttl: 30, rdata: 'ns2.test.io'),
 ];
 
 $appwriteZone = new Zone(
@@ -54,9 +54,9 @@ $appwriteZone = new Zone(
     soa: new Record(
         name: 'appwrite.io',
         type: Record::TYPE_SOA,
+        ttl: 30,
         rdata: 'ns1.appwrite.zone team.appwrite.io 1 7200 1800 1209600 3600',
-        ttl: 30
-    )
+    ),
 );
 
 // Load the localhost zone from zone file (contains large.localhost TXT records for TCP truncation tests)
@@ -66,11 +66,9 @@ $localhostZone = File::import($localhostZoneContent);
 /**
  * Simple multi-zone resolver for testing purposes
  */
-$multiZoneResolver = new class([$appwriteZone, $localhostZone]) implements Resolver {
+$multiZoneResolver = new readonly class ([$appwriteZone, $localhostZone]) implements Resolver {
     /** @param list<Zone> $zones */
-    public function __construct(private readonly array $zones)
-    {
-    }
+    public function __construct(private array $zones) {}
 
     public function resolve(Message $query): Message
     {
@@ -111,7 +109,7 @@ $multiZoneResolver = new class([$appwriteZone, $localhostZone]) implements Resol
 $dns = new Server($server, $multiZoneResolver);
 $dns->setDebug(false);
 
-$dns->onWorkerStart(function (Server $server, int $workerId) {
+$dns->onWorkerStart(function (Server $server, int $workerId): void {
     $span = Span::init('dns.worker.start');
     $span->set('worker.id', $workerId);
     $span->finish();

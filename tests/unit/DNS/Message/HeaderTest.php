@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS\Message;
 
 use PHPUnit\Framework\TestCase;
@@ -22,7 +24,7 @@ final class HeaderTest extends TestCase
             questionCount: 1,
             answerCount: 2,
             authorityCount: 3,
-            additionalCount: 4
+            additionalCount: 4,
         );
 
         $binary = $header->encode();
@@ -87,7 +89,7 @@ final class HeaderTest extends TestCase
             questionCount: 0x0506,
             answerCount: 0x0708,
             authorityCount: 0x090a,
-            additionalCount: 0x0b0c
+            additionalCount: 0x0b0c,
         );
 
         $binary = $header->encode();
@@ -111,7 +113,7 @@ final class HeaderTest extends TestCase
             questionCount: 0,
             answerCount: 0,
             authorityCount: 0,
-            additionalCount: 0
+            additionalCount: 0,
         );
     }
 
@@ -132,7 +134,7 @@ final class HeaderTest extends TestCase
             questionCount: 0,
             answerCount: 0,
             authorityCount: 0,
-            additionalCount: 0
+            additionalCount: 0,
         );
     }
 
@@ -188,7 +190,7 @@ final class HeaderTest extends TestCase
 
             $decoded = Header::decode($binaryHeader);
 
-            $this->assertSame(0xABCD, $decoded->id, "Failed for Z bits pattern: " . sprintf('0x%04X', $zBits));
+            $this->assertSame(0xABCD, $decoded->id, 'Failed for Z bits pattern: ' . \sprintf('0x%04X', $zBits));
             $this->assertFalse($decoded->isResponse);
             $this->assertTrue($decoded->recursionDesired);
             $this->assertSame(0, $decoded->responseCode);

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS;
 
 use InvalidArgumentException;
@@ -25,7 +27,7 @@ final class ZoneTest extends TestCase
             'other.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.other.com hostmaster.other.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.other.com hostmaster.other.com 1 7200 3600 1209600 300',
         );
 
         $this->expectException(InvalidArgumentException::class);
@@ -40,7 +42,7 @@ final class ZoneTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $records = [
             new Record('example.com', Record::TYPE_SOA),
@@ -58,7 +60,7 @@ final class ZoneTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $records = [
             new Record('other.com', Record::TYPE_A, ttl: 300, rdata: '1.1.1.1'),
@@ -76,7 +78,7 @@ final class ZoneTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $records = [
             new Record('*.other.com', Record::TYPE_A, ttl: 300, rdata: '1.1.1.1'),
@@ -94,7 +96,7 @@ final class ZoneTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $records = [
             new Record('*.api.example.com', Record::TYPE_A, ttl: 120, rdata: '203.0.113.10'),
@@ -113,7 +115,7 @@ final class ZoneTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $records = [
             new Record('api.example.com', Record::TYPE_A, ttl: 120, rdata: 'a.a.a.a'),

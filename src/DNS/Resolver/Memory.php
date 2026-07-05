@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS\Resolver;
 
 use Utopia\DNS\Message;
@@ -9,9 +11,7 @@ use Utopia\DNS\Zone\Resolver as ZoneResolver;
 
 class Memory implements Resolver
 {
-    public function __construct(private readonly Zone $zone)
-    {
-    }
+    public function __construct(private readonly Zone $zone) {}
 
     public function resolve(Message $query): Message
     {

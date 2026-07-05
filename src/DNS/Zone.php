@@ -39,7 +39,7 @@ final readonly class Zone
             }
             if ($this->name !== '.' && $record->name !== $this->name && !str_ends_with($record->name, $zoneSuffix)) {
                 throw new \InvalidArgumentException(
-                    "Record name '$record->name' does not belong to zone '$this->name'"
+                    "Record name '$record->name' does not belong to zone '$this->name'",
                 );
             }
         }
@@ -47,9 +47,6 @@ final readonly class Zone
 
     /**
      * Check if the zone is authoritative for a given name
-     *
-     * @param string $name
-     * @return bool
      */
     public function isAuthoritative(string $name): bool
     {

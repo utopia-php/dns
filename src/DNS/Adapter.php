@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS;
 
 abstract class Adapter
@@ -27,8 +29,6 @@ abstract class Adapter
 
     /**
      * Get the name of the adapter
-     *
-     * @return string
      */
     abstract public function getName(): string;
 }

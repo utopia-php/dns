@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\E2E\Utopia\DNS;
 
 use PHPUnit\Framework\TestCase;
@@ -17,7 +19,7 @@ final class ClientTest extends TestCase
         $client = new Client('127.0.0.1', self::PORT, 5, true);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_A)
+            new Question('dev2.appwrite.io', Record::TYPE_A),
         ));
 
         $records = $response->answers;
@@ -28,7 +30,7 @@ final class ClientTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $records[0]->class);
         $this->assertSame(1800, $records[0]->ttl);
         // RRSet order is randomized for load balancing per RFC 2181
-        $rdataValues = array_map(fn ($r) => $r->rdata, $records);
+        $rdataValues = array_map(fn(\Utopia\DNS\Message\Record $r): string => $r->rdata, $records);
         $this->assertEqualsCanonicalizing(['142.6.0.1', '142.6.0.2'], $rdataValues);
     }
 
@@ -36,7 +38,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('dev.appwrite.io', Record::TYPE_A)
+            new Question('dev.appwrite.io', Record::TYPE_A),
         ));
         $records = $response->answers;
 
@@ -49,7 +51,7 @@ final class ClientTest extends TestCase
         $this->assertSame('180.12.3.24', $records[0]->rdata);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_A)
+            new Question('dev2.appwrite.io', Record::TYPE_A),
         ));
         $records = $response->answers;
 
@@ -59,11 +61,11 @@ final class ClientTest extends TestCase
         $this->assertSame(1800, $records[0]->ttl);
         $this->assertSame(Record::TYPE_A, $records[0]->type);
         // RRSet order is randomized for load balancing per RFC 2181
-        $rdataValues = array_map(fn ($r) => $r->rdata, $records);
+        $rdataValues = array_map(fn(\Utopia\DNS\Message\Record $r): string => $r->rdata, $records);
         $this->assertEqualsCanonicalizing(['142.6.0.1', '142.6.0.2'], $rdataValues);
 
         $response = $client->query(Message::query(
-            new Question('dev3.appwrite.io', Record::TYPE_A)
+            new Question('dev3.appwrite.io', Record::TYPE_A),
         ));
         $this->assertCount(0, $response->answers);
     }
@@ -72,7 +74,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('dev.appwrite.io', Record::TYPE_AAAA)
+            new Question('dev.appwrite.io', Record::TYPE_AAAA),
         ));
         $records = $response->answers;
 
@@ -84,17 +86,17 @@ final class ClientTest extends TestCase
         $this->assertSame('2001:db8::ff00:42:8329', $records[0]->rdata);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_AAAA)
+            new Question('dev2.appwrite.io', Record::TYPE_AAAA),
         ));
         $records = $response->answers;
 
         $this->assertCount(2, $records);
         // RRSet order is randomized for load balancing per RFC 2181
-        $rdataValues = array_map(fn ($r) => $r->rdata, $records);
+        $rdataValues = array_map(fn(\Utopia\DNS\Message\Record $r): string => $r->rdata, $records);
         $this->assertEqualsCanonicalizing(['2001:db8::ff00:0:1', '2001:db8::ff00:0:2'], $rdataValues);
 
         $response = $client->query(Message::query(
-            new Question('dev3.appwrite.io', Record::TYPE_AAAA)
+            new Question('dev3.appwrite.io', Record::TYPE_AAAA),
         ));
         $this->assertCount(0, $response->answers);
     }
@@ -103,7 +105,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('alias.appwrite.io', Record::TYPE_CNAME)
+            new Question('alias.appwrite.io', Record::TYPE_CNAME),
         ));
         $records = $response->answers;
 
@@ -115,7 +117,7 @@ final class ClientTest extends TestCase
         $this->assertSame('cloud.appwrite.io', $records[0]->rdata);
 
         $response = $client->query(Message::query(
-            new Question('alias-missing.appwrite.io', Record::TYPE_CNAME)
+            new Question('alias-missing.appwrite.io', Record::TYPE_CNAME),
         ));
         $records = $response->answers;
 
@@ -126,7 +128,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('dev.appwrite.io', Record::TYPE_TXT)
+            new Question('dev.appwrite.io', Record::TYPE_TXT),
         ));
         $records = $response->answers;
 
@@ -138,12 +140,12 @@ final class ClientTest extends TestCase
         $this->assertSame('awesome-secret-key', $records[0]->rdata);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_TXT)
+            new Question('dev2.appwrite.io', Record::TYPE_TXT),
         ));
         $this->assertCount(0, $response->answers);
 
         $response = $client->query(Message::query(
-            new Question('dev3.appwrite.io', Record::TYPE_TXT)
+            new Question('dev3.appwrite.io', Record::TYPE_TXT),
         ));
         $this->assertCount(0, $response->answers);
     }
@@ -152,7 +154,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('delegated.appwrite.io', Record::TYPE_NS)
+            new Question('delegated.appwrite.io', Record::TYPE_NS),
         ));
         $this->assertCount(0, $response->answers);
 
@@ -167,7 +169,7 @@ final class ClientTest extends TestCase
         $this->assertSame('ns2.test.io', $authority[1]->rdata);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_NS)
+            new Question('dev2.appwrite.io', Record::TYPE_NS),
         ));
         $this->assertCount(0, $response->answers);
         $authority = $response->authority;
@@ -176,7 +178,7 @@ final class ClientTest extends TestCase
         $this->assertSame(Record::TYPE_SOA, $authority[0]->type);
 
         $response = $client->query(Message::query(
-            new Question('dev3.appwrite.io', Record::TYPE_NS)
+            new Question('dev3.appwrite.io', Record::TYPE_NS),
         ));
         $this->assertCount(0, $response->answers);
     }
@@ -185,7 +187,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('dev.appwrite.io', Record::TYPE_CAA)
+            new Question('dev.appwrite.io', Record::TYPE_CAA),
         ));
         $records = $response->answers;
 
@@ -197,12 +199,12 @@ final class ClientTest extends TestCase
         $this->assertSame('0 issue "letsencrypt.org"', $records[0]->rdata);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_CAA)
+            new Question('dev2.appwrite.io', Record::TYPE_CAA),
         ));
         $this->assertCount(0, $response->answers);
 
         $response = $client->query(Message::query(
-            new Question('dev3.appwrite.io', Record::TYPE_CAA)
+            new Question('dev3.appwrite.io', Record::TYPE_CAA),
         ));
         $this->assertCount(0, $response->answers);
     }
@@ -211,7 +213,7 @@ final class ClientTest extends TestCase
     {
         $client = new Client('127.0.0.1', self::PORT);
         $response = $client->query(Message::query(
-            new Question('appwrite.io', Record::TYPE_SOA)
+            new Question('appwrite.io', Record::TYPE_SOA),
         ));
         $this->assertCount(0, $response->authority);
 
@@ -228,7 +230,7 @@ final class ClientTest extends TestCase
         $this->assertStringContainsString('1 7200 1800 1209600 3600', $rdata);
 
         $response = $client->query(Message::query(
-            new Question('dev2.appwrite.io', Record::TYPE_SOA)
+            new Question('dev2.appwrite.io', Record::TYPE_SOA),
         ));
         $answers = $response->answers;
         $this->assertCount(0, $answers);
@@ -264,7 +266,7 @@ final class ClientTest extends TestCase
             $this->assertNotEmpty($client);
             $client = new Client('127.0.0.1', self::PORT);
             $this->assertNotEmpty($client);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $this->fail('IPv4 threw unexpected error');
         }
 
@@ -273,7 +275,7 @@ final class ClientTest extends TestCase
             $this->assertNotEmpty($client);
             $client = new Client('2606:4700:52::ac40:34d2', self::PORT);
             $this->assertNotEmpty($client);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $this->fail('IPv6 threw unexpected error');
         }
     }
@@ -302,9 +304,9 @@ final class ClientTest extends TestCase
 
         // TCP response should have more answers than truncated UDP
         $this->assertGreaterThan(
-            count($udpResponse->answers),
-            count($tcpResponse->answers),
-            'TCP should return more answers than truncated UDP'
+            \count($udpResponse->answers),
+            \count($tcpResponse->answers),
+            'TCP should return more answers than truncated UDP',
         );
     }
 }

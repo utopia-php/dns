@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS\Resolver;
 
 use PHPUnit\Framework\TestCase;
@@ -8,7 +10,7 @@ use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
 use Utopia\DNS\Resolver\Google;
 
-class GoogleTest extends TestCase
+final class GoogleTest extends TestCase
 {
     public function testResolveGoogleA(): void
     {
@@ -17,14 +19,13 @@ class GoogleTest extends TestCase
         $response = $resolver->resolve(Message::query(
             new Question(
                 name: 'google.com',
-                type: Record::TYPE_A
-            )
+                type: Record::TYPE_A,
+            ),
         ));
 
         $this->assertNotEmpty($response->answers);
         $this->assertInstanceOf(Record::class, $response->answers[0] ?? null);
 
-        /** @var Record $record */
         $record = $response->answers[0];
         $this->assertSame(Record::TYPE_A, $record->type);
         $this->assertSame('google.com', $record->name);
@@ -38,14 +39,13 @@ class GoogleTest extends TestCase
         $response = $resolver->resolve(Message::query(
             new Question(
                 name: 'google.com',
-                type: Record::TYPE_AAAA
-            )
+                type: Record::TYPE_AAAA,
+            ),
         ));
 
         $this->assertNotEmpty($response->answers);
         $this->assertInstanceOf(Record::class, $response->answers[0] ?? null);
 
-        /** @var Record $record */
         $record = $response->answers[0];
         $this->assertSame(Record::TYPE_AAAA, $record->type);
         $this->assertSame('google.com', $record->name);

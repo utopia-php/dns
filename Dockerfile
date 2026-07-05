@@ -30,6 +30,5 @@ COPY ./tests /usr/src/code/tests
 COPY ./src /usr/src/code/src
 COPY ./phpunit.xml /usr/src/code/phpunit.xml
 COPY ./phpstan.neon /usr/src/code/phpstan.neon
-COPY ./pint.json /usr/src/code/pint.json
 
 CMD [ "tail", "-f", "/dev/null" ]

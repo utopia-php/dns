@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS\Resolver;
 
 class Cloudflare extends Proxy
@@ -17,9 +19,8 @@ class Cloudflare extends Proxy
 
     /**
      * Get the name of the resolver
-     *
-     * @return string
      */
+    #[\Override]
     public function getName(): string
     {
         return "Cloudflare DNS ($this->server)";

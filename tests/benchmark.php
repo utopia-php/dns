@@ -55,12 +55,11 @@ function calculatePercentile(array $values, float $percentile): float
     return $values[$index];
 }
 
-function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $concurrency = 10)
+function benchmarkDnsServer($server, $port, array $testCases, $iterations = 100, $concurrency = 10): void
 {
     echo "Benchmarking DNS Server: $server:$port ($iterations queries per record, concurrency: $concurrency)...\n";
 
     $successCount = 0;
-    $failedCount = 0;
     $responseTimes = [];
     $timeSeriesData = [];
     $startTime = microtime(true);
@@ -155,7 +154,7 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                             Console::error("\n[FAILURE DETECTED] Test stopped on first error");
                             Console::error("Domain: {$result['domain']}");
                             Console::error("Query Type: {$result['type']}");
-                            Console::error("Iteration: " . ($i + $j));
+                            Console::error('Iteration: ' . ($i + $j));
                             Console::error("Error Message: {$result['error']}");
                             printFailureStats($successCount, $responseTimes, $timeSeriesData);
                             cleanupTmpDir($tmpDir);
@@ -169,20 +168,20 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
                                 'time' => $elapsedTime,
                                 'latency' => $result['time'],
                                 'domain' => $result['domain'],
-                                'type' => $result['type']
+                                'type' => $result['type'],
                             ];
                             $successCount++;
 
                             $currentAvg = array_sum($responseTimes) / count($responseTimes);
-                            echo "Query " . ($i + $j) . " ({$result['type']}): " .
-                                round($result['time'], 2) . " ms (Domain: {$result['domain']}, Running Avg: " .
-                                round($currentAvg, 2) . " ms)\n";
+                            echo 'Query ' . ($i + $j) . " ({$result['type']}): "
+                                . round($result['time'], 2) . " ms (Domain: {$result['domain']}, Running Avg: "
+                                . round($currentAvg, 2) . " ms)\n";
                         } else {
                             Console::error("\n[FAILURE DETECTED] Test stopped on first error");
                             Console::error("Domain: {$result['domain']}");
                             Console::error("Query Type: {$result['type']}");
-                            Console::error("Iteration: " . ($i + $j));
-                            Console::error("Error: No records found");
+                            Console::error('Iteration: ' . ($i + $j));
+                            Console::error('Error: No records found');
                             printFailureStats($successCount, $responseTimes, $timeSeriesData);
                             cleanupTmpDir($tmpDir);
                             exit(1);
@@ -200,7 +199,7 @@ function benchmarkDnsServer($server, $port, $testCases, $iterations = 100, $conc
     if (count($responseTimes) > 0) {
         printSuccessStats($successCount, $responseTimes, $timeSeriesData, $iterations, $testCases);
     } else {
-        Console::error("No successful queries. The server may not be responding.");
+        Console::error('No successful queries. The server may not be responding.');
     }
 }
 
@@ -234,7 +233,7 @@ function cleanupTmpDir($dir): void
 
             usleep(500000); // Wait 500ms before next attempt
             $attempt++;
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             usleep(500000); // Wait 500ms before next attempt
             $attempt++;
         }
@@ -247,11 +246,11 @@ function cleanupTmpDir($dir): void
 function printLatencyDistribution(array $responseTimes): void
 {
     Console::info("\n--- Latency Distribution ---");
-    Console::info("p50: " . round(calculatePercentile($responseTimes, 0.50), 2) . " ms");
-    Console::info("p75: " . round(calculatePercentile($responseTimes, 0.75), 2) . " ms");
-    Console::info("p90: " . round(calculatePercentile($responseTimes, 0.90), 2) . " ms");
-    Console::info("p95: " . round(calculatePercentile($responseTimes, 0.95), 2) . " ms");
-    Console::info("p99: " . round(calculatePercentile($responseTimes, 0.99), 2) . " ms");
+    Console::info('p50: ' . round(calculatePercentile($responseTimes, 0.50), 2) . ' ms');
+    Console::info('p75: ' . round(calculatePercentile($responseTimes, 0.75), 2) . ' ms');
+    Console::info('p90: ' . round(calculatePercentile($responseTimes, 0.90), 2) . ' ms');
+    Console::info('p95: ' . round(calculatePercentile($responseTimes, 0.95), 2) . ' ms');
+    Console::info('p99: ' . round(calculatePercentile($responseTimes, 0.99), 2) . ' ms');
 }
 
 function analyzeTimeSeries(array $timeSeriesData): array
@@ -272,7 +271,7 @@ function analyzeTimeSeries(array $timeSeriesData): array
             'avg' => array_sum($latencies) / count($latencies),
             'min' => min($latencies),
             'max' => max($latencies),
-            'requests' => count($latencies)
+            'requests' => count($latencies),
         ];
     }
 
@@ -286,15 +285,15 @@ function printTimeSeriesAnalysis(array $timeSeriesData): void
     Console::info("\n--- Time Series Analysis (1000 requests per window) ---");
     foreach ($windows as $window) {
         Console::info(
-            "Window {$window['window']} ({$window['requests']} requests): " .
-            "Avg: " . round($window['avg'], 2) . "ms, " .
-            "Min: " . round($window['min'], 2) . "ms, " .
-            "Max: " . round($window['max'], 2) . "ms"
+            "Window {$window['window']} ({$window['requests']} requests): "
+            . 'Avg: ' . round($window['avg'], 2) . 'ms, '
+            . 'Min: ' . round($window['min'], 2) . 'ms, '
+            . 'Max: ' . round($window['max'], 2) . 'ms',
         );
     }
 }
 
-function printSuccessStats($successCount, $responseTimes, $timeSeriesData, $iterations, $testCases): void
+function printSuccessStats($successCount, array $responseTimes, array $timeSeriesData, $iterations, array $testCases): void
 {
     $min = min($responseTimes);
     $max = max($responseTimes);
@@ -308,31 +307,31 @@ function printSuccessStats($successCount, $responseTimes, $timeSeriesData, $iter
     Console::success("\n--- Benchmark Results ---");
     Console::info("Total Requests: {$totalRequests}");
     Console::info("Successful: {$successCount}");
-    Console::info("Failed: 0");
-    Console::info("Total Test Time: " . round($totalTime, 2) . " seconds");
-    Console::info("Requests Per Second: " . round($rps, 2) . " req/s");
+    Console::info('Failed: 0');
+    Console::info('Total Test Time: ' . round($totalTime, 2) . ' seconds');
+    Console::info('Requests Per Second: ' . round($rps, 2) . ' req/s');
     Console::info("\n--- Response Times ---");
-    Console::info("Min Response Time: " . round($min, 2) . " ms");
-    Console::info("Max Response Time: " . round($max, 2) . " ms");
-    Console::info("Avg Response Time: " . round($avg, 2) . " ms");
+    Console::info('Min Response Time: ' . round($min, 2) . ' ms');
+    Console::info('Max Response Time: ' . round($max, 2) . ' ms');
+    Console::info('Avg Response Time: ' . round($avg, 2) . ' ms');
 
     printLatencyDistribution($responseTimes);
     printTimeSeriesAnalysis($timeSeriesData);
 }
 
-function printFailureStats($successCount, $responseTimes, $timeSeriesData): void
+function printFailureStats($successCount, $responseTimes, array $timeSeriesData): void
 {
     Console::error("\nTest Summary:");
     Console::error("- Successful queries before failure: {$successCount}");
-    Console::error("- Failed at: " . date('Y-m-d H:i:s'));
+    Console::error('- Failed at: ' . date('Y-m-d H:i:s'));
 
     if (count($responseTimes) > 0) {
         $totalTime = (end($timeSeriesData)['time'] - $timeSeriesData[0]['time']) / 1000;
         $rps = $successCount / $totalTime;
-        Console::error("- Total Test Time: " . round($totalTime, 2) . " seconds");
-        Console::error("- Requests Per Second: " . round($rps, 2) . " req/s");
-        Console::error("- Average response time before failure: " .
-            round(array_sum($responseTimes) / count($responseTimes), 2) . " ms");
+        Console::error('- Total Test Time: ' . round($totalTime, 2) . ' seconds');
+        Console::error('- Requests Per Second: ' . round($rps, 2) . ' req/s');
+        Console::error('- Average response time before failure: '
+            . round(array_sum($responseTimes) / count($responseTimes), 2) . ' ms');
         printLatencyDistribution($responseTimes);
         printTimeSeriesAnalysis($timeSeriesData);
     }
@@ -345,13 +344,13 @@ $options = getopt('', [
     'iterations::',
     'concurrency::',
     'domains::',
-    'types::'
+    'types::',
 ]);
 
 $server = $options['server'] ?? '127.0.0.1';
-$port = (int)($options['port'] ?? 53);
-$iterations = (int)($options['iterations'] ?? 10000);
-$concurrency = (int)($options['concurrency'] ?? 10);
+$port = (int) ($options['port'] ?? 53);
+$iterations = (int) ($options['iterations'] ?? 10000);
+$concurrency = (int) ($options['concurrency'] ?? 10);
 
 // Parse domains and types
 $defaultDomains = ['dev.appwrite.io', 'dev2.appwrite.io'];
@@ -367,32 +366,32 @@ $types = isset($options['types'])
 
 // Validate inputs
 if ($port < 1 || $port > 65535) {
-    Console::error("Invalid port number. Must be between 1 and 65535");
+    Console::error('Invalid port number. Must be between 1 and 65535');
     exit(1);
 }
 
 if ($iterations < 1) {
-    Console::error("Invalid number of iterations. Must be greater than 0");
+    Console::error('Invalid number of iterations. Must be greater than 0');
     exit(1);
 }
 
 if ($concurrency < 1) {
-    Console::error("Invalid concurrency level. Must be greater than 0");
+    Console::error('Invalid concurrency level. Must be greater than 0');
     exit(1);
 }
 
 if ($concurrency > $iterations) {
-    Console::error("Concurrency cannot be greater than iterations");
+    Console::error('Concurrency cannot be greater than iterations');
     exit(1);
 }
 
-if (empty($domains)) {
-    Console::error("No domains specified for testing");
+if ($domains === []) {
+    Console::error('No domains specified for testing');
     exit(1);
 }
 
-if (empty($types)) {
-    Console::error("No record types specified for testing");
+if ($types === []) {
+    Console::error('No record types specified for testing');
     exit(1);
 }
 
@@ -401,19 +400,19 @@ $validTypes = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'NS', 'PTR', 'SOA'];
 foreach ($types as $type) {
     if (!in_array(strtoupper($type), $validTypes)) {
         Console::error("Invalid record type: $type");
-        Console::error("Valid types are: " . implode(', ', $validTypes));
+        Console::error('Valid types are: ' . implode(', ', $validTypes));
         exit(1);
     }
 }
 
 // Display configuration
-Console::info("DNS Server Benchmark Configuration:");
+Console::info('DNS Server Benchmark Configuration:');
 Console::info("- Server: $server");
 Console::info("- Port: $port");
 Console::info("- Iterations per record: $iterations");
 Console::info("- Concurrency level: $concurrency");
-Console::info("- Domains: " . implode(', ', $domains));
-Console::info("- Record Types: " . implode(', ', $types));
+Console::info('- Domains: ' . implode(', ', $domains));
+Console::info('- Record Types: ' . implode(', ', $types));
 Console::info("Starting benchmark in 3 seconds...\n");
 sleep(3);
 

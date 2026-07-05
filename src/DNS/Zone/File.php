@@ -102,18 +102,18 @@ final readonly class File
             $lastClass = $rr['class'];
 
             $record = new Record(
-                name:     $rr['name'],
-                type:     $rr['type'],
-                class:    $rr['class'],
-                ttl:      $rr['ttl'],
-                rdata:    $rr['rdata'],
+                name: $rr['name'],
+                type: $rr['type'],
+                class: $rr['class'],
+                ttl: $rr['ttl'],
+                rdata: $rr['rdata'],
                 priority: $rr['priority'],
-                weight:   $rr['weight'],
-                port:     $rr['port']
+                weight: $rr['weight'],
+                port: $rr['port'],
             );
 
             if ($rr['type'] === Record::TYPE_SOA) {
-                if ($soa !== null) {
+                if ($soa instanceof \Utopia\DNS\Message\Record) {
                     throw new ImportException($content, "Multiple SOA records found (line $num).");
                 }
                 $soa = $record;
@@ -123,7 +123,7 @@ final readonly class File
             $records[] = $record;
         }
 
-        if ($soa === null) {
+        if (!$soa instanceof \Utopia\DNS\Message\Record) {
             throw new ImportException($content, 'No SOA record found in zone file');
         }
 
@@ -308,7 +308,7 @@ final readonly class File
         int $lastTTL,
         int $lastClass,
         bool $ownerOmitted,
-        int $lineNum
+        int $lineNum,
     ): array {
         $tokens = self::splitWhitespace($line);
         if ($tokens === []) {
@@ -343,7 +343,7 @@ final readonly class File
         $ttl   = $lastTTL;
         $class = $lastClass;
 
-        while ($i < count($tokens) - 1) {
+        while ($i < \count($tokens) - 1) {
             $t = $tokens[$i];
 
             if (ctype_digit($t)) {
@@ -362,7 +362,7 @@ final readonly class File
             break;
         }
 
-        if ($i >= count($tokens)) {
+        if ($i >= \count($tokens)) {
             throw new InvalidArgumentException("Missing record type (line $lineNum).");
         }
 
@@ -374,7 +374,7 @@ final readonly class File
 
         $i++;
 
-        $rdataTokens = array_slice($tokens, $i);
+        $rdataTokens = \array_slice($tokens, $i);
         if ($rdataTokens === []) {
             throw new InvalidArgumentException("Record '$typeString' has no RDATA (line $lineNum).");
         }
@@ -408,16 +408,15 @@ final readonly class File
 
             case Record::TYPE_NS:
             case Record::TYPE_CNAME:
-            case Record::TYPE_PTR: {
+            case Record::TYPE_PTR:
                 $name = self::absolutizeDomainName($tokens[0], $origin);
                 if ($name === null) {
                     throw new InvalidArgumentException("Relative domain name requires an origin (line $lineNum).");
                 }
                 return ['rdata' => $name, 'priority' => null, 'weight' => null, 'port' => null];
-            }
 
-            case Record::TYPE_MX: {
-                if (count($tokens) < 2 || !ctype_digit($tokens[0])) {
+            case Record::TYPE_MX:
+                if (\count($tokens) < 2 || !ctype_digit($tokens[0])) {
                     throw new InvalidArgumentException("MX requires numeric priority and exchange (line $lineNum).");
                 }
                 $priority = (int) $tokens[0];
@@ -426,10 +425,9 @@ final readonly class File
                     throw new InvalidArgumentException("MX exchange requires an origin (line $lineNum).");
                 }
                 return ['rdata' => $exchange, 'priority' => $priority, 'weight' => null, 'port' => null];
-            }
 
-            case Record::TYPE_SRV: {
-                if (count($tokens) < 4 || !ctype_digit($tokens[0]) || !ctype_digit($tokens[1]) || !ctype_digit($tokens[2])) {
+            case Record::TYPE_SRV:
+                if (\count($tokens) < 4 || !ctype_digit($tokens[0]) || !ctype_digit($tokens[1]) || !ctype_digit($tokens[2])) {
                     throw new InvalidArgumentException("SRV requires priority, weight, port, target (line $lineNum).");
                 }
                 $priority = (int) $tokens[0];
@@ -440,10 +438,9 @@ final readonly class File
                     throw new InvalidArgumentException("SRV target requires an origin (line $lineNum).");
                 }
                 return ['rdata' => $target, 'priority' => $priority, 'weight' => $weight, 'port' => $port];
-            }
 
-            case Record::TYPE_SOA: {
-                if (count($tokens) < 7) {
+            case Record::TYPE_SOA:
+                if (\count($tokens) < 7) {
                     throw new InvalidArgumentException("SOA requires MNAME, RNAME, SERIAL, REFRESH, RETRY, EXPIRE, MINIMUM (line $lineNum).");
                 }
                 $mname = self::absolutizeDomainName($tokens[0], $origin);
@@ -453,41 +450,35 @@ final readonly class File
                 }
                 $rdata = implode(' ', [$mname, $rname, $tokens[2], $tokens[3], $tokens[4], $tokens[5], $tokens[6]]);
                 return ['rdata' => $rdata, 'priority' => null, 'weight' => null, 'port' => null];
-            }
 
-            case Record::TYPE_TXT: {
+            case Record::TYPE_TXT:
                 $segments = [];
                 foreach ($tokens as $t) {
                     $t = trim($t);
                     if ($t === '') {
                         continue;
                     }
-                    if ($t[0] === '"' && substr($t, -1) === '"') {
+                    if ($t[0] === '"' && str_ends_with($t, '"')) {
                         $segments[] = self::decodeTxtSegment(substr($t, 1, -1));
                         continue;
                     }
                     $segments[] = self::decodeTxtSegment($t);
                 }
                 return ['rdata' => implode('', $segments), 'priority' => null, 'weight' => null, 'port' => null];
-            }
 
-            case Record::TYPE_CAA: {
-                if (count($tokens) < 3 || !ctype_digit($tokens[0])) {
+            case Record::TYPE_CAA:
+                if (\count($tokens) < 3 || !ctype_digit($tokens[0])) {
                     throw new InvalidArgumentException("CAA requires flag, tag, and quoted value (line $lineNum).");
                 }
-
                 $flag = (int) $tokens[0];
                 if ($flag < 0 || $flag > 255) {
                     throw new InvalidArgumentException("CAA flag must be between 0 and 255 (line $lineNum).");
                 }
-
                 $valueToken = $tokens[2];
-                if ($valueToken === '' || $valueToken[0] !== '"' || substr($valueToken, -1) !== '"') {
+                if ($valueToken === '' || $valueToken[0] !== '"' || !str_ends_with($valueToken, '"')) {
                     throw new InvalidArgumentException("CAA value must be quoted (line $lineNum).");
                 }
-
                 return ['rdata' => implode(' ', $tokens), 'priority' => null, 'weight' => null, 'port' => null];
-            }
 
             default:
                 return ['rdata' => implode(' ', $tokens), 'priority' => null, 'weight' => null, 'port' => null];
@@ -500,8 +491,8 @@ final readonly class File
 
         if ($record->type === Record::TYPE_SOA) {
             $parts = explode(' ', $record->rdata);
-            if (count($parts) >= 7) {
-                return sprintf(
+            if (\count($parts) >= 7) {
+                return \sprintf(
                     "%s\t%d\t%s\t%s\t%s %s (\n\t\t\t\t%s\t; serial\n\t\t\t\t%s\t; refresh\n\t\t\t\t%s\t; retry\n\t\t\t\t%s\t; expire\n\t\t\t\t%s )\t; minimum",
                     $name,
                     $record->ttl,
@@ -513,7 +504,7 @@ final readonly class File
                     $parts[3],
                     $parts[4],
                     $parts[5],
-                    $parts[6]
+                    $parts[6],
                 );
             }
         }
@@ -524,16 +515,16 @@ final readonly class File
             $origin,
             $record->priority,
             $record->weight,
-            $record->port
+            $record->port,
         );
 
-        return sprintf(
+        return \sprintf(
             "%s\t%d\t%s\t%s\t%s",
             $name,
             $record->ttl,
             self::getClassString($record->class),
             self::getTypeString($record->type),
-            $rdata
+            $rdata,
         );
     }
 
@@ -543,7 +534,7 @@ final readonly class File
         string $origin,
         ?int $priority = null,
         ?int $weight = null,
-        ?int $port = null
+        ?int $port = null,
     ): string {
         switch ($type) {
             case Record::TYPE_NS:
@@ -559,13 +550,12 @@ final readonly class File
                 $pri = $priority ?? 0;
                 $wgt = $weight ?? 0;
                 $prt = $port ?? 0;
-                return sprintf('%d %d %d %s', $pri, $wgt, $prt, self::relativizeDomainName($rdata, $origin));
+                return \sprintf('%d %d %d %s', $pri, $wgt, $prt, self::relativizeDomainName($rdata, $origin));
 
             case Record::TYPE_TXT:
                 return '"' . addcslashes($rdata, '"\\') . '"';
 
             case Record::TYPE_CAA:
-                return $rdata;
 
             default:
                 return $rdata;
@@ -606,7 +596,7 @@ final readonly class File
         }
 
         if (str_ends_with($name, $origin)) {
-            return rtrim(substr($name, 0, -strlen($origin)), '.');
+            return rtrim(substr($name, 0, -\strlen($origin)), '.');
         }
 
         return $name;
@@ -637,7 +627,7 @@ final readonly class File
     {
         $tokens = [];
         $current = '';
-        $len = strlen($str);
+        $len = \strlen($str);
         $inQuotes = false;
         $quote = null;
         $escaped = false;
@@ -694,7 +684,6 @@ final readonly class File
     /**
      * Canonicalize a domain name by trimming whitespace, removing the trailing dot and lowercasing it.
      *
-     * @param string|null $name
      * @return string|null '.' for root, or null if empty input
      */
     private static function canonicalizeName(?string $name): ?string
@@ -719,7 +708,7 @@ final readonly class File
     private static function decodeTxtSegment(string $value): string
     {
         $decoded = '';
-        $length = strlen($value);
+        $length = \strlen($value);
 
         for ($i = 0; $i < $length; $i++) {
             $char = $value[$i];
@@ -744,7 +733,7 @@ final readonly class File
                     $digits .= $value[++$i];
                     $count++;
                 }
-                $decoded .= chr((int) $digits);
+                $decoded .= \chr((int) $digits);
                 continue;
             }
 
@@ -760,7 +749,7 @@ final readonly class File
     private static function removeComment(string $line): string
     {
         $result = '';
-        $len = strlen($line);
+        $len = \strlen($line);
         $escaped = false;
         $inQuotes = false;
         $quote = '';

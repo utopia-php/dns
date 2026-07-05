@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS\Exception\Zone;
 
 /**
@@ -10,7 +12,7 @@ final class ImportException extends \RuntimeException
     public function __construct(
         private readonly string $content,
         string $message = '',
-        ?\Throwable $previous = null
+        ?\Throwable $previous = null,
     ) {
         parent::__construct($message, previous: $previous);
     }

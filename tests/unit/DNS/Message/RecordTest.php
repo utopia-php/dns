@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS\Message;
 
 use PHPUnit\Framework\TestCase;
@@ -14,7 +16,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_A,
             class: Record::CLASS_IN,
             ttl: 300,
-            rdata: '93.184.216.34'
+            rdata: '93.184.216.34',
         );
 
         // Raw RR: example.com. 300 IN A 93.184.216.34
@@ -49,7 +51,7 @@ final class RecordTest extends TestCase
         $this->assertNull($record->priority);
         $this->assertNull($record->weight);
         $this->assertNull($record->port);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testEncodeMxRecordMatchesBytes(): void
@@ -60,7 +62,7 @@ final class RecordTest extends TestCase
             class: Record::CLASS_IN,
             ttl: 3600,
             rdata: 'mail.exchange.example.com',
-            priority: 10
+            priority: 10,
         );
 
         // Raw RR: mail.example.com. 3600 IN MX 10 mail.exchange.example.com.
@@ -95,7 +97,7 @@ final class RecordTest extends TestCase
         $this->assertSame(3600, $record->ttl);
         $this->assertSame(10, $record->priority);
         $this->assertSame('mail.exchange.example.com', $record->rdata);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testEncodeSrvRecordMatchesBytes(): void
@@ -108,7 +110,7 @@ final class RecordTest extends TestCase
             rdata: 'sip.example.com',
             priority: 5,
             weight: 10,
-            port: 5060
+            port: 5060,
         );
 
         // Raw RR: _sip._tcp.example.com. 7200 IN SRV 5 10 5060 sip.example.com.
@@ -145,7 +147,7 @@ final class RecordTest extends TestCase
         $this->assertSame(10, $record->weight);
         $this->assertSame(5060, $record->port);
         $this->assertSame('sip.example.com', $record->rdata);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testEncodeTxtRecordMatchesBytes(): void
@@ -155,7 +157,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_TXT,
             class: Record::CLASS_IN,
             ttl: 600,
-            rdata: 'hello'
+            rdata: 'hello',
         );
 
         // Raw RR: example.com. 600 IN TXT "hello"
@@ -187,7 +189,7 @@ final class RecordTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $record->class);
         $this->assertSame(600, $record->ttl);
         $this->assertSame('hello', $record->rdata);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testDecodeCnameRecordParsesNameRdata(): void
@@ -208,7 +210,7 @@ final class RecordTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $record->class);
         $this->assertSame(4000, $record->ttl);
         $this->assertSame('cdn.example.com', $record->rdata);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testDecodeUnknownRecordKeepsHexData(): void
@@ -229,7 +231,7 @@ final class RecordTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $record->class);
         $this->assertSame(60, $record->ttl);
         $this->assertSame('0aff', $record->rdata);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testDecodeSoaRecordParsesFields(): void
@@ -264,9 +266,9 @@ final class RecordTest extends TestCase
         $this->assertSame(3600, $record->ttl);
         $this->assertSame(
             'ns1.example.com admin.example.com 2024102701 7200 3600 1209600 86400',
-            $record->rdata
+            $record->rdata,
         );
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testEncodeSoaRecordMatchesBytes(): void
@@ -276,7 +278,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_SOA,
             class: Record::CLASS_IN,
             ttl: 3600,
-            rdata: 'ns1.example.com admin.example.com 2024102701 7200 3600 1209600 86400'
+            rdata: 'ns1.example.com admin.example.com 2024102701 7200 3600 1209600 86400',
         );
 
         $expected = "\x07example\x03com\x00"
@@ -302,7 +304,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_SOA,
             class: Record::CLASS_IN,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster@example.com 2024102701 7200 3600 1209600 86400'
+            rdata: 'ns1.example.com hostmaster@example.com 2024102701 7200 3600 1209600 86400',
         );
 
         $encoded = $record->encode();
@@ -317,7 +319,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_SOA,
             class: Record::CLASS_IN,
             ttl: 3600,
-            rdata: 'ns1.example.com first.last@example.com 2024102701 7200 3600 1209600 86400'
+            rdata: 'ns1.example.com first.last@example.com 2024102701 7200 3600 1209600 86400',
         );
 
         $encoded = $record->encode();
@@ -344,7 +346,7 @@ final class RecordTest extends TestCase
         $this->assertSame(Record::CLASS_IN, $record->class);
         $this->assertSame(600, $record->ttl);
         $this->assertSame('helloworld', $record->rdata);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testDecodeTxtRecordWithThreeChunks(): void
@@ -398,13 +400,13 @@ final class RecordTest extends TestCase
             type: Record::TYPE_TXT,
             class: Record::CLASS_IN,
             ttl: 600,
-            rdata: $exactly256Bytes
+            rdata: $exactly256Bytes,
         );
 
         $encoded = $record->encode();
 
         // Extract RDATA portion to verify chunking
-        $nameLen = strlen("\x07example\x03com\x00");
+        $nameLen = \strlen("\x07example\x03com\x00");
         $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
         $rdataEncoded = substr($encoded, $headerLen);
 
@@ -412,9 +414,9 @@ final class RecordTest extends TestCase
         // First chunk: chr(255) + 255 bytes = 256 bytes
         // Second chunk: chr(1) + 1 byte = 2 bytes
         // Total RDATA: 256 + 2 = 258 bytes
-        $this->assertSame(258, strlen($rdataEncoded)); // Total RDATA length
-        $this->assertSame(255, ord($rdataEncoded[0])); // First chunk is 255 bytes
-        $this->assertSame(1, ord($rdataEncoded[256])); // Second chunk is 1 byte
+        $this->assertSame(258, \strlen($rdataEncoded)); // Total RDATA length
+        $this->assertSame(255, \ord($rdataEncoded[0])); // First chunk is 255 bytes
+        $this->assertSame(1, \ord($rdataEncoded[256])); // Second chunk is 1 byte
 
         // Verify round-trip
         $offset = 0;
@@ -431,7 +433,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_TXT,
             class: Record::CLASS_IN,
             ttl: 600,
-            rdata: $longString
+            rdata: $longString,
         );
 
         $encoded = $record->encode();
@@ -445,7 +447,7 @@ final class RecordTest extends TestCase
 
         // Verify the encoded data has multiple chunks
         // Extract RDATA portion (skip header: name + type + class + ttl + rdlength)
-        $nameLen = strlen("\x07example\x03com\x00");
+        $nameLen = \strlen("\x07example\x03com\x00");
         $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
         $rdataEncoded = substr($encoded, $headerLen);
 
@@ -453,9 +455,9 @@ final class RecordTest extends TestCase
         // First chunk: chr(255) + 255 bytes = 256 bytes
         // Second chunk: chr(45) + 45 bytes = 46 bytes
         // Total RDATA: 256 + 46 = 302 bytes
-        $this->assertSame(302, strlen($rdataEncoded)); // Total RDATA length
-        $this->assertSame(255, ord($rdataEncoded[0])); // First chunk is 255 bytes
-        $this->assertSame(45, ord($rdataEncoded[256])); // Second chunk is 45 bytes
+        $this->assertSame(302, \strlen($rdataEncoded)); // Total RDATA length
+        $this->assertSame(255, \ord($rdataEncoded[0])); // First chunk is 255 bytes
+        $this->assertSame(45, \ord($rdataEncoded[256])); // Second chunk is 45 bytes
     }
 
     public function testEncodeTxtRecordRoundTripWithMultipleChunks(): void
@@ -491,19 +493,19 @@ final class RecordTest extends TestCase
             type: Record::TYPE_TXT,
             class: Record::CLASS_IN,
             ttl: 600,
-            rdata: ''
+            rdata: '',
         );
 
         $encoded = $record->encode();
 
         // Extract RDATA portion
-        $nameLen = strlen("\x07example\x03com\x00");
+        $nameLen = \strlen("\x07example\x03com\x00");
         $headerLen = $nameLen + 2 + 2 + 4 + 2; // name + type + class + ttl + rdlength
         $rdataEncoded = substr($encoded, $headerLen);
 
         // Should be a single zero-length character-string: chr(0)
-        $this->assertSame(1, strlen($rdataEncoded)); // RDLENGTH should be 1
-        $this->assertSame(0, ord($rdataEncoded[0])); // First (and only) chunk is 0 bytes
+        $this->assertSame(1, \strlen($rdataEncoded)); // RDLENGTH should be 1
+        $this->assertSame(0, \ord($rdataEncoded[0])); // First (and only) chunk is 0 bytes
 
         // Verify round-trip: decode should work and return empty string
         $offset = 0;
@@ -520,7 +522,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_A,
             class: Record::CLASS_IN,
             ttl: 300,
-            rdata: 'ns2.appwrite.zone'
+            rdata: 'ns2.appwrite.zone',
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -536,7 +538,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_NS,
             class: Record::CLASS_IN,
             ttl: 300,
-            rdata: 'ns2.appwrite.zone'
+            rdata: 'ns2.appwrite.zone',
         );
 
         $record->validateRdata();
@@ -551,7 +553,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_A,
             class: Record::CLASS_IN,
             ttl: 300,
-            rdata: '93.184.216.34'
+            rdata: '93.184.216.34',
         );
 
         $this->assertSame('example.com', $record->name);
@@ -564,7 +566,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_A,
             class: Record::CLASS_IN,
             ttl: 300,
-            rdata: '93.184.216.34'
+            rdata: '93.184.216.34',
         );
 
         $this->assertSame('example.com', $record->name);
@@ -577,7 +579,7 @@ final class RecordTest extends TestCase
             type: Record::TYPE_A,
             class: Record::CLASS_IN,
             ttl: 300,
-            rdata: '93.184.216.34'
+            rdata: '93.184.216.34',
         );
 
         $renamed = $record->withName('  other.com  ');

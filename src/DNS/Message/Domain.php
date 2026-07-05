@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS\Message;
 
 use Utopia\DNS\Exception\Message\DecodingException;
@@ -12,9 +14,6 @@ final readonly class Domain
 
     /**
      * Encode a domain name according to RFC 1035.
-     *
-     * @param string $name
-     * @return string
      */
     public static function encode(string $name): string
     {
@@ -32,7 +31,7 @@ final readonly class Domain
         }
 
         $labels = explode('.', $trimmed);
-        $labelCount = count($labels);
+        $labelCount = \count($labels);
 
         if ($labelCount > self::MAX_LABELS) {
             throw new \InvalidArgumentException("Domain has too many labels: $labelCount");
@@ -50,13 +49,13 @@ final readonly class Domain
                 throw new \InvalidArgumentException('Domain label contains invalid characters');
             }
 
-            $labelLength = strlen($label);
+            $labelLength = \strlen($label);
 
             if ($labelLength > self::MAX_LABEL_LEN) {
                 throw new \InvalidArgumentException("Label too long: $label");
             }
 
-            $encoded .= chr($labelLength) . $label;
+            $encoded .= \chr($labelLength) . $label;
             $totalLength += $labelLength + 1; // length byte + label
         }
 
@@ -64,7 +63,7 @@ final readonly class Domain
 
         if ($totalLength > self::MAX_DOMAIN_NAME_LEN) {
             throw new \InvalidArgumentException(
-                "Encoded domain exceeds maximum length of " . self::MAX_DOMAIN_NAME_LEN . ' bytes'
+                'Encoded domain exceeds maximum length of ' . self::MAX_DOMAIN_NAME_LEN . ' bytes',
             );
         }
 
@@ -89,7 +88,7 @@ final readonly class Domain
         $labels = [];
         $jumped = false;
         $pos = $offset;
-        $dataLength = strlen($data);
+        $dataLength = \strlen($data);
 
         // Track visited pointer positions to detect loops (RFC 1035 compliance)
         // This is more reliable than iteration counting as it catches actual cycles
@@ -101,11 +100,11 @@ final readonly class Domain
         while (true) {
             if ($pos >= $dataLength) {
                 throw new DecodingException(
-                    'Unexpected end of data while decoding domain name'
+                    'Unexpected end of data while decoding domain name',
                 );
             }
 
-            $len = ord($data[$pos]);
+            $len = \ord($data[$pos]);
             if ($len === 0) {
                 if (!$jumped) {
                     $offset = $pos + 1;
@@ -116,29 +115,29 @@ final readonly class Domain
             if (($len & 0xC0) === 0xC0) {
                 if ($pos + 1 >= $dataLength) {
                     throw new DecodingException(
-                        'Truncated compression pointer in domain name'
+                        'Truncated compression pointer in domain name',
                     );
                 }
 
-                $pointer = (($len & 0x3F) << 8) | ord($data[$pos + 1]);
+                $pointer = (($len & 0x3F) << 8) | \ord($data[$pos + 1]);
 
                 // RFC 1035: Pointer must reference earlier in packet (forward refs invalid)
                 if ($pointer >= $pos) {
                     throw new DecodingException(
-                        'Compression pointer must reference earlier position in packet'
+                        'Compression pointer must reference earlier position in packet',
                     );
                 }
 
                 if ($pointer >= $dataLength) {
                     throw new DecodingException(
-                        'Compression pointer out of bounds in domain name'
+                        'Compression pointer out of bounds in domain name',
                     );
                 }
 
                 // Detect pointer loops by tracking visited positions
                 if (isset($visitedPointers[$pointer])) {
                     throw new DecodingException(
-                        'Compression pointer loop detected in domain name'
+                        'Compression pointer loop detected in domain name',
                     );
                 }
                 $visitedPointers[$pointer] = true;
@@ -155,13 +154,13 @@ final readonly class Domain
             // 00 = standard label, 11 = compression pointer, 01/10 = reserved
             if (($len & 0xC0) !== 0) {
                 throw new DecodingException(
-                    'Reserved label type encountered in domain name'
+                    'Reserved label type encountered in domain name',
                 );
             }
 
             if ($pos + 1 + $len > $dataLength) {
                 throw new DecodingException(
-                    'Label length exceeds remaining data while decoding domain name'
+                    'Label length exceeds remaining data while decoding domain name',
                 );
             }
 
@@ -171,7 +170,7 @@ final readonly class Domain
 
             if ($labelCount > self::MAX_LABELS) {
                 throw new DecodingException(
-                    'Domain name exceeds maximum label count'
+                    'Domain name exceeds maximum label count',
                 );
             }
 

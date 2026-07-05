@@ -2,14 +2,18 @@
     "name": "utopia-php/dns",
     "description": "Lite & fast micro PHP DNS server abstraction that is **easy to use**.",
     "type": "library",
-    "keywords": ["php","framework", "upf", "utopia", "dns"],
+    "keywords": [
+        "php",
+        "framework",
+        "upf",
+        "utopia",
+        "dns"
+    ],
     "license": "MIT",
     "minimum-stability": "stable",
     "scripts": {
-        "format": "./vendor/bin/pint --config pint.json",
-        "format:check": "./vendor/bin/pint --test --config pint.json",
-        "analyze": "./vendor/bin/phpstan analyse --level max -c phpstan.neon src tests",
-        "test": "./vendor/bin/phpunit --configuration phpunit.xml"
+        "test": "phpunit --configuration phpunit.xml --testsuite unit",
+        "test:e2e": "phpunit --configuration phpunit.xml --testsuite e2e"
     },
     "authors": [
         {
@@ -18,7 +22,9 @@
         }
     ],
     "autoload": {
-        "psr-4": {"Utopia\\DNS\\": "src/DNS"}
+        "psr-4": {
+            "Utopia\\DNS\\": "src/DNS/"
+        }
     },
     "require": {
         "php": ">=8.3",
@@ -28,10 +34,7 @@
         "utopia-php/domains": "^2.0"
     },
     "require-dev": {
-        "swoole/ide-helper": "5.1.8",
-        "phpunit/phpunit": "12.5.*",
-        "laravel/pint": "1.29.*",
-        "phpstan/phpstan": "2.0.*"
+        "swoole/ide-helper": "5.1.8"
     },
     "config": {
         "allow-plugins": {

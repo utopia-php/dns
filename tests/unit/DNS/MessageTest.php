@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS;
 
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -8,23 +10,23 @@ use Utopia\DNS\Exception\Message\DecodingException;
 use Utopia\DNS\Exception\Message\PartialDecodingException;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Header;
-use Utopia\DNS\Message\Record;
 use Utopia\DNS\Message\Question;
+use Utopia\DNS\Message\Record;
 
 final class MessageTest extends TestCase
 {
     public function testDecodeParsesStandardAnswer(): void
     {
         // Header: ID=0x1a2b, response, QD=1, AN=1, NS=0, AR=0 followed by question and single A answer
-        $message =
-            "\x1a\x2b\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00" .
-            "\x03www\x07example\x03com\x00\x00\x01\x00\x01" .
-            "\x03www\x07example\x03com\x00" .
-            "\x00\x01" .
-            "\x00\x01" .
-            "\x00\x00\x01\x2C" .
-            "\x00\x04" .
-            "\x5D\xB8\xD8\x22";
+        $message
+            = "\x1a\x2b\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00"
+            . "\x03www\x07example\x03com\x00\x00\x01\x00\x01"
+            . "\x03www\x07example\x03com\x00"
+            . "\x00\x01"
+            . "\x00\x01"
+            . "\x00\x00\x01\x2C"
+            . "\x00\x04"
+            . "\x5D\xB8\xD8\x22";
 
         $response = Message::decode($message);
 
@@ -53,15 +55,15 @@ final class MessageTest extends TestCase
     public function testEncodeProducesOriginalBytes(): void
     {
         // Same packet as above to ensure encode() round-trips original bytes
-        $message =
-            "\x1a\x2b\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00" .
-            "\x03www\x07example\x03com\x00\x00\x01\x00\x01" .
-            "\x03www\x07example\x03com\x00" .
-            "\x00\x01" .
-            "\x00\x01" .
-            "\x00\x00\x01\x2C" .
-            "\x00\x04" .
-            "\x5D\xB8\xD8\x22";
+        $message
+            = "\x1a\x2b\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00"
+            . "\x03www\x07example\x03com\x00\x00\x01\x00\x01"
+            . "\x03www\x07example\x03com\x00"
+            . "\x00\x01"
+            . "\x00\x01"
+            . "\x00\x00\x01\x2C"
+            . "\x00\x04"
+            . "\x5D\xB8\xD8\x22";
 
         $response = Message::decode($message);
         $encoded = $response->encode();
@@ -82,7 +84,7 @@ final class MessageTest extends TestCase
             questionCount: 2,
             answerCount: 0,
             authorityCount: 0,
-            additionalCount: 0
+            additionalCount: 0,
         );
 
         $question = new Question('example.com', Record::TYPE_A);
@@ -107,7 +109,7 @@ final class MessageTest extends TestCase
             questionCount: 0,
             answerCount: 1,
             authorityCount: 0,
-            additionalCount: 0
+            additionalCount: 0,
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -130,7 +132,7 @@ final class MessageTest extends TestCase
             questionCount: 0,
             answerCount: 0,
             authorityCount: 1,
-            additionalCount: 0
+            additionalCount: 0,
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -153,7 +155,7 @@ final class MessageTest extends TestCase
             questionCount: 0,
             answerCount: 0,
             authorityCount: 0,
-            additionalCount: 1
+            additionalCount: 1,
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -165,9 +167,9 @@ final class MessageTest extends TestCase
     public function testDecodeThrowsForNxDomainWithoutAuthority(): void
     {
         // ID=0x1a2c, NXDOMAIN response with zero answers and zero authority -> should fail validation
-        $message =
-            "\x1a\x2c\x85\x83\x00\x01\x00\x00\x00\x00\x00\x00" .
-            "\x07missing\x07example\x03com\x00\x00\x01\x00\x01";
+        $message
+            = "\x1a\x2c\x85\x83\x00\x01\x00\x00\x00\x00\x00\x00"
+            . "\x07missing\x07example\x03com\x00\x00\x01\x00\x01";
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('NXDOMAIN requires SOA in authority');
@@ -178,9 +180,9 @@ final class MessageTest extends TestCase
     public function testDecodeThrowsForNoDataWithoutAuthority(): void
     {
         // ID=0x1a2d, NOERROR response without SOA in authority -> should fail validation
-        $message =
-            "\x1a\x2d\x85\x80\x00\x01\x00\x00\x00\x00\x00\x00" .
-            "\x05empty\x07example\x03com\x00\x00\x01\x00\x01";
+        $message
+            = "\x1a\x2d\x85\x80\x00\x01\x00\x00\x00\x00\x00\x00"
+            . "\x05empty\x07example\x03com\x00\x00\x01\x00\x01";
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('NODATA should include SOA in authority');
@@ -202,9 +204,9 @@ final class MessageTest extends TestCase
     {
         // Header declares 1 question but packet ends before QTYPE/QCLASS
         // Declares one question but omits QTYPE/QCLASS, causing question decode failure
-        $packet =
-            "\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00" .
-            "\x03www\x07example\x03com\x00"; // missing type/class
+        $packet
+            = "\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"
+            . "\x03www\x07example\x03com\x00"; // missing type/class
 
         try {
             Message::decode($packet);
@@ -222,12 +224,12 @@ final class MessageTest extends TestCase
         $question = "\x03www\x07example\x03com\x00\x00\x01\x00\x01"; // www.example.com IN A
         // Header: ID=0xabcd, QR=1, QD=1, AN=1
         $header = "\xab\xcd\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00";
-        $answer =
-            "\x03www\x07example\x03com\x00" .
-            "\x00\x01" .
-            "\x00\x01" .
-            "\x00\x00\x01\x2C" .
-            "\x00\x04"; // missing 4 bytes of RDATA entirely
+        $answer
+            = "\x03www\x07example\x03com\x00"
+            . "\x00\x01"
+            . "\x00\x01"
+            . "\x00\x00\x01\x2C"
+            . "\x00\x04"; // missing 4 bytes of RDATA entirely
 
         try {
             Message::decode($header . $question . $answer);
@@ -241,16 +243,16 @@ final class MessageTest extends TestCase
     public function testDecodeThrowsPartialDecodingOnExtraBytes(): void
     {
         // Valid response with an extra trailing byte to trigger length validation
-        $message =
-            "\x1a\x2b\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00" .
-            "\x03www\x07example\x03com\x00\x00\x01\x00\x01" .
-            "\x03www\x07example\x03com\x00" .
-            "\x00\x01" .
-            "\x00\x01" .
-            "\x00\x00\x01\x2C" .
-            "\x00\x04" .
-            "\x5D\xB8\xD8\x22" .
-            "\xFF"; // extra byte
+        $message
+            = "\x1a\x2b\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00"
+            . "\x03www\x07example\x03com\x00\x00\x01\x00\x01"
+            . "\x03www\x07example\x03com\x00"
+            . "\x00\x01"
+            . "\x00\x01"
+            . "\x00\x00\x01\x2C"
+            . "\x00\x04"
+            . "\x5D\xB8\xD8\x22"
+            . "\xFF"; // extra byte
 
         $this->expectException(PartialDecodingException::class);
         $this->expectExceptionMessage('Invalid packet length');
@@ -261,24 +263,24 @@ final class MessageTest extends TestCase
     public function testDecodeNxDomainWithAuthority(): void
     {
         // SOA RDATA: ns1.example.com hostmaster.example.com 1 3600 900 604800 300
-        $authorityRdata =
-            "\x03ns1\x07example\x03com\x00" .
-            "\x0Ahostmaster\x07example\x03com\x00" .
-            "\x00\x00\x00\x01" .
-            "\x00\x00\x0E\x10" .
-            "\x00\x00\x03\x84" .
-            "\x00\x09\x3A\x80" .
-            "\x00\x00\x01\x2C";
+        $authorityRdata
+            = "\x03ns1\x07example\x03com\x00"
+            . "\x0Ahostmaster\x07example\x03com\x00"
+            . "\x00\x00\x00\x01"
+            . "\x00\x00\x0E\x10"
+            . "\x00\x00\x03\x84"
+            . "\x00\x09\x3A\x80"
+            . "\x00\x00\x01\x2C";
 
-        $message =
-            "\x1a\x2e\x81\x83\x00\x01\x00\x00\x00\x01\x00\x00" .
-            "\x07missing\x07example\x03com\x00\x00\x01\x00\x01" .
-            "\x07example\x03com\x00" .
-            "\x00\x06" .
-            "\x00\x01" .
-            "\x00\x00\x03\x84" .
-            "\x00\x3D" .
-            $authorityRdata;
+        $message
+            = "\x1a\x2e\x81\x83\x00\x01\x00\x00\x00\x01\x00\x00"
+            . "\x07missing\x07example\x03com\x00\x00\x01\x00\x01"
+            . "\x07example\x03com\x00"
+            . "\x00\x06"
+            . "\x00\x01"
+            . "\x00\x00\x03\x84"
+            . "\x00\x3D"
+            . $authorityRdata;
 
         $response = Message::decode($message);
 
@@ -317,7 +319,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: [],
-            additional: []
+            additional: [],
         );
 
         // Encode with 512-byte limit (UDP max per RFC 1035)
@@ -328,8 +330,8 @@ final class MessageTest extends TestCase
         $this->assertTrue($decoded->header->truncated, 'TC flag should be set when answers are truncated');
 
         // RFC 1035 Section 6.2: Preserve as many complete answer records as fit
-        $this->assertGreaterThan(0, count($decoded->answers), 'Should include answers that fit within size limit');
-        $this->assertLessThan(100, count($decoded->answers), 'Not all answers should fit');
+        $this->assertGreaterThan(0, \count($decoded->answers), 'Should include answers that fit within size limit');
+        $this->assertLessThan(100, \count($decoded->answers), 'Not all answers should fit');
 
         // Verify other sections are cleared per RFC truncation order
         $this->assertCount(0, $decoded->authority, 'Authority should be cleared when truncated');
@@ -340,7 +342,7 @@ final class MessageTest extends TestCase
         $this->assertSame($query->questions[0]->name, $decoded->questions[0]->name);
 
         // Verify truncated packet is within size limit
-        $this->assertLessThanOrEqual(512, strlen($truncated));
+        $this->assertLessThanOrEqual(512, \strlen($truncated));
     }
 
     /**
@@ -369,7 +371,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: [],
-            additional: $additional
+            additional: $additional,
         );
 
         $truncated = $response->encode(512);
@@ -411,7 +413,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: $authority,
-            additional: []
+            additional: [],
         );
 
         $truncated = $response->encode(512);
@@ -443,7 +445,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: [],
-            additional: []
+            additional: [],
         );
 
         // Encode without size limit
@@ -472,7 +474,7 @@ final class MessageTest extends TestCase
             Record::TYPE_SOA,
             Record::CLASS_IN,
             300,
-            'ns.example.com. hostmaster.example.com. 2024010101 3600 600 86400 300'
+            'ns.example.com. hostmaster.example.com. 2024010101 3600 600 86400 300',
         );
 
         $response = Message::response(
@@ -482,7 +484,7 @@ final class MessageTest extends TestCase
             answers: [],
             authority: [$soa],
             additional: [],
-            authoritative: true
+            authoritative: true,
         );
 
         // Force truncation to drop authority (packet with question + SOA exceeds small limit)
@@ -525,7 +527,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: $authority,
-            additional: $additional
+            additional: $additional,
         );
 
         $truncated = $response->encode(512);
@@ -535,7 +537,7 @@ final class MessageTest extends TestCase
         $this->assertCount(1, $decoded->answers);
         $this->assertCount(0, $decoded->authority);
         $this->assertCount(0, $decoded->additional, 'Additional must be dropped whenever authority is dropped');
-        $this->assertLessThanOrEqual(512, strlen($truncated));
+        $this->assertLessThanOrEqual(512, \strlen($truncated));
     }
 
     /**
@@ -569,18 +571,18 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: $authority,
-            additional: $additional
+            additional: $additional,
         );
 
         $truncated = $response->encode(512);
         $decoded = Message::decode($truncated);
 
         $this->assertTrue($decoded->header->truncated, 'TC must be set when answers are partial');
-        $this->assertGreaterThan(0, count($decoded->answers));
-        $this->assertLessThan(100, count($decoded->answers));
+        $this->assertGreaterThan(0, \count($decoded->answers));
+        $this->assertLessThan(100, \count($decoded->answers));
         $this->assertCount(0, $decoded->authority, 'Authority cleared under answer truncation');
         $this->assertCount(0, $decoded->additional, 'Additional cleared under answer truncation');
-        $this->assertLessThanOrEqual(512, strlen($truncated));
+        $this->assertLessThanOrEqual(512, \strlen($truncated));
     }
 
     /**
@@ -604,7 +606,7 @@ final class MessageTest extends TestCase
             answers: $answers,
             authority: [],
             additional: [],
-            truncated: true
+            truncated: true,
         );
 
         $encoded = $response->encode();
@@ -634,17 +636,17 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $answers,
             authority: [],
-            additional: []
+            additional: [],
         );
 
         $natural = $response->encode();
-        $exactSize = strlen($natural);
+        $exactSize = \strlen($natural);
 
         $atBoundary = $response->encode($exactSize);
         $this->assertSame($natural, $atBoundary, 'Encoding at exact size must match unconstrained output');
 
         $belowBoundary = $response->encode($exactSize - 1);
-        $this->assertLessThan(count($answers), count(Message::decode($belowBoundary)->answers));
+        $this->assertLessThan(\count($answers), \count(Message::decode($belowBoundary)->answers));
     }
 
     /**
@@ -675,7 +677,7 @@ final class MessageTest extends TestCase
             answers: $answers,
             authority: [],
             additional: $additional,
-            truncated: true
+            truncated: true,
         );
 
         $reEncoded = $response->encode(512);
@@ -683,7 +685,7 @@ final class MessageTest extends TestCase
 
         $this->assertTrue(
             $decoded->header->truncated,
-            'Original TC=1 must survive re-encoding even when sections are dropped'
+            'Original TC=1 must survive re-encoding even when sections are dropped',
         );
         $this->assertCount(0, $decoded->additional);
     }
@@ -713,7 +715,7 @@ final class MessageTest extends TestCase
             answers: $answers,
             authority: [],
             additional: [],
-            authoritative: true
+            authoritative: true,
         );
 
         $truncated = $response->encode(40);
@@ -723,7 +725,7 @@ final class MessageTest extends TestCase
         $this->assertCount(0, $decoded->answers);
         $this->assertTrue(
             $decoded->header->authoritative,
-            'AA must survive truncation — the original message had answers, TC already signals retry'
+            'AA must survive truncation — the original message had answers, TC already signals retry',
         );
     }
 
@@ -746,7 +748,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: $invalidSection === 'answers' ? $invalid : $valid,
             authority: $invalidSection === 'authority' ? $invalid : $valid,
-            additional: $invalidSection === 'additional' ? $invalid : $valid
+            additional: $invalidSection === 'additional' ? $invalid : $valid,
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -756,15 +758,13 @@ final class MessageTest extends TestCase
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return \Iterator<string, array<int, string>>
      */
-    public static function invalidSectionProvider(): array
+    public static function invalidSectionProvider(): \Iterator
     {
-        return [
-            'answers' => ['answers'],
-            'authority' => ['authority'],
-            'additional' => ['additional'],
-        ];
+        yield 'answers' => ['answers'];
+        yield 'authority' => ['authority'];
+        yield 'additional' => ['additional'];
     }
 
     /**
@@ -788,7 +788,7 @@ final class MessageTest extends TestCase
             questions: $query->questions,
             answers: [],
             authority: $authority,
-            additional: []
+            additional: [],
         );
 
         $truncated = $response->encode(512);
@@ -797,6 +797,6 @@ final class MessageTest extends TestCase
         $this->assertFalse($decoded->header->truncated, 'TC must remain unset when there were no answers to truncate');
         $this->assertCount(0, $decoded->answers);
         $this->assertCount(0, $decoded->authority, 'Oversized authority is dropped');
-        $this->assertLessThanOrEqual(512, strlen($truncated));
+        $this->assertLessThanOrEqual(512, \strlen($truncated));
     }
 }

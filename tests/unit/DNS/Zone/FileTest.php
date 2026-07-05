@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Utopia\DNS\Zone;
 
 use PHPUnit\Framework\TestCase;
@@ -87,13 +89,13 @@ ZONE;
         $this->assertSame('192.168.1.10', $www->rdata);
 
         $mx = $this->findRecord($zone->records, Record::TYPE_MX);
-        $this->assertNotNull($mx);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $mx);
         $this->assertSame(300, $mx->ttl);
         $this->assertSame('mail.example.com', $mx->rdata);
         $this->assertSame(10, $mx->priority);
 
         $srv = $this->findRecord($zone->records, Record::TYPE_SRV);
-        $this->assertNotNull($srv);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $srv);
         $this->assertSame('_sip._tcp.example.com', $srv->name);
         $this->assertSame(5, $srv->priority);
         $this->assertSame(10, $srv->weight);
@@ -240,11 +242,11 @@ ZONE;
         $this->assertSame('example.com', $zone->soa->name);
 
         $mx = $this->findRecord($zone->records, Record::TYPE_MX);
-        $this->assertNotNull($mx);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $mx);
         $this->assertSame('mail.example.com', $mx->rdata);
 
         $cname = $this->findRecord($zone->records, Record::TYPE_CNAME);
-        $this->assertNotNull($cname);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $cname);
         $this->assertSame('www.example.com', $cname->rdata);
     }
 
@@ -293,7 +295,7 @@ ZONE;
 
         $zone = File::import($contents);
         $txt = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($txt);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $txt);
         $this->assertSame('foobar', $txt->rdata);
     }
 
@@ -308,8 +310,8 @@ ZONE;
 
         $zone = File::import($contents);
         $txt = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($txt);
-        $this->assertSame("foo" . chr(10) . "bar", $txt->rdata);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $txt);
+        $this->assertSame('foo' . \chr(10) . 'bar', $txt->rdata);
     }
 
     public function testImportIgnoresUnknownDirective(): void
@@ -339,7 +341,7 @@ ZONE;
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($record);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
         $this->assertSame('v=DMARC1; p=none; rua=mailto:jon@snow.got; ruf=mailto:jon@snow.got; fo=1;', $record->rdata);
     }
 
@@ -361,7 +363,7 @@ ZONE;
         $roundTrip = File::import($exported);
         $roundTripTxt = $this->findRecord($roundTrip->records, Record::TYPE_TXT);
 
-        $this->assertNotNull($roundTripTxt);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $roundTripTxt);
         $this->assertSame($zone->records[0]->rdata, $roundTripTxt->rdata);
     }
 
@@ -383,7 +385,7 @@ ZONE;
 
         $this->assertSame($zone->name, $roundTrip->name);
         $this->assertSame($zone->soa->rdata, $roundTrip->soa->rdata);
-        $this->assertCount(count($zone->records), $roundTrip->records);
+        $this->assertCount(\count($zone->records), $roundTrip->records);
         $this->assertSame($zone->records[1]->rdata, $roundTrip->records[1]->rdata);
     }
 
@@ -420,7 +422,7 @@ ZONE;
 
         $zone = File::import($contents);
         $ptr = $this->findRecord($zone->records, Record::TYPE_PTR);
-        $this->assertNotNull($ptr);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $ptr);
         $this->assertSame('1.example.com', $ptr->name);
         $this->assertSame('host.example.com', $ptr->rdata);
     }
@@ -487,47 +489,47 @@ ZONE;
 
     public function testImportTxtWithEscapedSemicolon(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 @ 3600 IN TXT "foo\;bar"
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($record);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
         $this->assertSame('foo;bar', $record->rdata);
     }
 
     public function testImportTxtWithSemicolonInQuotes(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 @ 3600 IN TXT "not a comment; still text"
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($record);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
         $this->assertSame('not a comment; still text', $record->rdata);
     }
 
     public function testImportExportRoundTripForAaaa(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 www 600 IN AAAA 2001:db8::1
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
@@ -545,7 +547,7 @@ ZONE,
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $records = [
             new Record('api.example.com', Record::TYPE_A, ttl: 120, rdata: 'a.a.a.a'),
@@ -563,13 +565,13 @@ ZONE,
 
     public function testCanImportZoneWithTemplateRecords(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 www 600 IN AAAA b:b::b:b:b
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
@@ -582,25 +584,25 @@ ZONE,
 
     public function testImportExportRoundTripForCaa(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 @ 3600 IN CAA 0 issue "letsencrypt.org"
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_CAA);
-        $this->assertNotNull($record);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
         $this->assertSame('0 issue "letsencrypt.org"', $record->rdata);
 
         $exported = File::export($zone, includeComments: false);
         $roundTrip = File::import($exported);
         $roundTripCaa = $this->findRecord($roundTrip->records, Record::TYPE_CAA);
 
-        $this->assertNotNull($roundTripCaa);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $roundTripCaa);
         $this->assertSame($record->rdata, $roundTripCaa->rdata);
     }
 
@@ -609,13 +611,13 @@ ZONE,
         $this->expectException(ImportException::class);
         $this->expectExceptionMessageMatches('/CAA value must be quoted/');
 
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 @ 3600 IN CAA 0 issue letsencrypt.org
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         File::import($contents);
@@ -631,7 +633,7 @@ ZONE;
 
         $zone = File::import($contents);
         $ptr = $this->findRecord($zone->records, Record::TYPE_PTR);
-        $this->assertNotNull($ptr);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $ptr);
         $this->assertSame('1.2.0.192.in-addr.arpa', $ptr->name);
     }
 
@@ -654,13 +656,13 @@ ZONE;
         $this->expectException(ImportException::class);
         $this->expectExceptionMessage("Invalid record type '1H' (line 3).");
 
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 www 1h IN A 192.0.2.10
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         File::import($contents);
@@ -668,53 +670,53 @@ ZONE,
 
     public function testImportSupportsAlternativeClasses(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 www CS A 192.0.2.10
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_A);
-        $this->assertNotNull($record);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
         $this->assertSame(Record::CLASS_CS, $record->class);
     }
 
     public function testImportTxtWithEmbeddedQuoteAndBackslash(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 @ 3600 IN TXT "a \"quote\" and a \\ backslash"
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($record);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
         $this->assertSame('a "quote" and a \\ backslash', $record->rdata);
     }
 
     public function testImportTxtThreeDigitEscapeConsumesOnlyThreeDigits(): void
     {
-        $contents = sprintf(
+        $contents = \sprintf(
             <<<'ZONE'
 $ORIGIN example.com.
 %s
 @ 3600 IN TXT "foo\0100bar"
 ZONE,
-            self::DEFAULT_SOA
+            self::DEFAULT_SOA,
         );
 
         $zone = File::import($contents);
         $record = $this->findRecord($zone->records, Record::TYPE_TXT);
-        $this->assertNotNull($record);
-        $this->assertSame("foo" . chr(10) . "0bar", $record->rdata);
+        $this->assertInstanceOf(\Utopia\DNS\Message\Record::class, $record);
+        $this->assertSame('foo' . \chr(10) . '0bar', $record->rdata);
     }
 
     public function testImportFailsWhenSoaHasTooFewFields(): void

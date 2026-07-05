@@ -8,7 +8,7 @@ use Utopia\DNS\Message\Header;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
 
-final class Message
+final readonly class Message
 {
     public const int RCODE_NOERROR = 0;
     public const int RCODE_FORMERR = 1;
@@ -30,31 +30,31 @@ final class Message
      * @param list<Record> $additional The additional records.
      */
     public function __construct(
-        public readonly Header $header,
+        public Header $header,
         /** @var Question[] */
-        public readonly array $questions = [],
+        public array $questions = [],
         /** @var list<Record> */
-        public readonly array $answers = [],
+        public array $answers = [],
         /** @var list<Record> */
-        public readonly array $authority = [],
+        public array $authority = [],
         /** @var list<Record> */
-        public readonly array $additional = []
+        public array $additional = [],
     ) {
-        if ($header->questionCount !== count($questions)) {
+        if ($header->questionCount !== \count($questions)) {
             throw new \InvalidArgumentException('Invalid DNS response: question count mismatch');
         }
-        if ($header->answerCount !== count($answers)) {
+        if ($header->answerCount !== \count($answers)) {
             throw new \InvalidArgumentException('Invalid DNS response: answer count mismatch');
         }
-        if ($header->authorityCount !== count($authority)) {
+        if ($header->authorityCount !== \count($authority)) {
             throw new \InvalidArgumentException('Invalid DNS response: authority count mismatch');
         }
-        if ($header->additionalCount !== count($additional)) {
+        if ($header->additionalCount !== \count($additional)) {
             throw new \InvalidArgumentException('Invalid DNS response: additional count mismatch');
         }
-        $soaAuthorityCount = count(array_filter(
+        $soaAuthorityCount = \count(array_filter(
             $this->authority,
-            fn ($record) => $record->type === Record::TYPE_SOA
+            fn(\Utopia\DNS\Message\Record $record): bool => $record->type === Record::TYPE_SOA,
         ));
 
         // TC=1 signals an incomplete response, so NODATA/NXDOMAIN invariants
@@ -73,7 +73,7 @@ final class Message
     public static function query(
         Question $question,
         ?int $id = null,
-        bool $recursionDesired = true
+        bool $recursionDesired = true,
     ): self {
         if ($id === null) {
             $id = random_int(0, 0xFFFF);
@@ -91,7 +91,7 @@ final class Message
             questionCount: 1,
             answerCount: 0,
             authorityCount: 0,
-            additionalCount: 0
+            additionalCount: 0,
         );
 
         return new self($header, [$question]);
@@ -120,7 +120,7 @@ final class Message
         array $additional = [],
         bool $authoritative = false,
         bool $truncated = false,
-        bool $recursionAvailable = false
+        bool $recursionAvailable = false,
     ): self {
         $header = new Header(
             id: $header->id,
@@ -131,10 +131,10 @@ final class Message
             recursionDesired: $header->recursionDesired,
             recursionAvailable: $recursionAvailable,
             responseCode: $responseCode,
-            questionCount: count($questions),
-            answerCount: count($answers),
-            authorityCount: count($authority),
-            additionalCount: count($additional)
+            questionCount: \count($questions),
+            answerCount: \count($answers),
+            authorityCount: \count($authority),
+            additionalCount: \count($additional),
         );
 
 
@@ -143,7 +143,7 @@ final class Message
 
     public static function decode(string $packet): self
     {
-        if (strlen($packet) < Header::LENGTH) {
+        if (\strlen($packet) < Header::LENGTH) {
             throw new DecodingException('Invalid DNS response: header too short');
         }
 
@@ -176,7 +176,7 @@ final class Message
                 $additional[] = Record::decode($packet, $offset);
             }
 
-            if ($offset !== strlen($packet)) {
+            if ($offset !== \strlen($packet)) {
                 throw new DecodingException('Invalid packet length');
             }
         } catch (DecodingException $e) {
@@ -209,14 +209,14 @@ final class Message
         // Answers: include as many complete records as fit (partial allowed).
         $answerCount = 0;
         foreach ($this->answers as $answer) {
-            $encoded = $answer->encode($packet);
-            if ($maxSize !== null && strlen($packet) + strlen($encoded) > $maxSize) {
+            $encoded = $answer->encode();
+            if ($maxSize !== null && \strlen($packet) + \strlen($encoded) > $maxSize) {
                 break;
             }
             $packet .= $encoded;
             $answerCount++;
         }
-        $answersTruncated = $answerCount < count($this->answers);
+        $answersTruncated = $answerCount < \count($this->answers);
 
         // Authority then additional: all-or-nothing, and only once answers all fit.
         // Order matches RFC 1035 Section 6.2 (drop additional before authority).
@@ -224,22 +224,22 @@ final class Message
         $additionalCount = 0;
         if (!$answersTruncated) {
             $withAuthority = $this->appendRecords($packet, $this->authority);
-            if ($maxSize === null || strlen($withAuthority) <= $maxSize) {
+            if ($maxSize === null || \strlen($withAuthority) <= $maxSize) {
                 $packet = $withAuthority;
-                $authorityCount = count($this->authority);
+                $authorityCount = \count($this->authority);
 
                 $withAdditional = $this->appendRecords($packet, $this->additional);
-                if ($maxSize === null || strlen($withAdditional) <= $maxSize) {
+                if ($maxSize === null || \strlen($withAdditional) <= $maxSize) {
                     $packet = $withAdditional;
-                    $additionalCount = count($this->additional);
+                    $additionalCount = \count($this->additional);
                 }
             }
         }
 
-        $sectionsUnchanged =
-            $answerCount === count($this->answers)
-            && $authorityCount === count($this->authority)
-            && $additionalCount === count($this->additional);
+        $sectionsUnchanged
+            = $answerCount === \count($this->answers)
+            && $authorityCount === \count($this->authority)
+            && $additionalCount === \count($this->additional);
 
         if ($sectionsUnchanged) {
             return $packet;
@@ -250,7 +250,7 @@ final class Message
         // Use the original message's intent (not post-truncation counts): a
         // TC=1 response that merely encoded zero answers isn't NODATA — the
         // client will retry over TCP and the AA claim remains accurate.
-        $authorityDropped = $authorityCount < count($this->authority);
+        $authorityDropped = $authorityCount < \count($this->authority);
         $isNodataOrNxdomain = ($this->header->responseCode === self::RCODE_NOERROR && $this->answers === [])
             || $this->header->responseCode === self::RCODE_NXDOMAIN;
         $authoritative = ($authorityDropped && $isNodataOrNxdomain)
@@ -269,7 +269,7 @@ final class Message
             recursionDesired: $this->header->recursionDesired,
             recursionAvailable: $this->header->recursionAvailable,
             responseCode: $this->header->responseCode,
-            questionCount: count($this->questions),
+            questionCount: \count($this->questions),
             answerCount: $answerCount,
             authorityCount: $authorityCount,
             additionalCount: $additionalCount,
@@ -300,7 +300,7 @@ final class Message
     private function appendRecords(string $packet, array $records): string
     {
         foreach ($records as $record) {
-            $packet .= $record->encode($packet);
+            $packet .= $record->encode();
         }
         return $packet;
     }

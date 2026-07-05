@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS\Message;
 
 use PHPUnit\Framework\TestCase;
@@ -40,7 +42,7 @@ final class QuestionTest extends TestCase
         $this->assertSame('api.example.com', $question->name);
         $this->assertSame(Record::TYPE_AAAA, $question->type);
         $this->assertSame(Record::CLASS_IN, $question->class);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testDecodeHandlesCompressionPointer(): void
@@ -59,7 +61,7 @@ final class QuestionTest extends TestCase
         $this->assertSame('first.example.com', $parsedSecond->name);
         $this->assertSame(Record::TYPE_AAAA, $parsedSecond->type);
         $this->assertSame(Record::CLASS_IN, $parsedSecond->class);
-        $this->assertSame(strlen($message), $offset);
+        $this->assertSame(\strlen($message), $offset);
     }
 
     public function testConstructorTrimsWhitespaceFromName(): void

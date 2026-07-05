@@ -49,17 +49,17 @@ class Native extends Adapter
         protected int $maxTcpClients = 100,
         protected int $maxTcpBufferSize = 16384,
         protected int $maxTcpFrameSize = 65535,
-        protected int $tcpIdleTimeout = 30
+        protected int $tcpIdleTimeout = 30,
     ) {
 
-        $server = \socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        $server = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$server) {
             throw new Exception('Could not start server.');
         }
         $this->udpServer = $server;
 
         if ($this->enableTcp) {
-            $tcp = \socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+            $tcp = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
             if (!$tcp) {
                 throw new Exception('Could not start TCP server.');
             }
@@ -81,7 +81,6 @@ class Native extends Adapter
     }
 
     /**
-     * @param callable $callback
      * @phpstan-param callable(string $buffer, string $ip, int $port, ?int $maxResponseSize):string $callback
      */
     public function onPacket(callable $callback): void
@@ -94,16 +93,16 @@ class Native extends Adapter
      */
     public function start(): void
     {
-        if (socket_bind($this->udpServer, $this->host, $this->port) == false) {
+        if (socket_bind($this->udpServer, $this->host, $this->port) === false) {
             throw new Exception('Could not bind server to a server.');
         }
 
-        if ($this->tcpServer) {
-            if (socket_bind($this->tcpServer, $this->host, $this->port) == false) {
+        if ($this->tcpServer instanceof \Socket) {
+            if (socket_bind($this->tcpServer, $this->host, $this->port) === false) {
                 throw new Exception('Could not bind TCP server.');
             }
 
-            if (socket_listen($this->tcpServer, 128) == false) {
+            if (socket_listen($this->tcpServer, 128) === false) {
                 throw new Exception('Could not listen on TCP server.');
             }
 
@@ -121,7 +120,7 @@ class Native extends Adapter
 
             $readSockets = [$this->udpServer];
 
-            if ($this->tcpServer) {
+            if ($this->tcpServer instanceof \Socket) {
                 $readSockets[] = $this->tcpServer;
             }
 
@@ -134,8 +133,10 @@ class Native extends Adapter
 
             // Use 1 second timeout for socket_select to periodically check idle connections
             $changed = socket_select($readSockets, $write, $except, 1);
-
-            if ($changed === false || $changed === 0) {
+            if ($changed === false) {
+                continue;
+            }
+            if ($changed === 0) {
                 continue;
             }
 
@@ -146,22 +147,22 @@ class Native extends Adapter
                     $port = 0;
                     $len = socket_recvfrom($this->udpServer, $buf, 1024 * 4, 0, $ip, $port);
 
-                    if ($len > 0 && is_string($buf) && is_string($ip) && is_int($port)) {
-                        $answer = call_user_func($this->onPacket, $buf, $ip, $port, 512);
+                    if ($len > 0 && \is_string($buf) && \is_string($ip) && \is_int($port)) {
+                        $answer = \call_user_func($this->onPacket, $buf, $ip, $port, 512);
 
                         if ($answer !== '') {
-                            socket_sendto($this->udpServer, $answer, strlen($answer), 0, $ip, $port);
+                            socket_sendto($this->udpServer, $answer, \strlen($answer), 0, $ip, $port);
                         }
                     }
 
                     continue;
                 }
 
-                if ($this->tcpServer !== null && $socket === $this->tcpServer) {
+                if ($this->tcpServer instanceof \Socket && $socket === $this->tcpServer) {
                     $client = @socket_accept($this->tcpServer);
 
                     if ($client instanceof Socket) {
-                        if (count($this->tcpClients) >= $this->maxTcpClients) {
+                        if (\count($this->tcpClients) >= $this->maxTcpClients) {
                             @socket_close($client);
                             continue;
                         }
@@ -192,8 +193,6 @@ class Native extends Adapter
 
     /**
      * Get the name of the adapter
-     *
-     * @return string
      */
     public function getName(): string
     {
@@ -209,7 +208,7 @@ class Native extends Adapter
         if ($chunk === '' || $chunk === false) {
             $error = socket_last_error($client);
 
-            if ($chunk === '' || !in_array($error, [SOCKET_EAGAIN, SOCKET_EWOULDBLOCK], true)) {
+            if ($chunk === '' || !\in_array($error, [SOCKET_EAGAIN, SOCKET_EWOULDBLOCK], true)) {
                 $this->closeTcpClient($client);
             }
 
@@ -219,8 +218,8 @@ class Native extends Adapter
         // Update activity timestamp for idle timeout tracking
         $this->tcpLastActivity[$clientId] = time();
 
-        $currentBufferSize = strlen($this->tcpBuffers[$clientId] ?? '');
-        $chunkSize = strlen($chunk);
+        $currentBufferSize = \strlen($this->tcpBuffers[$clientId] ?? '');
+        $chunkSize = \strlen($chunk);
 
         if ($currentBufferSize + $chunkSize > $this->maxTcpBufferSize) {
             printf("TCP buffer size limit exceeded for client %d\n", $clientId);
@@ -230,9 +229,9 @@ class Native extends Adapter
 
         $this->tcpBuffers[$clientId] = ($this->tcpBuffers[$clientId] ?? '') . $chunk;
 
-        while (strlen($this->tcpBuffers[$clientId]) >= 2) {
+        while (\strlen($this->tcpBuffers[$clientId]) >= 2) {
             $unpacked = unpack('n', substr($this->tcpBuffers[$clientId], 0, 2));
-            $payloadLength = (is_array($unpacked) && array_key_exists(1, $unpacked) && is_int($unpacked[1])) ? $unpacked[1] : 0;
+            $payloadLength = (\is_array($unpacked) && \array_key_exists(1, $unpacked) && \is_int($unpacked[1])) ? $unpacked[1] : 0;
 
             // Close connection for invalid zero-length payloads
             if ($payloadLength === 0) {
@@ -248,7 +247,7 @@ class Native extends Adapter
                 return;
             }
 
-            if (strlen($this->tcpBuffers[$clientId]) < ($payloadLength + 2)) {
+            if (\strlen($this->tcpBuffers[$clientId]) < ($payloadLength + 2)) {
                 return;
             }
 
@@ -259,8 +258,8 @@ class Native extends Adapter
             $port = 0;
             socket_getpeername($client, $ip, $port);
 
-            if (is_string($ip) && is_int($port)) {
-                $answer = call_user_func($this->onPacket, $message, $ip, $port, self::MAX_TCP_MESSAGE_SIZE);
+            if (\is_string($ip) && \is_int($port)) {
+                $answer = \call_user_func($this->onPacket, $message, $ip, $port, self::MAX_TCP_MESSAGE_SIZE);
 
                 if ($answer !== '') {
                     $this->sendTcpResponse($client, $answer);
@@ -278,7 +277,7 @@ class Native extends Adapter
      */
     protected function sendTcpResponse(Socket $client, string $payload): void
     {
-        $payloadLength = strlen($payload);
+        $payloadLength = \strlen($payload);
 
         // RFC 1035: TCP uses 2-byte length prefix, max 65535 bytes
         if ($payloadLength > self::MAX_TCP_MESSAGE_SIZE) {
@@ -287,14 +286,14 @@ class Native extends Adapter
             printf(
                 "TCP response too large (%d bytes > %d max), dropping\n",
                 $payloadLength,
-                self::MAX_TCP_MESSAGE_SIZE
+                self::MAX_TCP_MESSAGE_SIZE,
             );
             $this->closeTcpClient($client);
             return;
         }
 
         $frame = pack('n', $payloadLength) . $payload;
-        $total = strlen($frame);
+        $total = \strlen($frame);
         $sent = 0;
 
         while ($sent < $total) {
@@ -303,7 +302,7 @@ class Native extends Adapter
             if ($written === false) {
                 $error = socket_last_error($client);
 
-                if (in_array($error, [SOCKET_EAGAIN, SOCKET_EWOULDBLOCK], true)) {
+                if (\in_array($error, [SOCKET_EAGAIN, SOCKET_EWOULDBLOCK], true)) {
                     socket_clear_error($client);
                     usleep(1000);
                     continue;

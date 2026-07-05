@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS\Validator;
 
 use Utopia\Validator;
@@ -22,20 +24,17 @@ class CAA extends Validator
 
     /**
      * Check if the provided value matches the CAA record format
-     *
-     * @param mixed $data
-     * @return bool
      */
     public function isValid(mixed $data): bool
     {
-        if (!is_string($data)) {
+        if (!\is_string($data)) {
             $this->reason = self::FAILURE_REASON_INVALID_FORMAT;
             return false;
         }
 
-        $parts = explode(" ", $data, 3);
+        $parts = explode(' ', $data, 3);
 
-        if (count($parts) !== 3) {
+        if (\count($parts) !== 3) {
             $this->reason = self::FAILURE_REASON_INVALID_FORMAT;
             return false;
         }
@@ -59,21 +58,21 @@ class CAA extends Validator
         }
 
         // Check tag is not empty
-        if (strlen($tag) === 0) {
+        if ($tag === '') {
             $this->reason = self::FAILURE_REASON_INVALID_TAG;
             return false;
         }
 
         // Check value is not empty and starts with " and ends with "
-        if (strlen($value) === 0 || $value[0] !== '"' || $value[strlen($value) - 1] !== '"') {
+        if ($value === '' || $value[0] !== '"' || $value[\strlen($value) - 1] !== '"') {
             $this->reason = self::FAILURE_REASON_INVALID_VALUE;
             return false;
         }
 
-        $value = substr($value, 1, strlen($value) - 2);
+        $value = substr($value, 1, \strlen($value) - 2);
 
         // Check value is not empty after removing the quotes
-        if (strlen($value) === 0) {
+        if ($value === '') {
             $this->reason = self::FAILURE_REASON_INVALID_VALUE;
             return false;
         }
@@ -84,7 +83,7 @@ class CAA extends Validator
 
     public function getDescription(): string
     {
-        if (!empty($this->reason)) {
+        if ($this->reason !== '' && $this->reason !== '0') {
             return $this->reason;
         }
 
@@ -95,8 +94,6 @@ class CAA extends Validator
      * Is array
      *
      * Function will return true if object is array.
-     *
-     * @return bool
      */
     public function isArray(): bool
     {
@@ -107,8 +104,6 @@ class CAA extends Validator
      * Get Type
      *
      * Returns validator type.
-     *
-     * @return string
      */
     public function getType(): string
     {

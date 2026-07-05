@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS;
 
 use PHPUnit\Framework\TestCase;
@@ -7,8 +9,8 @@ use Utopia\DNS\Message;
 use Utopia\DNS\Message\Header;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
-use Utopia\DNS\Zone\Resolver;
 use Utopia\DNS\Zone;
+use Utopia\DNS\Zone\Resolver;
 
 final class ResolverTest extends TestCase
 {
@@ -18,7 +20,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $zone = new Zone('example.com', [], $soa);
 
@@ -34,7 +36,7 @@ final class ResolverTest extends TestCase
             questionCount: 0,
             answerCount: 0,
             authorityCount: 0,
-            additionalCount: 0
+            additionalCount: 0,
         );
         $query = new Message($header, []);
 
@@ -51,7 +53,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $record = new Record('www.example.com', Record::TYPE_A, ttl: 300, rdata: '1.2.3.4');
         $zone = new Zone('example.com', [$record], $soa);
@@ -74,7 +76,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $cname = new Record('alias.example.com', Record::TYPE_CNAME, ttl: 1800, rdata: 'target.example.com');
         $zone = new Zone('example.com', [$cname], $soa);
@@ -96,7 +98,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $txtRecord = new Record('www.example.com', Record::TYPE_TXT, ttl: 600, rdata: '"hello"');
         $zone = new Zone('example.com', [$txtRecord], $soa);
@@ -120,7 +122,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $record = new Record('www.example.com', Record::TYPE_A, ttl: 300, rdata: '1.2.3.4');
         $zone = new Zone('example.com', [$record], $soa);
@@ -142,7 +144,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $wildcard = new Record('*.example.com', Record::TYPE_A, ttl: 60, rdata: '1.1.1.1');
         $zone = new Zone('example.com', [$wildcard], $soa);
@@ -165,7 +167,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $wildcard = new Record('*.example.com', Record::TYPE_CNAME, ttl: 600, rdata: 'target.example.com');
         $zone = new Zone('example.com', [$wildcard], $soa);
@@ -193,7 +195,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $aPrimary = new Record('www.example.com', Record::TYPE_A, ttl: 300, rdata: '203.0.113.10');
         $aSecondary = new Record('www.example.com', Record::TYPE_A, ttl: 180, rdata: '203.0.113.20');
@@ -208,7 +210,7 @@ final class ResolverTest extends TestCase
         $this->assertCount(2, $response->answers);
 
         // Check both records are present (order may vary due to RRSet randomization)
-        $rdatas = array_map(fn ($r) => $r->rdata, $response->answers);
+        $rdatas = array_map(fn(\Utopia\DNS\Message\Record $r): string => $r->rdata, $response->answers);
         $this->assertContains('203.0.113.10', $rdatas);
         $this->assertContains('203.0.113.20', $rdatas);
 
@@ -230,21 +232,21 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $mxPrimary = new Record(
             '*.example.com',
             Record::TYPE_MX,
             ttl: 3600,
             rdata: 'mail1.example.com',
-            priority: 10
+            priority: 10,
         );
         $mxSecondary = new Record(
             '*.example.com',
             Record::TYPE_MX,
             ttl: 3600,
             rdata: 'mail2.example.com',
-            priority: 20
+            priority: 20,
         );
         $zone = new Zone('example.com', [$mxPrimary, $mxSecondary], $soa);
 
@@ -258,8 +260,8 @@ final class ResolverTest extends TestCase
 
         // Extract priorities and rdata for order-independent comparison
         $answers = $response->answers;
-        $priorities = array_map(fn ($r) => $r->priority, $answers);
-        $rdatas = array_map(fn ($r) => $r->rdata, $answers);
+        $priorities = array_map(fn(\Utopia\DNS\Message\Record $r): ?int => $r->priority, $answers);
+        $rdatas = array_map(fn(\Utopia\DNS\Message\Record $r): string => $r->rdata, $answers);
 
         // Both records should have synthesized name
         foreach ($answers as $answer) {
@@ -280,13 +282,13 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $delegation = new Record(
             'delegated.example.com',
             Record::TYPE_NS,
             ttl: 86400,
-            rdata: 'ns1.delegated.example.com'
+            rdata: 'ns1.delegated.example.com',
         );
         $zone = new Zone('example.com', [$delegation], $soa);
 
@@ -309,7 +311,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $wildcard = new Record('*.example.com', Record::TYPE_TXT, ttl: 120, rdata: '"v=spf1 ~all"');
         $zone = new Zone('example.com', [$wildcard], $soa);
@@ -333,7 +335,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $exact = new Record('www.example.com', Record::TYPE_A, ttl: 300, rdata: '2.2.2.2');
         $wildcard = new Record('*.example.com', Record::TYPE_A, ttl: 60, rdata: '3.3.3.3');
@@ -354,7 +356,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $broadWildcard = new Record('*.example.com', Record::TYPE_A, ttl: 60, rdata: '1.1.1.1');
         $specificWildcard = new Record('*.sub.example.com', Record::TYPE_A, ttl: 60, rdata: '2.2.2.2');
@@ -379,7 +381,7 @@ final class ResolverTest extends TestCase
             'test-dns.appwrite.org',
             Record::TYPE_SOA,
             ttl: 300,
-            rdata: 'ns1-stage.appwrite.zone team.appwrite.io 1 3600 600 86400 300'
+            rdata: 'ns1-stage.appwrite.zone team.appwrite.io 1 3600 600 86400 300',
         );
 
         $zone = new Zone('test-dns.appwrite.org', [
@@ -408,7 +410,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 3600,
-            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300'
+            rdata: 'ns1.example.com hostmaster.example.com 1 7200 3600 1209600 300',
         );
         $nsRecord = new Record('delegated.example.com', Record::TYPE_NS, ttl: 3600, rdata: 'ns1.delegated.example.com');
         $zone = new Zone('example.com', [$nsRecord], $soa);
@@ -423,7 +425,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 300,
-            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300',
         );
         $nsRecord1 = new Record('example.com', Record::TYPE_NS, ttl: 3600, rdata: 'ns1-stage.appwrite.zone');
         $nsRecord2 = new Record('example.com', Record::TYPE_NS, ttl: 3600, rdata: 'ns2-stage.appwrite.zone');
@@ -449,7 +451,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 300,
-            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300',
         );
         $aRecord = new Record('example.com', Record::TYPE_A, ttl: 3600, rdata: '1.1.1.1');
         $aaaaRecord = new Record('example.com', Record::TYPE_AAAA, ttl: 3600, rdata: '2606:4700::1111');
@@ -471,7 +473,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 300,
-            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300',
         );
         $aRecord = new Record('example.com', Record::TYPE_A, ttl: 3600, rdata: '1.1.1.1');
         $zone = new Zone('example.com', [$aRecord], $soa);
@@ -493,7 +495,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 300,
-            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300',
         );
         $zone = new Zone('example.com', [], $soa);
 
@@ -514,7 +516,7 @@ final class ResolverTest extends TestCase
             'example.com',
             Record::TYPE_SOA,
             ttl: 300,
-            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300'
+            rdata: 'ns1.appwrite.zone. team@appwrite.io. 1761705275 3600 600 86400 300',
         );
         $nsRecord1 = new Record('example.com', Record::TYPE_NS, ttl: 3600, rdata: 'ns1-stage.appwrite.zone');
         $nsRecord2 = new Record('example.com', Record::TYPE_NS, ttl: 3600, rdata: 'ns2-stage.appwrite.zone');

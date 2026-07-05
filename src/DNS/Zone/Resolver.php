@@ -41,7 +41,7 @@ final readonly class Resolver
         // Step 1: Select best matching records for the query
         $records = self::selectBestRecords($query, $zone);
 
-        if (empty($records)) {
+        if ($records === []) {
             // SOA is stored separately; if querying SOA at the zone apex, return it
             if ($question->type === Record::TYPE_SOA && $question->name === $zone->name) {
                 return self::soaApexResponse($query, $zone);
@@ -81,8 +81,6 @@ final readonly class Resolver
     /**
      * Select the best matching records for a query
      *
-     * @param Message $query
-     * @param Zone $zone
      * @return list<Record>
      */
     private static function selectBestRecords(Message $query, Zone $zone): array
@@ -93,10 +91,10 @@ final readonly class Resolver
 
         $exactMatches = array_filter(
             $zone->records,
-            fn ($r) => $r->name === $question->name
+            fn(\Utopia\DNS\Message\Record $r): bool => $r->name === $question->name,
         );
 
-        if (!empty($exactMatches)) {
+        if ($exactMatches !== []) {
             return array_values($exactMatches);
         }
 
@@ -104,11 +102,11 @@ final readonly class Resolver
         // Find the closest enclosing wildcard
         $wildcardRecord = self::findClosestWildcard($question->name, $zone);
 
-        if ($wildcardRecord !== null) {
+        if ($wildcardRecord instanceof \Utopia\DNS\Message\Record) {
             // Return all records at the wildcard name
             return array_values(array_filter(
                 $zone->records,
-                fn ($r) => $r->name === $wildcardRecord->name
+                fn(\Utopia\DNS\Message\Record $r): bool => $r->name === $wildcardRecord->name,
             ));
         }
 
@@ -117,10 +115,6 @@ final readonly class Resolver
 
     /**
      * Find the closest enclosing wildcard for a query name
-     *
-     * @param string $questionName
-     * @param Zone $zone
-     * @return Record|null
      */
     private static function findClosestWildcard(string $questionName, Zone $zone): ?Record
     {
@@ -131,9 +125,10 @@ final readonly class Resolver
         // - *.example.com
 
         $parts = explode('.', $questionName);
+        $counter = \count($parts);
 
-        for ($i = 1; $i < count($parts); $i++) {
-            $wildcardName = '*.' . implode('.', array_slice($parts, $i));
+        for ($i = 1; $i < $counter; $i++) {
+            $wildcardName = '*.' . implode('.', \array_slice($parts, $i));
 
             // Check if this wildcard exists in the zone
             foreach ($zone->records as $record) {
@@ -150,9 +145,6 @@ final readonly class Resolver
      * Handle exact match case (E1, E2, E3, E4 paths)
      *
      * @param list<Record> $records
-     * @param Message $query
-     * @param Zone $zone
-     * @return Message
      */
     private static function handleExactMatch(array $records, Message $query, Zone $zone): Message
     {
@@ -170,10 +162,10 @@ final readonly class Resolver
             // Path E1: Exact match of type
             $exactTypeRecords = array_filter(
                 $records,
-                fn ($r) => $r->type === $question->type
+                fn(\Utopia\DNS\Message\Record $r): bool => $r->type === $question->type,
             );
 
-            if (!empty($exactTypeRecords)) {
+            if ($exactTypeRecords !== []) {
                 // E1: Return exact type match (randomized for load balancing)
                 return Message::response(
                     header: $query->header,
@@ -181,14 +173,14 @@ final readonly class Resolver
                     questions: $query->questions,
                     answers: self::randomizeRRSet(array_values($exactTypeRecords)),
                     authoritative: true,
-                    recursionAvailable: false
+                    recursionAvailable: false,
                 );
             }
 
             // Check for CNAME
-            $cnameRecords = array_filter($records, fn ($r) => $r->type === Record::TYPE_CNAME);
+            $cnameRecords = array_filter($records, fn(\Utopia\DNS\Message\Record $r): bool => $r->type === Record::TYPE_CNAME);
 
-            if (!empty($cnameRecords)) {
+            if ($cnameRecords !== []) {
                 // E2: CNAME exists
                 return Message::response(
                     header: $query->header,
@@ -196,7 +188,7 @@ final readonly class Resolver
                     questions: $query->questions,
                     answers: array_values($cnameRecords),
                     authoritative: true,
-                    recursionAvailable: false
+                    recursionAvailable: false,
                 );
             }
 
@@ -207,22 +199,22 @@ final readonly class Resolver
                 questions: $query->questions,
                 authority: [$zone->soa],
                 authoritative: true,
-                recursionAvailable: false
-            );
-        } else {
-            // E4: Not authoritative - referral
-            // Find NS records for delegation
-            $nsRecords = array_filter($records, fn ($r) => $r->type === Record::TYPE_NS);
-
-            return Message::response(
-                header: $query->header,
-                responseCode: Message::RCODE_NOERROR,
-                questions: $query->questions,
-                authority: array_values($nsRecords),
-                authoritative: false,
-                recursionAvailable: false
+                recursionAvailable: false,
             );
         }
+        // E4: Not authoritative - referral
+        // Find NS records for delegation
+        $nsRecords = array_filter($records, fn(\Utopia\DNS\Message\Record $r): bool => $r->type === Record::TYPE_NS);
+
+        return Message::response(
+            header: $query->header,
+            responseCode: Message::RCODE_NOERROR,
+            questions: $query->questions,
+            authority: array_values($nsRecords),
+            authoritative: false,
+            recursionAvailable: false,
+        );
+
     }
 
     /**
@@ -236,7 +228,7 @@ final readonly class Resolver
             questions: $query->questions,
             answers: [$zone->soa],
             authoritative: true,
-            recursionAvailable: false
+            recursionAvailable: false,
         );
     }
 
@@ -252,7 +244,7 @@ final readonly class Resolver
      */
     private static function randomizeRRSet(array $records): array
     {
-        if (count($records) <= 1) {
+        if (\count($records) <= 1) {
             return $records;
         }
 
@@ -267,7 +259,6 @@ final readonly class Resolver
      *
      * @param string $queryName The query name (e.g., "sub.example.com")
      * @param string $recordName The record name (e.g., "*.example.com")
-     * @return bool
      */
     private static function isWildcardMatch(string $queryName, string $recordName): bool
     {
@@ -279,18 +270,16 @@ final readonly class Resolver
         $queryParts = explode('.', $queryName);
 
         // Build the suffix that should match
-        $querySuffix = implode('.', array_slice($queryParts, 1));
+        $querySuffix = implode('.', \array_slice($queryParts, 1));
 
         return $querySuffix === $wildcardSuffix;
     }
 
     /**
-        * Handle wildcard match case (W1, W2, W3 paths)
-        *
-        * @param list<Record> $records
-        * @param Message $query
-        * @return Message
-        */
+     * Handle wildcard match case (W1, W2, W3 paths)
+     *
+     * @param list<Record> $records
+     */
     private static function handleWildcardMatch(array $records, Message $query, Zone $zone): Message
     {
         $question = $query->questions[0] ?? throw new \RuntimeException('Not reachable');
@@ -298,14 +287,14 @@ final readonly class Resolver
         // W1: Exact type match in wildcard records
         $exactTypeRecords = array_filter(
             $records,
-            fn ($r) => $r->type === $question->type
+            fn(\Utopia\DNS\Message\Record $r): bool => $r->type === $question->type,
         );
 
-        if (!empty($exactTypeRecords)) {
+        if ($exactTypeRecords !== []) {
             // Synthesize records with the query name (randomized for load balancing)
             $synthesizedRecords = array_map(
-                fn ($r) => $r->withName($question->name),
-                $exactTypeRecords
+                fn($r) => $r->withName($question->name),
+                $exactTypeRecords,
             );
 
             return Message::response(
@@ -314,18 +303,18 @@ final readonly class Resolver
                 questions: $query->questions,
                 answers: self::randomizeRRSet(array_values($synthesizedRecords)),
                 authoritative: true,
-                recursionAvailable: false
+                recursionAvailable: false,
             );
         }
 
         // Check for CNAME
-        $cnameRecords = array_filter($records, fn ($r) => $r->type === Record::TYPE_CNAME);
+        $cnameRecords = array_filter($records, fn(\Utopia\DNS\Message\Record $r): bool => $r->type === Record::TYPE_CNAME);
 
-        if (!empty($cnameRecords)) {
+        if ($cnameRecords !== []) {
             // W2: CNAME in wildcard
             $synthesizedRecords = array_map(
-                fn ($r) => $r->withName($question->name),
-                $cnameRecords
+                fn($r) => $r->withName($question->name),
+                $cnameRecords,
             );
 
             return Message::response(
@@ -334,7 +323,7 @@ final readonly class Resolver
                 questions: $query->questions,
                 answers: array_values($synthesizedRecords),
                 authoritative: true,
-                recursionAvailable: false
+                recursionAvailable: false,
             );
         }
 
@@ -345,7 +334,7 @@ final readonly class Resolver
             questions: $query->questions,
             authority: [$zone->soa],
             authoritative: true,
-            recursionAvailable: false
+            recursionAvailable: false,
         );
     }
 }

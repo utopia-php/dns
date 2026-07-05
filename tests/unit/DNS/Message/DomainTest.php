@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Utopia\DNS\Message;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Utopia\DNS\Exception\Message\DecodingException;
 use Utopia\DNS\Message\Domain;
-use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DomainTest extends TestCase
 {
@@ -20,7 +22,7 @@ final class DomainTest extends TestCase
     {
         $this->assertSame(
             Domain::encode('example.com'),
-            Domain::encode('example.com.')
+            Domain::encode('example.com.'),
         );
     }
 
@@ -42,7 +44,7 @@ final class DomainTest extends TestCase
         $decoded = Domain::decode($data, $offset);
 
         $this->assertSame('www.example.com', $decoded);
-        $this->assertSame(strlen($data), $offset);
+        $this->assertSame(\strlen($data), $offset);
     }
 
     public function testDecodeRootDomain(): void
@@ -65,11 +67,11 @@ final class DomainTest extends TestCase
         $offset = 0;
         $decoded = Domain::decode($data, $offset);
         $this->assertSame('first.example.com', $decoded);
-        $this->assertSame(strlen($first), $offset);
+        $this->assertSame(\strlen($first), $offset);
 
         $decodedPointer = Domain::decode($data, $offset);
         $this->assertSame('first.example.com', $decodedPointer);
-        $this->assertSame(strlen($first) + strlen($pointer), $offset);
+        $this->assertSame(\strlen($first) + \strlen($pointer), $offset);
     }
 
     /**
@@ -180,26 +182,23 @@ final class DomainTest extends TestCase
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return \Iterator<string, array<int, string>>
      */
-    public static function invalidDomainProvider(): array
+    public static function invalidDomainProvider(): \Iterator
     {
         $longLabel = str_repeat('a', Domain::MAX_LABEL_LEN + 1);
         $tooManyLabels = implode('.', array_fill(0, Domain::MAX_LABELS + 1, 'a'));
         $maxLabel = str_repeat('a', Domain::MAX_LABEL_LEN);
         $overLengthDomain = implode('.', [$maxLabel, $maxLabel, $maxLabel, $maxLabel]);
-
-        return [
-            'consecutive dots' => ['www..example.com', 'Domain labels must not be empty'],
-            'double trailing dot apex' => ['example..', 'Domain labels must not be empty'],
-            'double trailing dot absolute' => ['example.com..', 'Domain labels must not be empty'],
-            'at symbol label' => ['@', 'Domain label contains invalid characters'],
-            'label too long' => ["$longLabel.com", "Label too long: $longLabel"],
-            'too many labels' => [$tooManyLabels, 'Domain has too many labels: ' . (Domain::MAX_LABELS + 1)],
-            'encoded length exceeds limit' => [
-                $overLengthDomain,
-                'Encoded domain exceeds maximum length of ' . Domain::MAX_DOMAIN_NAME_LEN . ' bytes'
-            ],
+        yield 'consecutive dots' => ['www..example.com', 'Domain labels must not be empty'];
+        yield 'double trailing dot apex' => ['example..', 'Domain labels must not be empty'];
+        yield 'double trailing dot absolute' => ['example.com..', 'Domain labels must not be empty'];
+        yield 'at symbol label' => ['@', 'Domain label contains invalid characters'];
+        yield 'label too long' => ["$longLabel.com", "Label too long: $longLabel"];
+        yield 'too many labels' => [$tooManyLabels, 'Domain has too many labels: ' . (Domain::MAX_LABELS + 1)];
+        yield 'encoded length exceeds limit' => [
+            $overLengthDomain,
+            'Encoded domain exceeds maximum length of ' . Domain::MAX_DOMAIN_NAME_LEN . ' bytes',
         ];
     }
 }

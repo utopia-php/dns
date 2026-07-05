@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS;
 
 use Exception;
@@ -13,7 +15,7 @@ class Client
         protected int $timeout = 5,
         protected bool $useTcp = false,
         /** @var \Socket|null */
-        protected ?\Socket $socket = null
+        protected ?\Socket $socket = null,
     ) {
         $validator = new IP(IP::ALL); // IPv4 + IPv6
         if (!$validator->isValid($server)) {
@@ -37,10 +39,6 @@ class Client
         $this->socket = $socket;
     }
 
-    /**
-     * @param Message $message
-     * @return Message
-     */
     public function query(Message $message): Message
     {
         if ($this->useTcp) {
@@ -52,7 +50,7 @@ class Client
         }
 
         $packet = $message->encode();
-        if (socket_sendto($this->socket, $packet, strlen($packet), 0, $this->server, $this->port) === false) {
+        if (socket_sendto($this->socket, $packet, \strlen($packet), 0, $this->server, $this->port) === false) {
             throw new Exception('Failed to send data: ' . socket_strerror(socket_last_error($this->socket)));
         }
 
@@ -68,7 +66,7 @@ class Client
             throw new Exception("Failed to receive data from $this->server: $errorMessage (Error code: $error)");
         }
 
-        if (empty($data) || !is_string($data)) {
+        if (empty($data) || !\is_string($data)) {
             throw new Exception("Empty response received from $this->server:$this->port");
         }
 
@@ -85,8 +83,8 @@ class Client
         $socket = @stream_socket_client($uri, $errno, $errstr, $this->timeout, STREAM_CLIENT_CONNECT);
 
         if ($socket === false) {
-            $errCode = is_int($errno) ? $errno : 0;
-            $errMsg = is_string($errstr) ? $errstr : 'Unknown error';
+            $errCode = \is_int($errno) ? $errno : 0;
+            $errMsg = \is_string($errstr) ? $errstr : 'Unknown error';
             throw new Exception("Failed to connect to {$this->server}:{$this->port} over TCP: $errMsg ($errCode)");
         }
 
@@ -94,22 +92,22 @@ class Client
             stream_set_timeout($socket, $this->timeout);
 
             $packet = $message->encode();
-            $frame = pack('n', strlen($packet)) . $packet;
+            $frame = pack('n', \strlen($packet)) . $packet;
 
             $written = fwrite($socket, $frame);
 
-            if ($written === false || $written < strlen($frame)) {
+            if ($written === false || $written < \strlen($frame)) {
                 throw new Exception('Failed to send full TCP DNS query.');
             }
 
             $lengthBytes = $this->readBytes($socket, 2);
 
-            if (strlen($lengthBytes) !== 2) {
+            if (\strlen($lengthBytes) !== 2) {
                 throw new Exception('Failed to read DNS TCP length prefix.');
             }
 
             $unpacked = unpack('nlen', $lengthBytes);
-            $length = (is_array($unpacked) && isset($unpacked['len']) && is_int($unpacked['len'])) ? $unpacked['len'] : 0;
+            $length = (\is_array($unpacked) && isset($unpacked['len']) && \is_int($unpacked['len'])) ? $unpacked['len'] : 0;
 
             if ($length === 0) {
                 throw new Exception('Received empty DNS TCP response.');
@@ -117,7 +115,7 @@ class Client
 
             $payload = $this->readBytes($socket, $length);
 
-            if (strlen($payload) !== $length) {
+            if (\strlen($payload) !== $length) {
                 throw new Exception('Incomplete DNS TCP response received.');
             }
 
@@ -140,14 +138,14 @@ class Client
 
     protected function readBytes(mixed $socket, int $length): string
     {
-        if (!is_resource($socket)) {
+        if (!\is_resource($socket)) {
             return '';
         }
 
         $data = '';
 
-        while (strlen($data) < $length) {
-            $remaining = $length - strlen($data);
+        while (\strlen($data) < $length) {
+            $remaining = $length - \strlen($data);
 
             if ($remaining <= 0) {
                 break;

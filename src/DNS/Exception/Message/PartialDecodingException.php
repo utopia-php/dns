@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\DNS\Exception\Message;
 
 use Utopia\DNS\Message;
@@ -13,7 +15,7 @@ final class PartialDecodingException extends DecodingException
     public function __construct(
         private readonly Header $header,
         string $message = '',
-        ?\Throwable $previous = null
+        ?\Throwable $previous = null,
     ) {
         parent::__construct($message, Message::RCODE_FORMERR, $previous);
     }
