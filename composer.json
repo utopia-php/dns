@@ -29,7 +29,7 @@
     "require": {
         "php": ">=8.3",
         "utopia-php/span": "3.0.*",
-        "utopia-php/telemetry": "*",
+        "utopia-php/telemetry": "^0.4",
         "utopia-php/validators": "0.*",
         "utopia-php/domains": "^2.0"
     },
