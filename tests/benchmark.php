@@ -298,7 +298,7 @@ function printSuccessStats($successCount, array $responseTimes, array $timeSerie
     $min = min($responseTimes);
     $max = max($responseTimes);
     $avg = array_sum($responseTimes) / count($responseTimes);
-    $totalRequests = $iterations * count($testCases) * count($testCases[array_key_first($testCases)]);
+    $totalRequests = $iterations * count($testCases) * count(array_first($testCases));
 
     // Calculate total test time and RPS
     $totalTime = (end($timeSeriesData)['time'] - $timeSeriesData[0]['time']) / 1000; // Convert to seconds

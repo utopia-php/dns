@@ -55,15 +55,6 @@ final readonly class Zone
         if ($name === $this->name) {
             return true;
         }
-
-        // If NS records exist for a child zone, we're not authoritative
-        foreach ($this->records as $record) {
-            if ($record->name === $name && $record->type === Record::TYPE_NS) {
-                // This is a delegation point
-                return false;
-            }
-        }
-
-        return true;
+        return array_all($this->records, fn(\Utopia\DNS\Message\Record $record): bool => $record->name !== $name || $record->type !== Record::TYPE_NS);
     }
 }
