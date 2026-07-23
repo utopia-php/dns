@@ -13,7 +13,8 @@
     "minimum-stability": "stable",
     "scripts": {
         "test": "phpunit --configuration phpunit.xml --testsuite unit",
-        "test:e2e": "phpunit --configuration phpunit.xml --testsuite e2e"
+        "test:e2e": "phpunit --configuration phpunit.xml --testsuite e2e",
+        "bench": "bash tests/bench/run.sh"
     },
     "authors": [
         {
@@ -28,7 +29,7 @@
     },
     "require": {
         "php": ">=8.5",
-        "utopia-php/span": "3.0.*",
+        "ext-sockets": "*",
         "utopia-php/telemetry": "^0.4",
         "utopia-php/validators": "0.3.*",
         "utopia-php/domains": "^2.0"
@@ -41,5 +42,8 @@
             "php-http/discovery": true,
             "tbachert/spi": true
         }
+    },
+    "suggest": {
+        "ext-swoole": "Required by the Swoole adapter"
     }
 }

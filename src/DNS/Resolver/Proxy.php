@@ -6,6 +6,7 @@ namespace Utopia\DNS\Resolver;
 
 use Utopia\DNS\Client;
 use Utopia\DNS\Message;
+use Utopia\DNS\Query;
 use Utopia\DNS\Resolver;
 
 class Proxy implements Resolver
@@ -26,16 +27,8 @@ class Proxy implements Resolver
     /**
      * Resolve DNS Record by proxying to another DNS server
      */
-    public function resolve(Message $query): Message
+    public function resolve(Query $query): Message
     {
-        return $this->client->query($query);
-    }
-
-    /**
-     * Get the name of the resolver
-     */
-    public function getName(): string
-    {
-        return "Proxy ($this->server:$this->port)";
+        return $this->client->query($query->message);
     }
 }

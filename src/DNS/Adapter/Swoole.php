@@ -2,52 +2,75 @@
 
 namespace Utopia\DNS\Adapter;
 
+use Exception;
+use Swoole\Http\Server as HttpServer;
 use Swoole\Runtime;
 use Swoole\Server;
 use Swoole\Server\Port;
 use Utopia\DNS\Adapter;
+use Utopia\DNS\Adapter\Swoole\Http;
+use Utopia\DNS\Adapter\Swoole\Transport;
+use Utopia\DNS\Protocol;
 
+/**
+ * Composes one or more Swoole transports onto a single Swoole server,
+ * sharing one process and worker pool. UDP and TCP transports can bind
+ * the same port number; each HTTP transport needs its own TCP port.
+ */
 class Swoole extends Adapter
 {
-    /**
-     * Maximum DNS TCP message size per RFC 1035 Section 4.2.2
-     * TCP uses 2-byte length prefix, so max payload is 65535 bytes
-     */
-    public const int MAX_TCP_MESSAGE_SIZE = 65535;
-
     protected Server $server;
 
-    protected ?Port $tcpPort = null;
+    /** @var list<array{Transport, Server|Port}> */
+    protected array $listeners = [];
 
-    /** @var callable(string $buffer, string $ip, int $port, ?int $maxResponseSize): string */
-    protected mixed $onPacket;
-
+    /**
+     * @param list<Transport> $transports
+     * @param int $idleTimeout Seconds before idle TCP connections are closed (RFC 7766)
+     */
     public function __construct(
-        protected string $host = '0.0.0.0',
-        protected int $port = 53,
-        protected int $numWorkers = 1,
+        array $transports,
+        protected int $workers = 1,
         protected int $maxCoroutines = 3000,
-        protected bool $enableTcp = true,
+        protected int $idleTimeout = 30,
     ) {
-        $this->server = new Server($this->host, $this->port, SWOOLE_PROCESS, SWOOLE_SOCK_UDP);
-        $this->server->set([
-            'worker_num' => $this->numWorkers,
+        if ($transports === []) {
+            throw new Exception('At least one transport is required.');
+        }
+
+        // HTTP request events are only dispatched by Swoole\Http\Server,
+        // so an HTTP transport must provide the master listener.
+        usort($transports, fn(Transport $a, Transport $b): int => ($b instanceof Http) <=> ($a instanceof Http));
+
+        $master = $transports[0];
+        $this->server = $master instanceof Http
+            ? new HttpServer($master->host, $master->port, SWOOLE_PROCESS, $master->getSockType())
+            : new Server($master->host, $master->port, SWOOLE_PROCESS, $master->getSockType());
+
+        $this->server->set($master->getSettings() + [
+            'worker_num' => $this->workers,
             'max_coroutine' => $this->maxCoroutines,
+            // RFC 7766 Section 6.2.3: close idle TCP connections so slow
+            // clients cannot hold per-connection buffers open indefinitely
+            'heartbeat_idle_time' => $this->idleTimeout,
+            'heartbeat_check_interval' => max(1, intdiv($this->idleTimeout, 3)),
         ]);
 
-        if ($this->enableTcp) {
-            $port = $this->server->addListener($this->host, $this->port, SWOOLE_SOCK_TCP);
+        $this->listeners[] = [$master, $this->server];
 
-            if ($port instanceof Port) {
-                $this->tcpPort = $port;
-                $this->tcpPort->set([
-                    'open_length_check' => true,
-                    'package_length_type' => 'n',
-                    'package_length_offset' => 0,
-                    'package_body_offset' => 2,
-                    'package_max_length' => 65537,
-                ]);
+        foreach (\array_slice($transports, 1) as $transport) {
+            $port = $this->server->addListener($transport->host, $transport->port, $transport->getSockType());
+
+            if (!$port instanceof Port) {
+                throw new Exception(\sprintf('Could not listen on %s:%d.', $transport->host, $transport->port));
             }
+
+            $settings = $transport->getSettings();
+            if ($settings !== []) {
+                $port->set($settings);
+            }
+
+            $this->listeners[] = [$transport, $port];
         }
     }
 
@@ -66,46 +89,12 @@ class Swoole extends Adapter
     }
 
     /**
-     * @phpstan-param callable(string $buffer, string $ip, int $port, ?int $maxResponseSize):string $callback
+     * @phpstan-param callable(string $buffer, string $ip, int $port, Protocol $protocol): string $callback
      */
     public function onPacket(callable $callback): void
     {
-        $this->onPacket = $callback;
-
-        // UDP handler - enforces 512-byte limit per RFC 1035
-        $this->server->on('Packet', function ($server, $data, $clientInfo): void {
-            if (!\is_string($data) || !\is_array($clientInfo)) {
-                return;
-            }
-
-            $ip = \is_string($clientInfo['address'] ?? null) ? $clientInfo['address'] : '';
-            $port = \is_int($clientInfo['port'] ?? null) ? $clientInfo['port'] : 0;
-
-            $response = \call_user_func($this->onPacket, $data, $ip, $port, 512);
-
-            if ($response !== '' && $server instanceof Server) {
-                $server->sendto($ip, $port, $response);
-            }
-        });
-
-        // TCP handler - supports larger responses with length-prefixed framing per RFC 5966
-        if ($this->tcpPort instanceof Port) {
-            $this->tcpPort->on('Receive', function (Server $server, int $fd, int $reactorId, string $data): void {
-                $info = $server->getClientInfo($fd, $reactorId);
-                if (!\is_array($info)) {
-                    return;
-                }
-
-                $payload = substr($data, 2); // strip 2-byte length prefix
-                $ip = \is_string($info['remote_ip'] ?? null) ? $info['remote_ip'] : '';
-                $port = \is_int($info['remote_port'] ?? null) ? $info['remote_port'] : 0;
-
-                $response = \call_user_func($this->onPacket, $payload, $ip, $port, self::MAX_TCP_MESSAGE_SIZE);
-
-                if ($response !== '') {
-                    $server->send($fd, pack('n', \strlen($response)) . $response);
-                }
-            });
+        foreach ($this->listeners as [$transport, $target]) {
+            $transport->attach($target, $callback);
         }
     }
 
@@ -116,13 +105,5 @@ class Swoole extends Adapter
     {
         Runtime::enableCoroutine();
         $this->server->start();
-    }
-
-    /**
-     * Get the name of the adapter
-     */
-    public function getName(): string
-    {
-        return 'swoole';
     }
 }

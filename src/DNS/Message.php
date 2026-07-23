@@ -10,6 +10,17 @@ use Utopia\DNS\Message\Record;
 
 final readonly class Message
 {
+    /**
+     * Maximum DNS message size per RFC 1035 Section 4.2.2.
+     * TCP framing uses a 2-byte length prefix, so no message may exceed 65535 bytes.
+     */
+    public const int MAX_SIZE = 65535;
+
+    /**
+     * Maximum UDP payload size per RFC 1035 Section 4.2.1 (without EDNS0).
+     */
+    public const int MAX_UDP_SIZE = 512;
+
     public const int RCODE_NOERROR = 0;
     public const int RCODE_FORMERR = 1;
     public const int RCODE_SERVFAIL = 2;

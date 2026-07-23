@@ -5,24 +5,26 @@ require __DIR__ . '/../../vendor/autoload.php';
 use Utopia\DNS\Adapter\Swoole;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Record;
+use Utopia\DNS\Query;
 use Utopia\DNS\Resolver;
 use Utopia\DNS\Server;
 use Utopia\DNS\Zone;
 use Utopia\DNS\Zone\File;
 use Utopia\DNS\Zone\Resolver as ZoneResolver;
-use Utopia\Span\Exporter;
-use Utopia\Span\Span;
-use Utopia\Span\Storage;
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) {
     return;
 }
 
-Span::setStorage(new Storage\Coroutine());
-Span::setExporters(new Exporter\Stdout());
-
 $port = (int) (getenv('PORT') ?: 5300);
-$server = new Swoole('0.0.0.0', $port);
+$httpPort = (int) (getenv('HTTP_PORT') ?: 5301);
+$proxyPort = (int) (getenv('PROXY_PORT') ?: 5302);
+$server = new Swoole([
+    new Swoole\Udp('0.0.0.0', $port),
+    new Swoole\Tcp('0.0.0.0', $port),
+    new Swoole\Http('0.0.0.0', $httpPort),
+    new Swoole\Tcp('0.0.0.0', $proxyPort, proxyProtocol: true),
+]);
 
 $records = [
     // Single A
@@ -70,12 +72,13 @@ $multiZoneResolver = new readonly class ([$appwriteZone, $localhostZone]) implem
     /** @param list<Zone> $zones */
     public function __construct(private array $zones) {}
 
-    public function resolve(Message $query): Message
+    public function resolve(Query $query): Message
     {
-        $question = $query->questions[0] ?? null;
+        $message = $query->message;
+        $question = $message->questions[0] ?? null;
         if ($question === null) {
             return Message::response(
-                header: $query->header,
+                header: $message->header,
                 responseCode: Message::RCODE_FORMERR,
                 authoritative: true,
             );
@@ -86,33 +89,22 @@ $multiZoneResolver = new readonly class ([$appwriteZone, $localhostZone]) implem
         foreach ($this->zones as $zone) {
             $zoneName = $zone->name;
             if ($queryName === $zoneName || str_ends_with($queryName, '.' . $zoneName)) {
-                return ZoneResolver::lookup($query, $zone);
+                return ZoneResolver::lookup($message, $zone);
             }
         }
 
         // No matching zone found - return NXDOMAIN with first zone's SOA
         return Message::response(
-            header: $query->header,
+            header: $message->header,
             responseCode: Message::RCODE_NXDOMAIN,
-            questions: $query->questions,
+            questions: $message->questions,
             authority: [$this->zones[0]->soa],
             authoritative: true,
         );
-    }
-
-    public function getName(): string
-    {
-        return 'multi-zone-memory';
     }
 };
 
 $dns = new Server($server, $multiZoneResolver);
 $dns->setDebug(false);
-
-$dns->onWorkerStart(function (Server $server, int $workerId): void {
-    $span = Span::init('dns.worker.start');
-    $span->set('worker.id', $workerId);
-    $span->finish();
-});
 
 $dns->start();

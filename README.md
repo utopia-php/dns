@@ -18,11 +18,11 @@ Although part of the [Utopia Framework](https://github.com/utopia-php/framework)
 composer require utopia-php/dns
 ```
 
-The library requires PHP 8.3+ with the `ext-sockets` extension. The Swoole adapter additionally needs the `ext-swoole` extension.
+The library requires PHP 8.5+ with the `ext-sockets` extension. The Swoole adapter additionally needs the `ext-swoole` extension.
 
 ## Quick start
 
-Create an authoritative DNS server by wiring an adapter (UDP socket implementation) and a resolver (how records are answered). The example below uses the native PHP socket adapter and the in-memory zone resolver.
+Create an authoritative DNS server by wiring an adapter (which transports to listen on) and a resolver (how records are answered). The example below uses the native PHP socket adapter with UDP and TCP transports and the in-memory zone resolver.
 
 ```php
 <?php
@@ -35,7 +35,10 @@ use Utopia\DNS\Resolver\Memory;
 use Utopia\DNS\Server;
 use Utopia\DNS\Zone;
 
-$adapter = new Native('0.0.0.0', 5300);
+$adapter = new Native([
+    new Native\Udp('0.0.0.0', 5300),
+    new Native\Tcp('0.0.0.0', 5300),
+]);
 
 $zone = new Zone(
     name: 'example.test',
@@ -57,7 +60,7 @@ $server->setDebug(true);
 $server->start();
 ```
 
-The server listens on both UDP and TCP port `5300` (RFC 5966) and answers queries for `example.test` from the in-memory zone. Implement the [`Utopia\DNS\Resolver`](src/DNS/Resolver.php) interface to serve records from databases, APIs, or other stores.
+The server listens on UDP and TCP port `5300` (RFC 5966) and answers queries for `example.test` from the in-memory zone. Implement the [`Utopia\DNS\Resolver`](src/DNS/Resolver.php) interface to serve records from databases, APIs, or other stores.
 
 ## Resolvers
 - `Memory`: authoritative resolver backed by a `Zone` object
@@ -67,11 +70,60 @@ The server listens on both UDP and TCP port `5300` (RFC 5966) and answers querie
 
 Resolvers can be combined with any adapter. Implementing the `Resolver` interface allows you to plug in custom logic while reusing the message encoding/decoding and telemetry tooling.
 
-## Adapters
-- `Native`: pure PHP UDP server based on `ext-sockets`
-- `Swoole`: non-blocking server built on the Swoole UDP runtime
+Resolvers receive a `Query`, which carries the decoded `Message` plus its source: the client IP, port, and transport protocol. Cross-cutting concerns such as tracing or rate limiting compose as resolver decorators:
 
-Adapters are responsible only for receiving and returning raw packets. They call back into the server with the payload, source IP, and port so your resolver logic stays isolated.
+```php
+final readonly class RateLimited implements Resolver
+{
+    public function __construct(private Resolver $inner) {}
+
+    public function resolve(Query $query): Message
+    {
+        if ($this->isFlooding($query->ip)) {
+            return Message::response($query->message->header, Message::RCODE_REFUSED, authoritative: false);
+        }
+
+        return $this->inner->resolve($query);
+    }
+}
+```
+
+Note that UDP source addresses can be forged; stream transports (`Protocol::Tcp`, `Protocol::Https`) carry verified peer addresses.
+
+## Adapters and transports
+
+An adapter composes one or more transports into a single process. Transports are responsible only for receiving and returning raw packets — they call back into the server with the payload, source IP, and port so your resolver logic stays isolated.
+
+- `Native`: blocking select loop based on `ext-sockets`, with `Native\Udp` and `Native\Tcp` transports
+- `Swoole`: non-blocking server built on the Swoole runtime, with `Swoole\Udp`, `Swoole\Tcp`, and `Swoole\Http` transports
+
+Transports of one adapter share the process and (for Swoole) the worker pool. UDP and TCP transports can bind the same port number; each HTTP transport needs its own TCP port:
+
+```php
+use Utopia\DNS\Adapter\Swoole;
+
+$adapter = new Swoole(
+    transports: [
+        new Swoole\Udp('0.0.0.0', 53),
+        new Swoole\Tcp('0.0.0.0', 53),
+        new Swoole\Http('0.0.0.0', 443, certPath: '/etc/ssl/dns.crt', keyPath: '/etc/ssl/dns.key'),
+    ],
+    workers: 4,
+);
+```
+
+`Swoole\Http` implements DNS over HTTPS (RFC 8484): it accepts wire-format queries via `GET` (`?dns=` base64url) and `POST` (`application/dns-message`). Leave `certPath` unset to serve plain HTTP behind a TLS-terminating proxy.
+
+### Client addresses behind load balancers
+
+Load balancers usually replace the client address with their own. The TCP transports accept a PROXY protocol v1/v2 header (as sent by DigitalOcean, AWS, or HAProxy load balancers) when constructed with `proxyProtocol: true`, and report the original client address to your resolver:
+
+```php
+new Swoole\Tcp('0.0.0.0', 53, proxyProtocol: true);
+new Native\Tcp('0.0.0.0', 53, proxyProtocol: true);
+```
+
+Only enable this behind a load balancer that sends the header — with it enabled, direct DNS clients are rejected. The HTTP transport uses `new Swoole\Http('0.0.0.0', 443, trustProxy: true)` instead, which reads the `X-Forwarded-For` header. PROXY protocol is a TCP feature: UDP transports always see the packet source address, so preserve it at the network layer (for example `externalTrafficPolicy: Local` on Kubernetes).
 
 ## DNS client
 
@@ -113,13 +165,25 @@ foreach ($response->answers as $answer) {
 
 ## Benchmarking
 
-Run the bundled benchmark tool to measure throughput against your server:
+Run `composer bench` to start a sample Swoole server and measure UDP, TCP, and DNS over HTTPS throughput against it with [dnspyre](https://github.com/Tantalor93/dnspyre) (fetched automatically when not installed; tune with the `PORT`, `QUERIES`, `CONCURRENCY`, and `DOMAINS` environment variables). To benchmark an already-running server directly:
 
 ```bash
-php tests/benchmark.php --server=127.0.0.1 --port=5300 --iterations=1000 --concurrency=20
+dnspyre -n 250 -c 20 --server 127.0.0.1:5300 dev.appwrite.io
 ```
 
-The script reports requests per second, latency distribution, and error counts across common record types.
+The report covers requests per second, success counts, and latency percentiles per transport.
+
+## Upgrading from 1.x
+
+Version 2.0 replaces per-adapter protocol flags with composable transports:
+
+- `new Native($host, $port)` → `new Native([new Native\Udp($host, $port), new Native\Tcp($host, $port)])`
+- `new Swoole($host, $port, $numWorkers)` → `new Swoole([new Swoole\Udp($host, $port), new Swoole\Tcp($host, $port)], workers: $numWorkers)`
+- `enableTcp: false` → omit the `Tcp` transport
+- TCP tuning options (`maxTcpClients`, `maxTcpBufferSize`, `maxTcpFrameSize`, `tcpIdleTimeout`) moved to the `Native\Tcp` constructor as `maxClients`, `maxBufferSize`, `maxFrameSize`, and `idleTimeout`
+- `Resolver::resolve()` now receives a `Utopia\DNS\Query` carrying the decoded message and its source (`$query->message`, `$query->ip`, `$query->port`, `$query->protocol`) instead of a bare `Message`
+- `Adapter::getName()` and `Resolver::getName()` were removed without replacement
+- The server no longer emits `utopia-php/span` traces (`dns.packet`); metrics via `Server::setTelemetry()` are unchanged. Emit spans from your `Resolver` implementation if you need tracing
 
 ## License
 

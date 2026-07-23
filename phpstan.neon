@@ -6,5 +6,4 @@ parameters:
         - vendor/swoole/ide-helper
     excludePaths:
         - tests/resources
-        - tests/benchmark.php
         - vendor

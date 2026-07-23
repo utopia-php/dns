@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
+use Utopia\DNS\Protocol;
+use Utopia\DNS\Query;
 use Utopia\DNS\Resolver\Memory;
 use Utopia\DNS\Zone;
 
@@ -31,12 +33,12 @@ final class MemoryTest extends TestCase
 
         $resolver = new Memory($zone);
 
-        $response = $resolver->resolve(Message::query(
+        $response = $resolver->resolve(new Query(Message::query(
             new Question(
                 name: 'www.example.com',
                 type: Record::TYPE_A,
             ),
-        ));
+        ), '127.0.0.1', 53, Protocol::Udp));
 
         $this->assertSame(Message::RCODE_NOERROR, $response->header->responseCode);
         $this->assertCount(1, $response->answers);
@@ -64,12 +66,12 @@ final class MemoryTest extends TestCase
 
         $resolver = new Memory($zone);
 
-        $response = $resolver->resolve(Message::query(
+        $response = $resolver->resolve(new Query(Message::query(
             new Question(
                 name: 'www.example.com',
                 type: Record::TYPE_AAAA,
             ),
-        ));
+        ), '127.0.0.1', 53, Protocol::Udp));
 
         $this->assertSame(Message::RCODE_NOERROR, $response->header->responseCode);
         $this->assertEmpty($response->answers);
@@ -95,12 +97,12 @@ final class MemoryTest extends TestCase
 
         $resolver = new Memory($zone);
 
-        $response = $resolver->resolve(Message::query(
+        $response = $resolver->resolve(new Query(Message::query(
             new Question(
                 name: 'missing.example.com',
                 type: Record::TYPE_A,
             ),
-        ));
+        ), '127.0.0.1', 53, Protocol::Udp));
 
         $this->assertSame(Message::RCODE_NXDOMAIN, $response->header->responseCode);
         $this->assertEmpty($response->answers);
@@ -126,12 +128,12 @@ final class MemoryTest extends TestCase
 
         $resolver = new Memory($zone);
 
-        $response = $resolver->resolve(Message::query(
+        $response = $resolver->resolve(new Query(Message::query(
             new Question(
                 name: 'child.www.example.com',
                 type: Record::TYPE_SOA,
             ),
-        ));
+        ), '127.0.0.1', 53, Protocol::Udp));
 
         $this->assertSame(Message::RCODE_NXDOMAIN, $response->header->responseCode);
         $this->assertEmpty($response->answers);

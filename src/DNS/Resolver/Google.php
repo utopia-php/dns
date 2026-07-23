@@ -16,13 +16,4 @@ class Google extends Proxy
     {
         parent::__construct($useBackup ? '8.8.4.4' : '8.8.8.8');
     }
-
-    /**
-     * Get the name of the resolver
-     */
-    #[\Override]
-    public function getName(): string
-    {
-        return "Google DNS ($this->server)";
-    }
 }

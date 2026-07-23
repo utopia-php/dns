@@ -16,13 +16,4 @@ class Cloudflare extends Proxy
     {
         parent::__construct($useBackup ? '1.0.0.1' : '1.1.1.1');
     }
-
-    /**
-     * Get the name of the resolver
-     */
-    #[\Override]
-    public function getName(): string
-    {
-        return "Cloudflare DNS ($this->server)";
-    }
 }

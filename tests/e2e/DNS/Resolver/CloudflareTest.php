@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Utopia\DNS\Message;
 use Utopia\DNS\Message\Question;
 use Utopia\DNS\Message\Record;
+use Utopia\DNS\Protocol;
+use Utopia\DNS\Query;
 use Utopia\DNS\Resolver\Cloudflare;
 
 final class CloudflareTest extends TestCase
@@ -16,12 +18,12 @@ final class CloudflareTest extends TestCase
     {
         $resolver = new Cloudflare();
 
-        $response = $resolver->resolve(Message::query(
+        $response = $resolver->resolve(new Query(Message::query(
             new Question(
                 name: 'google.com',
                 type: Record::TYPE_A,
             ),
-        ));
+        ), '127.0.0.1', 53, Protocol::Udp));
 
         $this->assertNotEmpty($response->answers);
         $this->assertInstanceOf(Record::class, $response->answers[0] ?? null);
@@ -36,12 +38,12 @@ final class CloudflareTest extends TestCase
     {
         $resolver = new Cloudflare();
 
-        $response = $resolver->resolve(Message::query(
+        $response = $resolver->resolve(new Query(Message::query(
             new Question(
                 name: 'google.com',
                 type: Record::TYPE_AAAA,
             ),
-        ));
+        ), '127.0.0.1', 53, Protocol::Udp));
 
         $this->assertNotEmpty($response->answers);
         $this->assertInstanceOf(Record::class, $response->answers[0] ?? null);
