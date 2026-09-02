@@ -5,10 +5,9 @@ ENV TESTING=$TESTING
 
 WORKDIR /usr/local/src/
 
-COPY composer.lock /usr/local/src/
 COPY composer.json /usr/local/src/
 
-RUN composer install --ignore-platform-reqs --optimize-autoloader \
+RUN composer update --ignore-platform-reqs --optimize-autoloader \
     --no-plugins --no-scripts --prefer-dist
 
 FROM appwrite/base:0.11.3 AS final
